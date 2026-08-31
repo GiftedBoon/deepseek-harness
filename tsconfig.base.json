@@ -281,6 +281,8 @@
       "@deepseek-ai/dsh-bash-sandbox/invariant": ["./packages/shell/bash-sandbox/src/invariant.ts"],
       "@deepseek-ai/dsh-brand": ["./packages/util/brand/src"],
       "@deepseek-ai/dsh-brand/invariant": ["./packages/util/brand/src/invariant.ts"],
+      "@deepseek-ai/dsh-channel-wecom": ["./packages/channel/channel-wecom/src"],
+      "@deepseek-ai/dsh-channel-wecom/invariant": ["./packages/channel/channel-wecom/src/invariant.ts"],
       "@deepseek-ai/dsh-cmdline": ["./packages/boot/cmdline/src"],
       "@deepseek-ai/dsh-cmdline/invariant": ["./packages/boot/cmdline/src/invariant.ts"],
       "@deepseek-ai/dsh-code-runtime": ["./packages/code-runtime/code-runtime/src"],

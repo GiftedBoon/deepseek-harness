@@ -31,6 +31,7 @@ packages/    @deepseek-ai/dsh-<pkg> workspaces at packages/<group>/<pkg>/
   bundle/      installable dsh --profile patch-layer bundles
   workflow/    workflow capability + worker-thread provider + tool Consumer
   webhook/     webhook ingress
+  channel/     enterprise messaging
   todo/        todo_write tool
   plan/        plan mode as logged state
   preset/      per-session agent composition from preset cordis.yml files
@@ -46,7 +47,7 @@ packages/    @deepseek-ai/dsh-<pkg> workspaces at packages/<group>/<pkg>/
   boot/        shared profile/application boot glue
   sdk/         JSON-RPC protocol + TypeScript client/server
   examples/    reusable composition bundles (agent-spine)
-  experimental/ private prototypes excluded from official releases
+  experimental/ private prototypes
   support/     dev/test infrastructure
   util/        zero-dependency utilities
 python/      Python SDK and bundled runtime (see python/README.md)

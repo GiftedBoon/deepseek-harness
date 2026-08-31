@@ -406,6 +406,79 @@ Depends on: [`LocalConfig`](#deepseek-aidsh-bash-local)
 
 Source: [`packages/shell/bash-sandbox/src/index.ts:35`](../packages/shell/bash-sandbox/src/index.ts)
 
+<a id="deepseek-aidsh-channel-wecom"></a>
+
+## `@deepseek-ai/dsh-channel-wecom`
+
+Requires: `agents` · `agentDefaultModel` · `agentPresets` · `credentials` · `permissionPresets` · `sessionPersistence` · `sessions` · `sessionTitle` · `storageDomain` · `workspaceRegistry`
+
+```ts config-catalog
+/** Enterprise WeCom channel configuration. */
+export interface Config {
+  /** Enterprise WeCom intelligent-bot id. */
+  botId: string
+  /** Credential reference containing the bot secret. */
+  secretEnv: string
+  /** Credential reference containing the stable HMAC identity key. */
+  sessionKeyEnv: string
+  /** Existing absolute directory owned by every mapped Session. */
+  workspacePath: string
+  /** Agent preset mounted for each delivery activation. */
+  agentPreset: string
+  /** Confined, noninteractive permission preset applied to mapped Sessions. */
+  permissionPreset: string
+  /** Whether a group owns one Session or one Session per sender. */
+  groupConversationMode?: GroupConversationMode
+  /** Exact admitted sender ids, with `*` as an explicit wildcard. */
+  allowedUsers: string[]
+  /** Exact admitted group ids, with `*` as an explicit wildcard. */
+  allowedChats: string[]
+  /** Prefix used for newly created Session titles. */
+  sessionTitlePrefix?: string
+  /** Maximum wait for the first successful SDK authentication. */
+  connectTimeoutMs?: number
+  /** Minimum delay used to coalesce cumulative stream updates. */
+  streamFlushIntervalMs?: number
+  /** Maximum inbound text length measured as UTF-8 bytes. */
+  maxInputBytes?: number
+  /** Maximum outbound text length measured as UTF-8 bytes. */
+  maxReplyBytes?: number
+  /** Maximum wait for the correlated Agent turn to end. */
+  turnTimeoutMs?: number
+  /** Age after which delivery deduplication records are removed. */
+  deliveryRetentionMs?: number
+  /** Maximum retained delivery deduplication records. */
+  maxDeliveryRecords?: number
+  /** Interval between active-send outbox retry passes. */
+  outboxRetryIntervalMs?: number
+  /** Failed active sends allowed before an outbox item is dropped. */
+  maxOutboxAttempts?: number
+  /** Operator-localized text sent by channel-owned states. */
+  messages: ChannelMessages
+}
+
+/** Supported conversation ownership for group messages. */
+export type GroupConversationMode = 'shared' | 'per-user'
+
+/** Operator-owned user-visible channel messages. */
+export interface ChannelMessages {
+  /** Placeholder sent before the first model delta. */
+  processing: string
+  /** Final text after the Agent turn exceeds its deadline. */
+  timeout: string
+  /** Final text after another processing failure. */
+  failure: string
+  /** Final text when a successful turn emitted no visible text. */
+  emptyReply: string
+  /** Reply for a frame that fails admission. */
+  unauthorized: string
+  /** Reply while the same delivery id is already processing. */
+  duplicate: string
+}
+```
+
+Source: [`packages/channel/channel-wecom/src/config.ts:23`](../packages/channel/channel-wecom/src/config.ts)
+
 <a id="deepseek-aidsh-client-connection"></a>
 
 ## `@deepseek-ai/dsh-client-connection`

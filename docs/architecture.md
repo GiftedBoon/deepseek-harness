@@ -60,6 +60,7 @@ Here are some core packages that contribute to the Cordis tree.
 | [`core/scope`](subsystems/scope.md) | The per-agent scoped-registration primitive | library, no key |
 | [`llm/llm`](subsystems/llm-streaming.md) | Message and stream vocabulary plus the adapter seam | `ctx.llm` |
 | [`webhook/webhook`](subsystems/webhook.md) | Authenticated-delivery dispatch and Workspace Session creation | `ctx.webhookRuntime` |
+| [`channel/channel-wecom`](../packages/channel/channel-wecom/README.md) | Enterprise WeCom conversation identity, Agent driving, and reply projection | function plugin; no key |
 
 ## Events
 
@@ -130,6 +131,7 @@ New behavior attaches to a documented extension point. Changing the loop itself 
 | Add a human command | register on `ctx.commands`; it dispatches without a model turn |
 | Add background work | register on `ctx.jobs`; `job_*` tools collect or stop it |
 | Start a Session from an external webhook | register a trusted rule on `ctx.webhookRuntime` and mount a provider adapter |
+| Drive a persistent Session from enterprise WeCom | mount `dsh-channel-wecom` in a long-lived profile with a noninteractive confined permission preset |
 | Add filesystem access or policy | register a `ctx.fs` provider or listen to `fs/*` events |
 | Confine spawned processes | use a `ctx.sandbox` backend; consumers wrap argv before spawning |
 | Intercept a request, tool, or turn | use its `agent/*` or `tools/*` event; `agent/turn-stopping` stops a turn |

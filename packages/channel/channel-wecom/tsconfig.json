@@ -1,0 +1,25 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types"
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../llm/llm" },
+    { "path": "../../core/session" },
+    { "path": "../../core/agent" },
+    { "path": "../../core/agent-default-model" },
+    { "path": "../../preset/agent-presets" },
+    { "path": "../../credentials/credentials" },
+    { "path": "../../interaction/permission-presets" },
+    { "path": "../../session/session-persistence" },
+    { "path": "../../session/session-title" },
+    { "path": "../../storage/storage-domain" },
+    { "path": "../../workspace/workspace" },
+    { "path": "../../runtime-diagnostics/invariants" }
+  ]
+}

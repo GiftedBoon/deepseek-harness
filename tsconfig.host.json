@@ -265,6 +265,7 @@
     { "path": "./packages/runtime-diagnostics/invariants" },
     { "path": "./packages/test-support/agent-loop-testkit" },
     { "path": "./packages/acp/acp" },
+    { "path": "./packages/channel/channel-wecom" },
     { "path": "./packages/bundle/acp-app" },
     { "path": "./packages/bundle/base" },
     { "path": "./packages/bundle/headless" },
