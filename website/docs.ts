@@ -136,7 +136,7 @@ const homeAndGuide = pairedPages([
     label: { root: '在 Linux 上部署企业微信', en: 'Deploy WeCom on Linux' },
     sidebar: { root: 'zh-guide', en: 'en-guide' },
     section: { root: '集成', en: 'Integrations' },
-    order: 1,
+    order: 2,
   },
   {
     source: 'docs/user/guide/python-sdk.md',

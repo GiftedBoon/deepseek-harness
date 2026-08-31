@@ -8,7 +8,12 @@ const sdk = vi.hoisted(() => {
     connected = 0
     disconnected = 0
 
-    constructor(readonly options: { logger: Record<string, (...args: unknown[]) => void> }) {
+    constructor(readonly options: { logger: {
+      debug: (...args: unknown[]) => void
+      info: (...args: unknown[]) => void
+      warn: (...args: unknown[]) => void
+      error: (...args: unknown[]) => void
+    } }) {
       state.instances.push(this)
     }
 
@@ -115,7 +120,7 @@ describe('OfficialWeComClient', () => {
     const { adapter, client } = harness()
     const texts: unknown[] = []
     const authenticated = vi.fn()
-    const offText = adapter.onText(frame => { texts.push(frame) })
+    const offText = adapter.onText((frame) => { texts.push(frame) })
     const offAuthenticated = adapter.onAuthenticated(authenticated)
     const frame = { body: { text: { content: 'hello' } } }
     client.emit('message.text', frame)

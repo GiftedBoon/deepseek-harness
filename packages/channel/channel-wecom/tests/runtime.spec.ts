@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ResolvedConfig } from '../src/config.ts'
 import { conversationIdentity, deliveryIdentity } from '../src/identity.ts'
 import { WeComChannelRuntime } from '../src/runtime.ts'
@@ -234,7 +235,7 @@ function harness(options: {
     domain: domain as never,
     identitySecret: 'identity',
     workspace: workspace as never,
-    modelSelection: { provider: 'provider', model: 'model', reasoningEffort: 'high' },
+    modelSelection: { provider: 'provider', model: 'model', reasoningEffort: ReasoningEffortId('high') },
     persisted: persisted as never,
   })
   runtimes.push(runtime)

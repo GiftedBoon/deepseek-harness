@@ -31,6 +31,8 @@ The channel family connects authenticated enterprise messaging transports to ord
 
 Channels are protocol drivers rather than model-facing tools. They activate regular Agents and project only correlated visible assistant text back to the provider.
 
+- [Core subsystem](../../docs/subsystems/core.md) — Agent creation, Session lifecycle, model routing, and the event flow that channels drive.
+
 <a id="dev-note"></a>
 ## Dev Note
 

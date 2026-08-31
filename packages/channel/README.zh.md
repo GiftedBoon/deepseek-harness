@@ -31,6 +31,8 @@ Channel 系列把经过身份验证的企业消息传输连接到普通 Workspac
 
 渠道是协议驱动器，而不是模型工具。它们激活普通 Agent，并且只把已关联的可见 assistant 文本投影回提供方。
 
+- [Core 子系统](../../docs/subsystems/core.zh.md) — 渠道驱动的 Agent 创建、Session 生命周期、模型路由和事件流程。
+
 <a id="dev-note"></a>
 ## 开发备注
 
