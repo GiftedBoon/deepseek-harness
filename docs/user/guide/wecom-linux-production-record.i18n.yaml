@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/user/guide/wecom-linux-production-record.md
+wecom-linux-production-record.md: ba9bbd0c88ded0d7cdec3d2a3c6979e31fc8b511
+wecom-linux-production-record.zh.md: 3c23c50f79b9b54861320c34e820fbe87649ea73
