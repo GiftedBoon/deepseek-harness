@@ -8,7 +8,7 @@ English | [中文](wecom-linux-production-record.zh.md)
 
 ## Summary
 
-This page records the WeCom Harness deployment completed on host `debian` on 2026-09-01. The service starts from a fixed Git tag and uses a dedicated system account, persistent data directory, confined workspace, root-owned credential file, and systemd supervision. The record contains no BotID, WeCom user or chat ID, API key, bot secret, Session key, or Web administration token. The [WeCom Linux deployment guide](wecom-linux-deployment.md) remains authoritative for the general procedure and configuration fields.
+This page records the WeCom Harness deployment completed on host `debian` on 2026-09-01. The service starts from a fixed Git tag and uses a dedicated system account, persistent data directory, confined workspace, root-owned credential file, systemd supervision, and an internal Nginx entry point with password login. The record contains no BotID, WeCom user or chat ID, API key, bot secret, Session key, Web login password, or launch token. The [WeCom Linux deployment guide](wecom-linux-deployment.md) remains authoritative for the general procedure and configuration fields.
 
 ## Table of Contents
 
@@ -18,6 +18,7 @@ This page records the WeCom Harness deployment completed on host `debian` on 202
 - [Profile configuration](#profile-configuration)
 - [Credentials and model](#credentials-and-model)
 - [systemd service](#systemd-service)
+- [Internal Web access](#internal-web-access)
 - [Acceptance results](#acceptance-results)
 - [Open items](#open-items)
 - [Routine operations](#routine-operations)
@@ -90,14 +91,14 @@ The channel dependency uses a local link into the release directory. An upgrade 
 
 The copied `standard` preset uses a fixed unattended persona and disables `@deepseek-ai/dsh-tool-ask-user`. The channel uses the `wecom-channel` permission preset with the `workspace-write` sandbox and `never` approval mode; it must not use `danger-full-access`.
 
-`cordis.patch.yml` disables `modules` and `client-hmr`, loads only the copied system-trust preset root, and mounts `@deepseek-ai/dsh-channel-wecom`. The channel uses one exact user allowlist, an empty chat allowlist, `per-user` group conversation mode, and the `/srv/dsh-workspace` workspace.
+`cordis.patch.yml` disables `client-hmr`, loads only the copied system-trust preset root, and mounts `@deepseek-ai/dsh-channel-wecom`. The channel uses one exact user allowlist, an empty chat allowlist, `per-user` group conversation mode, and the `/srv/dsh-workspace` workspace. The Web application includes the plugin-management module.
 
-The Web server binds only to loopback. `web-runtime` sets `openBrowser: false`, `printUrl: false`, `surfaceContext: false`, and an empty `trustedHosts`, so the unattended service does not write the administration URL token to new startup logs or add the Web UI address to model context.
+The DSH Web server binds only to loopback. `web-runtime` sets `openBrowser: false`, `printUrl: false`, `surfaceContext: false`, and trusts only `192.168.3.213:9000`, so the unattended service does not write the launch-token URL to new startup logs or add the Web UI address to model context. Connection applies the same trusted authority and enables the `trader` form account through the `DSH_WEB_LOGIN_PASSWORD` credential reference.
 
 <a id="credentials-and-model"></a>
 ## Credentials and model
 
-The credential file contains only `DEEPSEEK_API_KEY`, `WECOM_BOT_SECRET`, and a newly generated high-entropy `WECOM_SESSION_KEY`. This record does not store their values or lengths.
+The credential file contains `DEEPSEEK_API_KEY`, `WECOM_BOT_SECRET`, a high-entropy `WECOM_SESSION_KEY`, and `DSH_WEB_LOGIN_PASSWORD`. This record does not store their values or lengths.
 
 The deployment uses the `deepseek-official` provider and the default `deepseek-v4-flash` model. A real headless request returned `MODEL-OK`, which proves that the model credential and outbound request path work.
 
@@ -110,7 +111,14 @@ The deployment uses the `deepseek-official` provider and the default `deepseek-v
 
 The service uses `Restart=always`, `RestartSec=10`, `TimeoutStopSec=30`, `UMask=0077`, `PrivateTmp=true`, and `ProtectSystem=strict`. Its `ReadWritePaths` contains only `/var/lib/deepseek-harness` and `/srv/dsh-workspace`.
 
-The service is enabled for `multi-user.target`. At the end of acceptance it is `active/running`, and `NRestarts=1` records the intentional SIGTERM supervision recovery test.
+The service is enabled for `multi-user.target`. After the password-login deployment it is `active/running` with `NRestarts=0` for the current activation.
+
+<a id="internal-web-access"></a>
+## Internal Web access
+
+Nginx listens on `192.168.3.213:9000` and proxies HTTP and WebSocket traffic to `127.0.0.1:3180`. The upstream port remains loopback-only. Internal users open `http://192.168.3.213:9000/`, sign in as `trader`, and receive the ordinary authority-bound browser cookie for up to 30 days. A new browser or cleared site data requires another password login; a normal DSH restart does not invalidate an unexpired cookie.
+
+The Nginx site is `/etc/nginx/sites-available/dsh-wecom`, enabled through `/etc/nginx/sites-enabled/dsh-wecom`. It limits login `POST` requests per client address to 10 per minute with a burst of 5; ordinary page and WebSocket traffic is not counted. This deployment uses plaintext HTTP on a trusted internal network and does not expose port `9000` to the public Internet.
 
 <a id="acceptance-results"></a>
 ## Acceptance results
@@ -126,7 +134,10 @@ The following results come from operations on the deployment host and in the WeC
 | Profile expansion | `pnpm dsh --profile wecom --dump-config` exited with status 0 |
 | Model request | Returned `MODEL-OK` |
 | Service health | `ActiveState=active` and `SubState=running` |
-| HTTP authentication | Unauthenticated `http://127.0.0.1:3180/` returned `401` |
+| HTTP authentication | Unauthenticated root returned `303` to `/login`; the login page returned `200`; correct credentials returned `303`; the resulting cookie returned `200` for the root page |
+| Login input bound | A declared 8,193-byte form body returned `413` |
+| Login localization | `Accept-Language: zh-CN` returned `Content-Language: zh-CN` |
+| Internal reverse proxy | `http://192.168.3.213:9000/login` returned `200` |
 | Listener scope | Port `3180` listens only on `127.0.0.1` |
 | WeCom connection | The Node process holds an established connection to `openws.work.weixin.qq.com:443` |
 | Authorized direct message | Returned the processing message and then `PROD-PONG` |
@@ -144,6 +155,7 @@ The following results come from operations on the deployment host and in the WeC
 - The unauthorized-user check requires a second WeCom identity. When a test identity is available, confirm that the channel returns the unauthorized message without starting a model turn.
 - The old BotID owner must remain stopped with automatic startup disabled; the channel has no leader election.
 - Production backups still need integration with the company's encrypted backup system. A backup must include both `/var/lib/deepseek-harness` and `/etc/deepseek-harness/wecom.env`.
+- The password-login source patch is installed in the current release directory. The next application upgrade must include the corresponding repository commit in a new immutable release instead of copying these source files forward by hand.
 
 <a id="routine-operations"></a>
 ## Routine operations
@@ -161,9 +173,17 @@ Check the service and listener state:
 
 ```sh
 sudo systemctl show dsh-wecom -p ActiveState -p SubState -p MainPID -p NRestarts
-curl -o /dev/null -s -w '%{http_code}\n' http://127.0.0.1:3180/
+curl -o /dev/null -s -w '%{http_code}\n' http://192.168.3.213:9000/login
 sudo ss -ltnp | grep ':3180'
+sudo ss -ltnp | grep ':9000'
 sudo ss -tpn | grep ':443'
+```
+
+Validate and reload the reverse proxy after editing its site:
+
+```sh
+sudo nginx -t
+sudo systemctl reload nginx
 ```
 
 After a profile change, expand the configuration before restarting the service:
@@ -199,7 +219,9 @@ Do not roll back existing data across an incompatible SQLite schema or Session f
 
 - Never commit the credential file, BotID, user or chat IDs, administration token, or real message content to Git.
 - `allowedUsers` and `allowedChats` must contain exact values and must not use the `"*"` wildcard.
-- Port `3180` must remain loopback-only and must not be exposed through a firewall or reverse proxy.
+- Port `3180` must remain loopback-only. Nginx is the only listener that exposes the Web application, on internal address `192.168.3.213:9000`.
+- Port `9000` carries the login password and bearer cookie over plaintext HTTP. Keep it on the trusted internal network; add TLS before any wider exposure.
+- Nginx must rate-limit repeated `/login` attempts because the application does not include an account lockout or attempt throttle.
 - `wecom-channel` must retain `workspace-write` or narrow to `read-only`, and it must retain `approval: never`.
 - The unattended preset must keep `tool-ask-user` disabled.
 - Only one process can own a BotID at a time.

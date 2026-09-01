@@ -2,13 +2,13 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-attachment'
-import type {} from '@deepseek-ai/dsh-credentials'
+import { credentialRef } from '@deepseek-ai/dsh-credentials'
 // Activates the webServer Context merge used below.
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { API_PATH } from './api-path.ts'
 import { bridge, DEFAULT_MAX_REQUEST_BODY_BYTES } from './http-bridge.ts'
-import { assertTrustedAuthority } from './api-request-trust.ts'
-import { BrowserAuth } from './browser-auth.ts'
+import { assertTrustedAuthority, isTrustedApiRequest } from './api-request-trust.ts'
+import { BrowserAuth, type PasswordLogin } from './browser-auth.ts'
 import { HostConnectionService } from './rpc-host.ts'
 
 export type {
@@ -77,14 +77,29 @@ export interface ConnectionConfig {
    * bind. An entry that is not a bare, canonical authority fails plugin load.
    */
   trustedHosts?: string[]
+  /** Optional browser form-login account. */
+  passwordLogin?: PasswordLoginConfig
   /** Absolute browser-session lifetime in days. Default: 30. */
   cookieMaxAgeDays?: number
   /** Maximum buffered JSON body for every `/api` request. Default: 300 MiB. */
   maxRequestBodyBytes?: number
 }
 
+/** Deployment configuration for browser password login. */
+export interface PasswordLoginConfig {
+  /** Login name displayed and accepted by the form. */
+  username: string
+  /** Credential reference holding the password. */
+  passwordEnv: string
+}
+
 export const Config: z<ConnectionConfig> = z.object({
   trustedHosts: z.array(String).default([]),
+  // Prevent Schemastery from materializing an omitted optional object as `{}`.
+  passwordLogin: z.object({
+    username: z.string().min(1).required(),
+    passwordEnv: z.string().min(1).required(),
+  }).default(undefined as unknown as PasswordLoginConfig),
   cookieMaxAgeDays: z.natural().min(1).default(30),
   maxRequestBodyBytes: z.natural().min(1).default(DEFAULT_MAX_REQUEST_BODY_BYTES),
 })
@@ -99,16 +114,35 @@ export const Config: z<ConnectionConfig> = z.object({
 export async function apply(ctx: Context, config?: ConnectionConfig): Promise<void> {
   // The Loader resolves schema defaults; hand-built test contexts may pass none.
   const trustedHosts = config?.trustedHosts ?? []
+  const passwordLogin = config?.passwordLogin
   const cookieMaxAgeDays = config?.cookieMaxAgeDays ?? 30
   const maxRequestBodyBytes = config?.maxRequestBodyBytes ?? DEFAULT_MAX_REQUEST_BODY_BYTES
   // Config boundary: a malformed entry fails the load loudly here rather than
   // silently authorizing its hostname prefix at request time.
   for (const entry of trustedHosts) assertTrustedAuthority(entry)
   assertImageBodyCapacity(ctx, maxRequestBodyBytes)
+  let resolvedPasswordLogin: PasswordLogin | undefined
+  if (passwordLogin !== undefined) {
+    const passwordRef = credentialRef(passwordLogin.passwordEnv)
+    const configuredPassword = await ctx.credentials.resolve(passwordRef)
+    if (configuredPassword === undefined || configuredPassword.value.length === 0) {
+      throw new Error(`client-connection: password login credential ${JSON.stringify(passwordLogin.passwordEnv)} is not configured`)
+    }
+    resolvedPasswordLogin = {
+      username: passwordLogin.username,
+      resolvePassword: async () => (await ctx.credentials.resolve(passwordRef))?.value,
+    }
+  }
+  const browserAuth = await BrowserAuth.create(
+    ctx.root,
+    ctx.credentials,
+    cookieMaxAgeDays,
+    resolvedPasswordLogin,
+  )
   const connection = new HostConnectionService(
     ctx,
     trustedHosts,
-    await BrowserAuth.create(ctx.root, ctx.credentials, cookieMaxAgeDays),
+    browserAuth,
   )
   const fetchHandler = connection.createSharedFetchHandler(API_PATH)
   const route: WebRoute = {
@@ -125,6 +159,20 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
     },
   }
   ctx.effect(() => ctx.webServer.register(route), 'client-connection: /api route')
+  if (passwordLogin !== undefined) {
+    ctx.effect(() => ctx.webServer.register({
+      kind: 'exact',
+      path: '/login',
+      handler: async (req, res) => {
+        if (!isTrustedApiRequest(req, trustedHosts)) {
+          res.writeHead(403)
+          res.end('forbidden')
+          return
+        }
+        await browserAuth.handleLogin(req, res)
+      },
+    }), 'client-connection: /login route')
+  }
   ctx.inject(['attachments'], (attachmentCtx) => {
     assertImageBodyCapacity(attachmentCtx, maxRequestBodyBytes)
   })

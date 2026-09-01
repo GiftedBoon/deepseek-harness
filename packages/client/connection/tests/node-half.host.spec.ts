@@ -7,10 +7,11 @@ import { describe, expect, it } from 'vitest'
 import type { AddressInfo } from 'node:net'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
+import type { CredentialProvider } from '@deepseek-ai/dsh-credentials'
 import type { WebServer, WebRoute, WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
 import { API_PATH, RpcId, apply, inject, type ClientRequest, type HostConnectionHandle } from '../src/index.ts'
 import { DEFAULT_MAX_REQUEST_BODY_BYTES } from '../src/http-bridge.ts'
-import { provideBrowserCredentials } from './browser-credentials.ts'
+import { provideBrowserCredentials, RecordCredentials } from './browser-credentials.ts'
 
 /** Structural webServer fake recording both route registries. */
 function fakeHttpServer(
@@ -81,7 +82,7 @@ function fakeResponse(): {
   return { response, state }
 }
 
-async function mounted(config?: { trustedHosts?: string[] }): Promise<{
+async function mounted(config?: { trustedHosts?: string[]; passwordLogin?: { username: string; passwordEnv: string } }): Promise<{
   routes: WebRoute[]
   upgrades: WebUpgradeRoute[]
   connection: HostConnectionHandle
@@ -153,6 +154,37 @@ describe('connection node half', () => {
     await dispose()
     expect(routes).toHaveLength(0)
     expect(upgrades).toHaveLength(0)
+  })
+
+  it('registers the password-login route only when its credential is configured', async () => {
+    const ctx = new Context()
+    const routes: WebRoute[] = []
+    const store = new RecordCredentials()
+    store.references.set('DSH_WEB_LOGIN_PASSWORD', 'secret')
+    ctx.provide('credentials', store as unknown as CredentialProvider)
+    ctx.provide('webServer', fakeHttpServer(routes, []) as WebServer)
+    const fiber = ctx.plugin({ inject: [...inject], apply }, {
+      passwordLogin: { username: 'trader', passwordEnv: 'DSH_WEB_LOGIN_PASSWORD' },
+    })
+    await fiber.await()
+    expect(routes.map(route => route.path)).toEqual([API_PATH, '/login'])
+    await fiber.dispose()
+
+    const missing = new Context()
+    missing.provide('credentials', new RecordCredentials() as unknown as CredentialProvider)
+    missing.provide('webServer', fakeHttpServer([], []) as WebServer)
+    await expect(apply(missing, {
+      passwordLogin: { username: 'trader', passwordEnv: 'DSH_WEB_LOGIN_PASSWORD' },
+    })).rejects.toThrow(/password login credential .* is not configured/u)
+
+    const empty = new Context()
+    const emptyStore = new RecordCredentials()
+    emptyStore.references.set('DSH_WEB_LOGIN_PASSWORD', '')
+    empty.provide('credentials', emptyStore as unknown as CredentialProvider)
+    empty.provide('webServer', fakeHttpServer([], []) as WebServer)
+    await expect(apply(empty, {
+      passwordLogin: { username: 'trader', passwordEnv: 'DSH_WEB_LOGIN_PASSWORD' },
+    })).rejects.toThrow(/password login credential .* is not configured/u)
   })
 
   it('refuses an untrusted Host on any /api path before the bridge runs', async () => {

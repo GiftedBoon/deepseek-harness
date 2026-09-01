@@ -1,12 +1,18 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type { CredentialProvider, CredentialRecord } from '@deepseek-ai/dsh-credentials'
+import type { CredentialProvider, CredentialRecord, CredentialRef, ResolvedCredential } from '@deepseek-ai/dsh-credentials'
 
 /** Mutable credential-record double for Connection authentication tests. */
 export class RecordCredentials {
   record: CredentialRecord | undefined
+  readonly references = new Map<string, string>()
   discardWrites = false
   reads = 0
   modifies = 0
+
+  resolve(ref: CredentialRef): Promise<ResolvedCredential | undefined> {
+    const value = this.references.get(ref)
+    return Promise.resolve(value === undefined ? undefined : { value, source: 'test' })
+  }
 
   readRecord(): Promise<CredentialRecord | undefined> {
     this.reads += 1

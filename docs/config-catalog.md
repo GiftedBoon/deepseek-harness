@@ -404,10 +404,20 @@ export interface ConnectionConfig {
    * bind. An entry that is not a bare, canonical authority fails plugin load.
    */
   trustedHosts?: string[]
+  /** Optional browser form-login account. */
+  passwordLogin?: PasswordLoginConfig
   /** Absolute browser-session lifetime in days. Default: 30. */
   cookieMaxAgeDays?: number
   /** Maximum buffered JSON body for every `/api` request. Default: 300 MiB. */
   maxRequestBodyBytes?: number
+}
+
+/** Deployment configuration for browser password login. */
+export interface PasswordLoginConfig {
+  /** Login name displayed and accepted by the form. */
+  username: string
+  /** Credential reference holding the password. */
+  passwordEnv: string
 }
 ```
 

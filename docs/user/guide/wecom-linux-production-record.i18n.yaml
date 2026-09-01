@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/user/guide/wecom-linux-production-record.md
-wecom-linux-production-record.md: ba9bbd0c88ded0d7cdec3d2a3c6979e31fc8b511
-wecom-linux-production-record.zh.md: 3c23c50f79b9b54861320c34e820fbe87649ea73
+wecom-linux-production-record.md: bb187b9c96a184c04fa59bfd05f3325ef2129ef5
+wecom-linux-production-record.zh.md: a583ace2929df961ccba37de4a15c47c052366a2

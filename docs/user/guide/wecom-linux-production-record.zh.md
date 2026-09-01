@@ -8,7 +8,7 @@ description: "记录 2026-09-01 企业微信 Harness Linux 生产实例的发布
 
 ## 概要
 
-本文记录 2026-09-01 在主机 `debian` 上完成的企业微信 Harness 部署。服务从固定 Git tag 启动，使用独立系统账号、持久数据目录、受限工作区、root 持有的凭据文件和 systemd 监管。记录不包含 BotID、企业微信用户或群聊 ID、API Key、机器人 Secret、Session Key 或 Web 管理 token。通用部署步骤及配置字段仍以[企业微信 Linux 部署指南](wecom-linux-deployment.zh.md)为准。
+本文记录 2026-09-01 在主机 `debian` 上完成的企业微信 Harness 部署。服务从固定 Git tag 启动，使用独立系统账号、持久数据目录、受限工作区、root 持有的凭据文件、systemd 监管，以及带密码登录的内网 Nginx 入口。记录不包含 BotID、企业微信用户或群聊 ID、API Key、机器人 Secret、Session Key、Web 登录密码或启动令牌。通用部署步骤及配置字段仍以[企业微信 Linux 部署指南](wecom-linux-deployment.zh.md)为准。
 
 ## 目录
 
@@ -18,6 +18,7 @@ description: "记录 2026-09-01 企业微信 Harness Linux 生产实例的发布
 - [Profile 配置](#profile-configuration)
 - [凭据与模型](#credentials-and-model)
 - [systemd 服务](#systemd-service)
+- [内网 Web 访问](#internal-web-access)
 - [验收结果](#acceptance-results)
 - [待完成事项](#open-items)
 - [日常运维](#routine-operations)
@@ -90,14 +91,14 @@ Profile 位于 `/var/lib/deepseek-harness/profiles/wecom`。`package.json` 组�
 
 复制的 `standard` preset 使用固定的无人值守 persona，并禁用 `@deepseek-ai/dsh-tool-ask-user`。渠道使用 `wecom-channel` 权限 preset，其沙箱为 `workspace-write`，审批模式为 `never`；不得改为 `danger-full-access`。
 
-`cordis.patch.yml` 禁用 `modules` 和 `client-hmr`，只加载复制的 system-trust preset root，并挂载 `@deepseek-ai/dsh-channel-wecom`。渠道使用一个精确用户 allowlist、空的群聊 allowlist、`per-user` 群聊会话模式，以及 `/srv/dsh-workspace` 工作区。
+`cordis.patch.yml` 禁用 `client-hmr`，只加载复制的 system-trust preset root，并挂载 `@deepseek-ai/dsh-channel-wecom`。渠道使用一个精确用户 allowlist、空的群聊 allowlist、`per-user` 群聊会话模式，以及 `/srv/dsh-workspace` 工作区。Web 应用包含插件管理模块。
 
-Web 服务只绑定 loopback。`web-runtime` 设置 `openBrowser: false`、`printUrl: false`、`surfaceContext: false` 和空的 `trustedHosts`，因此无人值守服务不会把管理 URL token 写入新的启动日志，也不会把 Web UI 地址加入模型上下文。
+DSH Web 服务只绑定 loopback。`web-runtime` 设置 `openBrowser: false`、`printUrl: false`、`surfaceContext: false`，并仅信任 `192.168.3.213:9000`，因此无人值守服务不会把启动令牌 URL 写入新的启动日志，也不会把 Web UI 地址加入模型上下文。Connection 应用相同的受信 authority，并通过 `DSH_WEB_LOGIN_PASSWORD` 凭据引用启用 `trader` 表单账号。
 
 <a id="credentials-and-model"></a>
 ## 凭据与模型
 
-凭据文件只包含 `DEEPSEEK_API_KEY`、`WECOM_BOT_SECRET` 和新生成的高熵 `WECOM_SESSION_KEY`。本记录不保存这些值或其长度。
+凭据文件包含 `DEEPSEEK_API_KEY`、`WECOM_BOT_SECRET`、高熵 `WECOM_SESSION_KEY` 和 `DSH_WEB_LOGIN_PASSWORD`。本记录不保存这些值或其长度。
 
 部署使用 `deepseek-official` provider 和 `deepseek-v4-flash` 默认模型。真实 headless 请求返回 `MODEL-OK`，证明模型凭据和外部请求链路可用。
 
@@ -110,7 +111,14 @@ Web 服务只绑定 loopback。`web-runtime` 设置 `openBrowser: false`、`prin
 
 服务使用 `Restart=always`、`RestartSec=10`、`TimeoutStopSec=30`、`UMask=0077`、`PrivateTmp=true` 和 `ProtectSystem=strict`。`ReadWritePaths` 仅允许 `/var/lib/deepseek-harness` 与 `/srv/dsh-workspace`。
 
-服务已启用到 `multi-user.target`。验收结束时状态为 `active/running`，`NRestarts=1` 来自预期的 SIGTERM 监管恢复测试。
+服务已启用到 `multi-user.target`。密码登录部署后，状态为 `active/running`，当前激活的 `NRestarts=0`。
+
+<a id="internal-web-access"></a>
+## 内网 Web 访问
+
+Nginx 监听 `192.168.3.213:9000`，并把 HTTP 与 WebSocket 流量代理到 `127.0.0.1:3180`。上游端口仍只对 loopback 开放。内网用户打开 `http://192.168.3.213:9000/`，以 `trader` 登录，然后获得最长 30 天有效的普通 authority-bound 浏览器 cookie。新浏览器或清除站点数据后需要重新输入密码；普通 DSH 重启不会使未过期 cookie 失效。
+
+Nginx site 位于 `/etc/nginx/sites-available/dsh-wecom`，并通过 `/etc/nginx/sites-enabled/dsh-wecom` 启用。它按客户端地址把登录 `POST` 限制为每分钟 10 次，并允许 5 次突发；普通页面与 WebSocket 流量不计入。本部署在受信内网中使用明文 HTTP，不将 `9000` 端口暴露到公网。
 
 <a id="acceptance-results"></a>
 ## 验收结果
@@ -126,7 +134,10 @@ Web 服务只绑定 loopback。`web-runtime` 设置 `openBrowser: false`、`prin
 | Profile 展开 | `pnpm dsh --profile wecom --dump-config` 退出状态为 0 |
 | 模型请求 | 返回 `MODEL-OK` |
 | 服务健康 | `ActiveState=active`、`SubState=running` |
-| HTTP 认证 | 未认证的 `http://127.0.0.1:3180/` 返回 `401` |
+| HTTP 认证 | 未认证的根路径向 `/login` 返回 `303`；登录页返回 `200`；正确凭据返回 `303`；随后携带 cookie 访问根页面返回 `200` |
+| 登录输入上限 | 声明长度为 8,193 字节的表单请求体返回 `413` |
+| 登录本地化 | `Accept-Language: zh-CN` 返回 `Content-Language: zh-CN` |
+| 内网反向代理 | `http://192.168.3.213:9000/login` 返回 `200` |
 | 监听范围 | `3180` 仅监听 `127.0.0.1` |
 | 企业微信连接 | Node 进程持有到 `openws.work.weixin.qq.com:443` 的已建立连接 |
 | 授权单聊 | 先返回处理中消息，最终返回 `PROD-PONG` |
@@ -144,6 +155,7 @@ Web 服务只绑定 loopback。`web-runtime` 设置 `openBrowser: false`、`prin
 - 未授权用户测试需要另一个企业微信身份。具备测试身份后，确认渠道返回未授权文案且不启动模型轮次。
 - 旧 BotID owner 必须保持停止并禁用自动启动；渠道没有 leader election。
 - 生产备份尚需接入公司的加密备份系统。备份必须同时覆盖 `/var/lib/deepseek-harness` 和 `/etc/deepseek-harness/wecom.env`。
+- 密码登录源码补丁已安装到当前发布目录。下次应用升级必须在新的不可变发布中包含对应仓库提交，不得手工向前复制这些源码文件。
 
 <a id="routine-operations"></a>
 ## 日常运维
@@ -161,9 +173,17 @@ sudo journalctl -u dsh-wecom -f
 
 ```sh
 sudo systemctl show dsh-wecom -p ActiveState -p SubState -p MainPID -p NRestarts
-curl -o /dev/null -s -w '%{http_code}\n' http://127.0.0.1:3180/
+curl -o /dev/null -s -w '%{http_code}\n' http://192.168.3.213:9000/login
 sudo ss -ltnp | grep ':3180'
+sudo ss -ltnp | grep ':9000'
 sudo ss -tpn | grep ':443'
+```
+
+修改 Nginx site 后，先验证再重载反向代理：
+
+```sh
+sudo nginx -t
+sudo systemctl reload nginx
 ```
 
 修改 profile 后必须先展开配置，再重启服务：
@@ -199,7 +219,9 @@ sudo -u dsh -H env PATH=/usr/local/bin:/usr/bin:/bin DSH_HOME=/var/lib/deepseek-
 
 - 不得把凭据文件、BotID、用户或群聊 ID、管理 token 或真实消息内容提交到 Git。
 - `allowedUsers` 和 `allowedChats` 必须使用精确值，不得使用通配符 `"*"`。
-- 端口 `3180` 必须保持 loopback-only，且不得通过防火墙或反向代理公开。
+- `3180` 端口必须保持只对 loopback 开放。Nginx 是唯一对外提供 Web 应用的 listener，监听内网地址 `192.168.3.213:9000`。
+- `9000` 端口通过明文 HTTP 传输登录密码和 bearer cookie。必须将其限定在受信内网；扩大暴露范围前必须添加 TLS。
+- 应用不包含账号锁定或尝试限流，因此 Nginx 必须限制重复 `/login` 尝试的速率。
 - `wecom-channel` 必须保持 `workspace-write` 或收窄为 `read-only`，并保持 `approval: never`。
 - 无人值守 preset 必须继续禁用 `tool-ask-user`。
 - 每个 BotID 同时只能由一个进程持有。

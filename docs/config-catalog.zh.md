@@ -406,14 +406,24 @@ export interface ConnectionConfig {
    * bind. An entry that is not a bare, canonical authority fails plugin load.
    */
   trustedHosts?: string[]
+  /** Optional browser form-login account. */
+  passwordLogin?: PasswordLoginConfig
   /** Absolute browser-session lifetime in days. Default: 30. */
   cookieMaxAgeDays?: number
   /** Maximum buffered JSON body for every `/api` request. Default: 300 MiB. */
   maxRequestBodyBytes?: number
 }
+
+/** Deployment configuration for browser password login. */
+export interface PasswordLoginConfig {
+  /** Login name displayed and accepted by the form. */
+  username: string
+  /** Credential reference holding the password. */
+  passwordEnv: string
+}
 ```
 
-来源：[`packages/client/connection/src/index.ts:55`](../packages/client/connection/src/index.ts)
+来源：[`packages/client/connection/src/index.ts:70`](../packages/client/connection/src/index.ts)
 
 <a id="deepseek-aidsh-client-hmr"></a>
 

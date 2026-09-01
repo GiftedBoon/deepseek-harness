@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-channel-wecom",
   "description": "Enterprise WeCom AI Bot long-connection channel for persistent DeepSeek Harness conversations",
-  "version": "0.1.2-alpha.2",
+  "version": "0.1.2-alpha.3",
   "publishConfig": {
     "access": "public"
   },
