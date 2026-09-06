@@ -67,7 +67,7 @@ kind: "package-reference"
 
 渠道在 `channel_wecom` storage domain 中持久保存会话路由、交付状态和 outbox 记录。重复的已完成或已失败交付会直接重放存储的最终文本，不会再次调用模型。同一会话中的消息依次排队；不同会话彼此独立。
 
-每条准入消息都会创建或恢复一个 Agent，在发布前挂载已配置的 agent preset，应用非交互权限 preset，把新 Session 附加到已配置 Workspace，并发送一条普通用户消息。渠道通过准确的 Agent、Session、消息与 turn 关联 `agent/inbox/claimed`、`assistant/chunk` 和 `turn/end`。该区间静止后，渠道会 flush Session 并释放 Agent。
+每条准入消息都会创建或恢复一个 Agent，在发布前挂载已配置的 agent preset，应用非交互权限 preset，把新 Session 附加到已配置 Workspace，并发送一条普通用户消息。渠道通过准确的 Agent、Session、消息、turn 和 attempt 关联 `agent/inbox/claimed`、`agent/assistant-stream` 和 `turn/end`。该区间静止后，渠道会 flush Session 并释放 Agent。
 
 第一次被动回复是 `messages.processing`；后续累计更新只包含 `text-delta` 输出，绝不包含 reasoning。被动最终回复失败时会退回到主动 Markdown 发送。两种传输都失败时，受限长度的最终文本会进入持久 outbox，并在认证后及每个已配置间隔重试。
 

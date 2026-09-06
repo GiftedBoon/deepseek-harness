@@ -40,7 +40,7 @@ export function apply(ctx: Context, config: Config): Promise<void> {
     const identity = await ctx.credentials.resolve(credentialRef(resolved.sessionKeyEnv))
     if (identity === undefined) throw new Error(`channel-wecom: credential ${resolved.sessionKeyEnv} is not configured`)
     const workspace = await ctx.workspaceRegistry.create(resolved.workspacePath)
-    const persisted = new Set<SessionId>((await ctx.sessionPersistence.list()).map(header => header.id))
+    const persisted = new Set<SessionId>((await ctx.sessionPersistence.list()).map(snapshot => snapshot.header.id))
     const domain = await ctx.storageDomain.open(channelWeComDomainSpec)
     const runtime = new WeComChannelRuntime(ctx, {
       config: resolved,

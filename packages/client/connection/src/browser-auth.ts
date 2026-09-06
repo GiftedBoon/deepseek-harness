@@ -255,6 +255,7 @@ export class BrowserAuth {
    * @param processOwner - root application context retaining one token across Connection reloads.
    * @param credentials - persistent credential provider for the Web profile.
    * @param maxAgeDays - positive absolute browser-cookie lifetime in days.
+   * @param passwordLogin - optional form-login credentials resolved at application startup.
    * @returns initialized authentication owner with the process owner's launch token.
    */
   static async create(
@@ -336,7 +337,11 @@ export class BrowserAuth {
       && payload.expiresAt - payload.issuedAt <= this.maxAgeMilliseconds
   }
 
-  /** Serve the optional form login and exchange valid credentials for the normal browser cookie. */
+  /**
+   * Serve the optional form login and exchange valid credentials for the normal browser cookie.
+   * @param req - incoming login-page or credential-submission request.
+   * @param res - response completed with the login page, redirect, or rejection.
+   */
   async handleLogin(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const passwordLogin = this.passwordLogin
     if (passwordLogin === undefined) {
@@ -452,7 +457,7 @@ async function readLoginBody(req: IncomingMessage): Promise<string | undefined> 
     req.resume()
     return undefined
   }
-  const chunks: Buffer[] = []
+  const chunks: Uint8Array[] = []
   let size = 0
   for await (const chunk of req) {
     const bytes = Buffer.from(chunk)

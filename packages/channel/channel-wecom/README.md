@@ -67,7 +67,7 @@ Single chats map by user; groups map by chat or by chat plus user according to `
 
 The channel persists conversation routing, delivery state, and outbox records in the `channel_wecom` storage domain. Repeated completed or failed deliveries replay their stored final text without invoking the model. Messages in one conversation queue behind each other; other conversations remain independent.
 
-Each admitted message creates or resumes one Agent, mounts the configured agent preset before publication, applies the noninteractive permission preset, attaches a new Session to the configured Workspace, and sends one ordinary user message. The channel correlates `agent/inbox/claimed`, `assistant/chunk`, and `turn/end` by exact Agent, Session, message, and turn. It flushes the Session and disposes the Agent after the interval reaches quiescence.
+Each admitted message creates or resumes one Agent, mounts the configured agent preset before publication, applies the noninteractive permission preset, attaches a new Session to the configured Workspace, and sends one ordinary user message. The channel correlates `agent/inbox/claimed`, `agent/assistant-stream`, and `turn/end` by exact Agent, Session, message, turn, and attempt. It flushes the Session and disposes the Agent after the interval reaches quiescence.
 
 The first passive reply is `messages.processing`; later cumulative updates contain only `text-delta` output, never reasoning. Passive-final failure falls back to an active Markdown send. If both transports fail, the bounded final text enters the durable outbox and retries after authentication and on the configured interval.
 

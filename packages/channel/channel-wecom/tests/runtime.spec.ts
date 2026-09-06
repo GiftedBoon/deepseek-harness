@@ -35,9 +35,9 @@ class Domain {
   closed = 0
 
   table(name: string): Table<unknown> {
-    if (name === 'conversations') return this.conversations as Table<unknown>
-    if (name === 'deliveries') return this.deliveries as Table<unknown>
-    if (name === 'outbox') return this.outbox as Table<unknown>
+    if (name === 'conversations') return this.conversations
+    if (name === 'deliveries') return this.deliveries
+    if (name === 'outbox') return this.outbox
     throw new Error(`unexpected table: ${name}`)
   }
 
@@ -179,12 +179,15 @@ function harness(options: {
           emit('session/event', { id: 'other' }, { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } })
           emit('agent/inbox/claimed', { agent, message: { id: 'other' }, turn: 9 })
           emit('agent/inbox/claimed', { agent, message, turn: 1 })
-          emit('session/event', session, { type: 'assistant/chunk', data: { turn: 2, chunk: { type: 'text-delta', text: 'wrong' } } })
-          emit('session/event', session, { type: 'assistant/chunk', data: { turn: 1, chunk: { type: 'reasoning-delta', text: 'hidden' } } })
+          emit('agent/assistant-stream', { agent, frame: { type: 'start', attemptId: 'wrong', revision: 1, turn: 2, step: 1 } })
+          emit('agent/assistant-stream', { agent, frame: { type: 'chunk', attemptId: 'wrong', revision: 2, index: 0, time: 1, chunk: { type: 'text-delta', text: 'wrong' } } })
+          emit('agent/assistant-stream', { agent, frame: { type: 'start', attemptId: 'attempt', revision: 3, turn: 1, step: 1 } })
+          emit('agent/assistant-stream', { agent, frame: { type: 'chunk', attemptId: 'attempt', revision: 4, index: 0, time: 2, chunk: { type: 'reasoning-delta', text: 'hidden' } } })
           if (behavior.emitAgentError) emit('agent/error', { agent, turn: 1, error: new Error('observed failure') })
           if (behavior.output !== undefined && behavior.output !== '') {
-            emit('session/event', session, { type: 'assistant/chunk', data: { turn: 1, chunk: { type: 'text-delta', text: behavior.output } } })
+            emit('agent/assistant-stream', { agent, frame: { type: 'chunk', attemptId: 'attempt', revision: 5, index: 1, time: 3, chunk: { type: 'text-delta', text: behavior.output } } })
           }
+          emit('agent/assistant-stream', { agent, frame: { type: 'end', attemptId: 'attempt', revision: 6, index: 2, outcome: { kind: 'abandoned' } } })
           emit('session/event', session, { type: 'turn/end', data: { turn: 1, reason: behavior.reason ?? { kind: 'completed' } } })
         })
       },

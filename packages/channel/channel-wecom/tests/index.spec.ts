@@ -52,14 +52,13 @@ function context(options: { permission?: { approval: string; sandbox: string }; 
       standingKeyFor: async () => { calls.push('standing') },
     },
     credentials: {
-      resolve: async (reference: { name?: string; key?: string }) => {
-        const value = reference.name ?? reference.key ?? String(reference)
+      resolve: async (value: string) => {
         if (options.missing !== undefined && value.includes(options.missing)) return undefined
         return { value: value.includes('SECRET') ? 'bot-secret' : 'identity-secret' }
       },
     },
     workspaceRegistry: { create: async (path: string) => ({ path }) },
-    sessionPersistence: { list: async () => [{ id: 'persisted' }] },
+    sessionPersistence: { list: async () => [{ header: { id: 'persisted' }, revision: 'revision' }] },
     storageDomain: { open: async () => ({ close: async () => {} }) },
     agentDefaultModel: { currentSelection: () => ({ provider: 'provider', model: 'model' }) },
     effect: (factory: () => () => Promise<void>) => {

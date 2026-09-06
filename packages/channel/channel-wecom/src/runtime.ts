@@ -1,7 +1,7 @@
 /** Enterprise WeCom delivery, Agent, persistence, streaming, and teardown runtime. */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { Agent, AgentHandle, ModelSelection } from '@deepseek-ai/dsh-agent'
+import type { Agent, AgentHandle, AssistantStreamFrame, ModelSelection } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-presets'
 import { createUserMessage, errorChain, type LlmCallConfig, type UserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId, TurnEndReason } from '@deepseek-ai/dsh-session'
@@ -21,6 +21,7 @@ interface PromptInterval {
   readonly stream: WeComReplyStream
   readonly turnDone: Promise<TurnEndReason>
   readonly settleTurn: (reason: TurnEndReason) => void
+  attemptId?: AssistantStreamFrame['attemptId']
   turn?: number
   output: string
 }
@@ -78,6 +79,9 @@ export class WeComChannelRuntime {
   constructor(private readonly ctx: Context, private readonly options: RuntimeOptions) {
     this.disposers.push(ctx.on('agent/inbox/claimed', ({ agent, message, turn }) => {
       this.onInboxClaimed(agent, message, turn)
+    }))
+    this.disposers.push(ctx.on('agent/assistant-stream', ({ agent, frame }) => {
+      this.onAssistantStream(agent, frame)
     }))
     this.disposers.push(ctx.on('session/event', (session, event) => { this.onSessionEvent(session, event) }))
     this.disposers.push(ctx.on('agent/error', ({ agent, turn, error }) => {
@@ -209,11 +213,11 @@ export class WeComChannelRuntime {
     const agentOptions = { provider: this.options.modelSelection.provider, model: this.options.modelSelection.model }
     const handle = existing
       ? await this.ctx.agents.resume({
-          resumeSessionId: sessionId,
-          agentOptions,
-          signal: this.controller.signal,
-          setup,
-        })
+        resumeSessionId: sessionId,
+        agentOptions,
+        signal: this.controller.signal,
+        setup,
+      })
       : await this.ctx.agents.create({
         sessionId,
         signal: this.controller.signal,
@@ -269,11 +273,24 @@ export class WeComChannelRuntime {
   private onSessionEvent(session: Session, event: SessionEvent): void {
     const interval = this.active.get(session.id)
     if (interval === undefined || interval.agent.session !== session || interval.turn === undefined) return
-    if (event.type === 'assistant/chunk' && event.data.turn === interval.turn && event.data.chunk.type === 'text-delta') {
-      interval.output += event.data.chunk.text
-      interval.stream.append(event.data.chunk.text)
-    } else if (event.type === 'turn/end' && event.data.turn === interval.turn) {
+    if (event.type === 'turn/end' && event.data.turn === interval.turn) {
       interval.settleTurn(event.data.reason)
+    }
+  }
+
+  private onAssistantStream(agent: Agent, frame: AssistantStreamFrame): void {
+    const interval = this.active.get(agent.session.id)
+    if (interval === undefined || interval.agent !== agent || interval.turn === undefined) return
+    if (frame.type === 'start') {
+      if (frame.turn === interval.turn) interval.attemptId = frame.attemptId
+      return
+    }
+    if (frame.attemptId !== interval.attemptId) return
+    if (frame.type === 'end') {
+      delete interval.attemptId
+    } else if (frame.chunk.type === 'text-delta') {
+      interval.output += frame.chunk.text
+      interval.stream.append(frame.chunk.text)
     }
   }
 

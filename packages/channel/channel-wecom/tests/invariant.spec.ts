@@ -31,21 +31,23 @@ describe('channel-wecom invariant', () => {
 
   it('fails when the domain or referenced conversation is missing', async () => {
     let install: ((ctx: unknown, fail: (message: string) => void) => void) | undefined
-    await apply({ invariants: { register: (_name: string, candidate: typeof install) => { install = candidate; return () => {} } } } as never)
+    await apply({
+      invariants: { register: (_name: string, candidate: typeof install) => { install = candidate; return () => {} } },
+    } as never)
     if (install === undefined) throw new Error('invariant was not registered')
 
     let missingDomain: ((change: Record<string, unknown>) => void) | undefined
     install({
       on: (_name: string, listener: typeof missingDomain) => { missingDomain = listener },
       storage: { form: () => ({ get: () => undefined }) },
-    }, message => { throw new Error(message) })
+    }, (message) => { throw new Error(message) })
     expect(() => missingDomain?.({ domain: 'channel_wecom' })).toThrow(/no open authoritative domain/)
 
     let missingConversation: ((change: Record<string, unknown>) => void) | undefined
     install({
       on: (_name: string, listener: typeof missingConversation) => { missingConversation = listener },
       storage: { form: () => ({ get: () => ({ table: () => ({ get: () => undefined }) }) }) },
-    }, message => { throw new Error(message) })
+    }, (message) => { throw new Error(message) })
     expect(() => missingConversation?.({
       domain: 'channel_wecom', table: 'deliveries', operation: 'put', key: 'delivery',
       value: { conversationKey: 'missing' },

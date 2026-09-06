@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/channel/channel-wecom/README.md
-README.md: c2c2d04ef0fdf480dfaa8965fd9bb220988514bd
-README.zh.md: 2ce65e80506fe38d8aa964f4d5a767b8f604f1e3
+README.md: 9ef1b9be085d338aa730e05c7e818413fa30b5a5
+README.zh.md: 391d0693f5095b05a2f5bc7f2bae799696dd74ce
