@@ -1,0 +1,24 @@
+[Unit]
+Description=DeepSeek Harness Trader Ops deployment
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=simple
+User=dsh
+Group=dsh
+WorkingDirectory=/opt/deepseek-harness/current
+EnvironmentFile=/etc/deepseek-harness/trader-ops.env
+ExecStart=/usr/local/bin/pnpm dsh web --patch /opt/deepseek-harness/current/deployments/trader-ops/config/dsh/trader-ops.patch.yml --port 3180 --no-open
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/deepseek-harness /srv/dsh-workspace
+
+[Install]
+WantedBy=multi-user.target

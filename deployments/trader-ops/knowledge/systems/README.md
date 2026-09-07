@@ -1,22 +1,24 @@
-# Systems：系统与依赖说明
+# Systems and dependencies
 
-本目录记录系统职责、组件关系、数据流、接口语义和可观测性入口。OpenViking 检索这些内容，为 Agent 定位正确系统和工具提供背景。
+English | [中文](README.zh.md)
 
-## 应该放在这里
+This directory records system responsibilities, component relationships, data flows, interface semantics, and observability entry points. OpenViking retrieves this material to help the agent locate the correct system and tool.
 
-- 系统边界、负责人、上下游依赖和环境差异。
-- MCP tool 对应的后端服务及其只读/写入语义。
-- 数据库表、API 字段和监控指标的解释。
-- 脱敏后的主机角色、服务名称和故障域说明。
+## What belongs here
 
-## 不应该放在这里
+- System boundaries, owners, upstream and downstream dependencies, and environment differences.
+- The backend service behind each MCP tool and its read or write semantics.
+- Explanations of database tables, API fields, and monitoring metrics.
+- Redacted host roles, service names, and failure-domain descriptions.
 
-- 密码、Token、私钥、完整生产连接串或其他秘密。
-- 可直接执行的危险命令。
-- 业务概念定义；放在 `../business/`。
-- 具体事件的处置流程；放在 `../runbooks/`。
+## What does not belong here
 
-## 示例：`strategy-control.md`
+- Passwords, tokens, private keys, complete production connection strings, or other secrets.
+- Dangerous commands that can be executed directly.
+- Business concept definitions; place them in `../business/`.
+- Response procedures for a specific incident; place them in `../runbooks/`.
+
+## Example: `strategy-control.md`
 
 ```markdown
 ---
@@ -30,16 +32,16 @@ updated_at: 2026-09-07
 
 # Strategy Control
 
-Strategy Control 是产品策略绑定关系的权威服务。
+Strategy Control is the authoritative service for product-strategy bindings.
 
-## Agent 接入
+## Agent integration
 
-| Tool | 行为 | 数据新鲜度 |
+| Tool | Behaviour | Data freshness |
 |---|---|---|
-| `get_product_strategy` | 只读查询当前绑定 | 实时 |
-| `switch_product_strategy` | 修改生产绑定 | 实时，高风险 |
+| `get_product_strategy` | Read the current binding | Live |
+| `switch_product_strategy` | Change the production binding | Live, high risk |
 
-## 约束
+## Constraints
 
-写入工具必须经过 `policies` 的身份、风险和审批检查。Agent 不得根据本文中的示例值推断生产状态。
+Write tools must pass the identity, risk, and approval checks in `policies`. The agent must not infer production state from example values in this document.
 ```

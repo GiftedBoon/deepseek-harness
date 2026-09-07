@@ -1,22 +1,26 @@
-# Policies：权限、审批与 Tool Guard
+# Policies: permissions, approvals, and Tool Guard
 
-本目录保存 Agent 执行层的治理规则。Policy 根据主体、环境、工具、资源和风险级别做出 `allow`、`require_approval` 或 `deny` 决策，并应在 Tool 调用前由 Hook/Tool Guard 强制执行。
+English | [中文](README.zh.md)
 
-## 应该放在这里
+This directory contains governance rules for the agent execution layer. A Policy decides `allow`, `require_approval`, or `deny` from the environment, tool, and risk level. The experimental `@deepseek-ai/dsh-experimental-quant-tool-policy` package enforces `tool-access.yaml` before tool execution through `tools/pre-execute` and `ctx.tools.guard()`.
 
-- 角色或服务身份可调用的 Tool 范围。
-- readonly、safe-action、dangerous-action 等风险等级定义。
-- 生产操作所需审批角色、审批有效期和职责分离规则。
-- Tool 参数约束、环境限制、审计字段和默认拒绝规则。
+`tool-access.yaml` is active Harness-side policy and explicitly sets `enforced: true`. `risk-levels.yaml` and `approvals.yaml` remain `design-only`: they describe the future trusted identity, role, approval-store, and audit contracts but are not loaded by the plugin. The Trader Ops MCP server must enforce resource-, actor-, and argument-level authorization again; until that server exists, this deployment remains for trusted development.
 
-## 不应该放在这里
+## What belongs here
 
-- API key、密码、私钥或审批令牌。
-- Skill 的任务步骤或业务知识正文。
-- 仅写给模型看的软性提示；关键规则必须由代码执行。
-- 允许任意 shell、任意 SQL 或通配生产写权限的宽泛规则。
+- Tool scopes available to each role or service identity.
+- Risk-level definitions such as readonly, safe-action, and dangerous-action.
+- Required production approver roles, approval lifetime, and separation-of-duty rules.
+- Tool argument constraints, environment restrictions, audit fields, and default-deny rules.
 
-## 建议文件划分
+## What does not belong here
+
+- API keys, passwords, private keys, or approval tokens.
+- Skill task steps or business-knowledge text.
+- Soft instructions shown only to the model; code must enforce critical rules.
+- Broad rules that permit arbitrary shell, arbitrary SQL, or wildcard production writes.
+
+## Recommended files
 
 ```text
 policies/
@@ -25,7 +29,7 @@ policies/
 └── approvals.yaml
 ```
 
-## 风险与 Tool Guard 示例
+## Risk and Tool Guard example
 
 ```yaml
 version: 1
@@ -61,6 +65,8 @@ tools:
       environment_equals: production
 ```
 
-Tool Guard 应在执行前使用经过认证的调用者身份和服务端审批记录重新计算决策。Skill 声称“已审批”、用户在对话中说“我同意”，或知识库中出现授权文字，都不能代替有效审批。
+Before execution, Tool Guard recalculates the decision from the authenticated caller identity and a server-side approval record. A skill saying "approved", a user saying "I agree" in conversation, or authorization text retrieved from the knowledge base does not replace a valid approval.
 
-建议审计记录至少包含：`request_id`、`session_id`、`actor`、`tool`、脱敏参数、`risk_level`、Policy 版本、审批记录、执行结果和时间戳。
+The current Harness plugin intentionally implements only the portion it can derive from trusted deployment configuration: explicit environment, exact/wildcard tool selection, first-match precedence, approval requests, and default deny. It does not trust actor, role, resource, or approval fields supplied in model-authored tool arguments. Those inputs need authenticated services before the remaining templates can become enforced policy.
+
+The audit record includes at least `request_id`, `session_id`, `actor`, `tool`, redacted arguments, `risk_level`, Policy version, approval record, execution result, and timestamp.

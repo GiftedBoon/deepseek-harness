@@ -1,22 +1,24 @@
-# Skills：可执行任务说明
+# Skills: executable task instructions
 
-本目录保存 Harness 可发现的 Skill bundle。每个一级子目录包含一个 `SKILL.md`；Harness 先把 `name` 和 `description` 发布到 Skill catalog，任务匹配后由 Skill Loader 读取完整正文。Skill 不应进入 OpenViking 的普通知识索引。
+English | [中文](README.zh.md)
 
-## 应该放在这里
+This directory contains skill bundles discovered by Harness. Each direct child directory contains one `SKILL.md`. Harness first publishes its `name` and `description` in the skill catalog, then Skill Loader reads the complete body when a task matches. OpenViking must not index skills as ordinary knowledge.
 
-- Agent 完成一类任务时必须遵守的完整步骤、校验和停止条件。
-- 允许调用的 MCP tools、输入要求、输出格式和失败处理。
-- Skill 专用的 `references/`、`scripts/` 或 `assets/` 配套资源。
-- 合法的 YAML frontmatter：`name`、`description`，以及需要时的 `whenToUse`、`disable-model-invocation`、`user-invocable`。
+## What belongs here
 
-## 不应该放在这里
+- Complete steps, validations, and stopping conditions that the agent must follow for one task class.
+- Permitted MCP tools, input requirements, output format, and failure handling.
+- Skill-specific `references/`, `scripts/`, or `assets/` resources.
+- Valid YAML frontmatter: `name`, `description`, and, when required, `whenToUse`, `disable-model-invocation`, or `user-invocable`.
 
-- 大段通用业务百科或系统说明；放在 `../knowledge/` 并按需检索。
-- MCP tool 的实现和凭据。
-- 仅用于权限、审批或风险分级的规则；放在 `../policies/` 并由执行路径强制实施。
-- 依赖模型从摘要猜测的关键步骤；所有必要步骤必须写入完整 `SKILL.md`。
+## What does not belong here
 
-## Skill bundle 示例
+- General business encyclopaedia or system descriptions; place them in `../knowledge/` for retrieval.
+- MCP tool implementations or credentials.
+- Permission, approval, or risk classification rules; place them in `../policies/` and enforce them on the execution path.
+- Critical steps that require the model to guess from a summary; put every required step in the complete `SKILL.md`.
+
+## Skill bundle example
 
 ```text
 skills/
@@ -29,17 +31,17 @@ skills/
 ```markdown
 ---
 name: example-task
-description: 查询指定对象并返回带来源的结果，不执行写操作。
-whenToUse: 用户要求查询指定对象的当前状态时。
+description: Query a specified object and return a sourced result without writing.
+whenToUse: Use when the user requests the current state of a specified object.
 user-invocable: true
 ---
 
 # Example Task
 
-1. 解析并复述对象标识。
-2. 调用只读 MCP tool 获取实时数据。
-3. 对照检索到的业务定义解释字段。
-4. 返回查询时间、数据来源和结果；不得把缓存知识当作当前状态。
+1. Parse and restate the object identifier.
+2. Call a read-only MCP tool for live data.
+3. Interpret the fields against retrieved business definitions.
+4. Return the query time, data source, and result; never present cached knowledge as current state.
 ```
 
-文件系统 Provider 只发现 Skill root 的直接子项：`<root>/<name>/SKILL.md` 或 `<root>/<name>.md`。因此不要再增加业务分类层级。
+The filesystem provider discovers only direct children of the skill root: `<root>/<name>/SKILL.md` or `<root>/<name>.md`. Do not add another business-category level.

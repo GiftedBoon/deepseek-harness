@@ -1,0 +1,31 @@
+# Design contract only. Conversation text never counts as an approval record.
+version: 1
+status: design-only
+enforced: false
+default: deny
+
+approval_classes:
+  controlled_write:
+    approver_roles: [trader_ops_reviewer]
+    requester_cannot_approve: true
+    expires_in: 15m
+    require_reason: true
+  privileged_operation:
+    approver_roles: [trading_duty_manager]
+    requester_cannot_approve: true
+    expires_in: 5m
+    require_reason: true
+    require_change_ticket: true
+
+required_audit_fields:
+  - request_id
+  - session_id
+  - actor
+  - environment
+  - tool
+  - redacted_arguments
+  - risk_level
+  - policy_version
+  - approval_record
+  - result
+  - timestamp

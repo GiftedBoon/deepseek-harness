@@ -1,0 +1,47 @@
+# Enforced by @deepseek-ai/dsh-experimental-quant-tool-policy in the DSH patch.
+version: 1
+status: experimental
+enforced: true
+default: deny
+
+rules:
+  - id: openviking-read
+    tools:
+      - mcp__openviking__read
+      - mcp__openviking__search
+      - mcp__openviking__list
+      - mcp__openviking__tree
+      - mcp__openviking__grep
+      - mcp__openviking__glob
+    risk: read_only
+    environments: [development, staging, production]
+    decision: allow
+
+  - id: openviking-write
+    tools:
+      - mcp__openviking__add_resource
+      - mcp__openviking__write
+      - mcp__openviking__remember
+      - mcp__openviking__edit
+    risk: controlled_write
+    environments: [development, staging]
+    decision: require_approval
+
+  - id: openviking-forget
+    tools:
+      - mcp__openviking__forget
+    risk: privileged_operation
+    environments: [development, staging, production]
+    decision: deny
+
+  - id: trader-ops-read
+    tool_pattern: mcp__trader_ops__get_*
+    risk: read_only
+    environments: [development, staging, production]
+    decision: allow
+
+  - id: trader-ops-mutation
+    tool_pattern: mcp__trader_ops__*
+    risk: privileged_operation
+    environments: [production]
+    decision: require_approval

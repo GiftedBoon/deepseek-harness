@@ -1,0 +1,21 @@
+# Optional future layer. Do not pass this file to `dsh --patch` until a Trader
+# Ops MCP server exists and its transport, authentication and tool schemas have
+# been reviewed.
+
+- insert:
+    - id: trader-ops-mcp
+      name: '@deepseek-ai/dsh-mcp-client'
+      disabled: !!js process.env.TRADER_OPS_MCP_ENABLED !== '1'
+      config:
+        serverName: trader_ops
+        transport: streamable-http
+        url: !!js process.env.TRADER_OPS_MCP_URL
+        headers:
+          Authorization: !!js process.env.TRADER_OPS_MCP_TOKEN && `Bearer ${process.env.TRADER_OPS_MCP_TOKEN}`
+        toolCallTimeoutMs: 60000
+        failOnStartupError: true
+        reconnect:
+          enabled: true
+          maxAttempts: 5
+          initialDelayMs: 1000
+          maxDelayMs: 30000

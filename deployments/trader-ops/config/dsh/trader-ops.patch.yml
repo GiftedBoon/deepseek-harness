@@ -1,0 +1,38 @@
+# This layer is applied after the selected DSH profile and the installed
+# OpenViking plugin bundle. Secrets are read by the plugin from environment
+# variables; do not add them here.
+
+- id: openviking-memory-runtime
+  name: '@openviking/dsh-memory-plugin'
+  config:
+    endpoint: !!js process.env.OPENVIKING_URL ?? 'http://127.0.0.1:1933'
+    recallPeerScope: actor
+    recallTokenBudget: 2000
+    recallMaxContentChars: 500
+    recallLimit: 10
+    scoreThreshold: 0.35
+    profileTokenBudget: 10000
+    commitTokenThreshold: 20000
+    commitKeepRecentCount: 10
+    captureToolResults: false
+    captureMode: semantic
+    captureMaxLength: 24000
+    captureAssistantTurns: true
+    skipSubagentSessions: true
+    requestTimeoutMs: 10000
+    mcpToolCallTimeoutMs: 60000
+
+- insert:
+    - id: trader-ops-tool-policy
+      name: '@deepseek-ai/dsh-experimental-quant-tool-policy'
+      config:
+        policyFile: ./deployments/trader-ops/policies/tool-access.yaml
+        environment: !!js process.env.TRADER_OPS_ENVIRONMENT
+
+    - id: trader-ops-skills
+      name: '@deepseek-ai/dsh-skill-filesystem'
+      config:
+        providerName: trader-ops
+        includeDefaultRoots: false
+        customSkillDirs:
+          - ./deployments/trader-ops/skills

@@ -1,0 +1,22 @@
+# Design contract only. No runtime component loads this file yet.
+version: 1
+status: design-only
+enforced: false
+default_risk: prohibited
+
+risk_levels:
+  read_only:
+    description: Reads data without changing an external system.
+    approval: none
+    audit: required
+  controlled_write:
+    description: Reversible write in an explicitly selected non-production environment.
+    approval: required
+    audit: required
+  privileged_operation:
+    description: Production change, credential action, deletion, or trading-state mutation.
+    approval: required
+    audit: required
+  prohibited:
+    description: Operation has no reviewed execution path.
+    decision: deny

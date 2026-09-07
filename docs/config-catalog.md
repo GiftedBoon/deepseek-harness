@@ -753,6 +753,27 @@ export interface InspectorOptions {
 
 Source: [`packages/experimental/inspector/src/index.ts:66`](../packages/experimental/inspector/src/index.ts)
 
+<a id="deepseek-aidsh-experimental-quant-tool-policy"></a>
+
+## `@deepseek-ai/dsh-experimental-quant-tool-policy`
+
+Requires: `tools`
+
+```ts config-catalog
+/** Required plugin configuration; neither path nor environment is inferred. */
+export interface Config {
+  /** YAML policy document, resolved from the process working directory. */
+  policyFile: string
+  /** Explicit deployment environment; policy selection never guesses it. */
+  environment: PolicyEnvironment
+}
+
+/** Deployment environment used to select eligible policy rules. */
+export type PolicyEnvironment = 'development' | 'staging' | 'production'
+```
+
+Source: [`packages/experimental/quant-tool-policy/src/index.ts:25`](../packages/experimental/quant-tool-policy/src/index.ts)
+
 <a id="deepseek-aidsh-experimental-tool-agent-team"></a>
 
 ## `@deepseek-ai/dsh-experimental-tool-agent-team`

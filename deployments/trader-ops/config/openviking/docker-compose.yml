@@ -1,0 +1,17 @@
+services:
+  openviking:
+    image: "${OPENVIKING_IMAGE:?set OPENVIKING_IMAGE}"
+    container_name: trader-ops-openviking
+    restart: unless-stopped
+    ports:
+      # Keep OpenViking private by default. Use a TLS reverse proxy or a private
+      # network when Harness and OpenViking run on different hosts.
+      - "127.0.0.1:${OPENVIKING_SERVER_PORT:-1933}:1933"
+    volumes:
+      - "${OPENVIKING_HOME:?set OPENVIKING_HOME}:/app/.openviking"
+    healthcheck:
+      test: ["CMD", "openviking-entrypoint", "--healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

@@ -1,35 +1,37 @@
-# query-strategy Skill
+# query-strategy skill
 
-本目录承载“查询产品策略”的完整 Skill bundle。Skill 用知识检索解释字段，用 MCP tool 获取当前绑定或历史切换记录，并清楚区分两类结果。
+English | [中文](README.zh.md)
 
-## 应该放在这里
+This directory contains the complete "query product strategy" skill bundle. The skill uses retrieved knowledge to interpret fields, calls MCP tools for current bindings or historical switches, and clearly distinguishes the two result types.
 
-- 当前策略与历史策略查询的意图识别和参数规则。
-- 产品消歧、时间范围默认值、排序和结果摘要要求。
-- 只读 Tool 白名单及数据新鲜度说明。
+## What belongs here
 
-## 不应该放在这里
+- Intent recognition and parameter rules for current and historical strategy queries.
+- Product disambiguation, default time ranges, ordering, and result-summary requirements.
+- A read-only tool allowlist and data-freshness guidance.
 
-- 策略概念、切换业务规则的长篇说明；放在 `../../knowledge/business/`。
-- 策略切换、启停或修改配置的步骤。
-- 历史查询结果的静态副本。
-- SQL、数据库密码或绕过 MCP 的访问方式。
+## What does not belong here
 
-## `SKILL.md` 示例
+- Long explanations of strategy concepts or switching rules; place them in `../../knowledge/business/`.
+- Strategy switching, start/stop, or configuration-change steps.
+- Static copies of historical query results.
+- SQL, database passwords, or access paths that bypass MCP.
+
+## `SKILL.md` example
 
 ```markdown
 ---
 name: query-strategy
-description: 查询产品当前策略或指定时间范围内的策略切换历史；只读。
-whenToUse: 用户询问产品当前使用什么策略，或要求查看策略历史时。
+description: Read a product's current strategy or strategy-switch history for a specified time range.
+whenToUse: Use when the user asks which strategy a product uses or requests its strategy history.
 user-invocable: true
 ---
 
 # Query Strategy
 
-1. 提取产品代码，并判断用户需要“当前绑定”还是“历史记录”。
-2. 当前绑定调用 `get_product_strategy`；历史记录调用 `query_strategy_history`。
-3. 用户未给历史时间范围时使用部署约定的默认范围，并在输出中明确说明。
-4. 历史记录按切换时间倒序，展示 `old_strategy → new_strategy`、操作者和时间。
-5. 返回实时数据来源和查询时间；不得调用任何写入 Tool。
+1. Extract the product code and decide whether the user needs the current binding or historical records.
+2. Call `get_product_strategy` for the current binding or `query_strategy_history` for historical records.
+3. When the user omits a historical range, use the deployment default and state that range in the output.
+4. Sort history newest first and show `old_strategy → new_strategy`, operator, and timestamp.
+5. Return the live data source and query time; never call a write tool.
 ```

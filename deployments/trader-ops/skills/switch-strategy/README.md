@@ -1,39 +1,41 @@
-# switch-strategy Skill
+# switch-strategy skill
 
-本目录承载“切换产品策略”的完整 Skill bundle。这是高风险写操作：Skill 负责组织检查、计划、审批、执行和验证，但最终权限必须由 Policy/Hook/Tool Guard 强制执行，不能只依赖提示词。
+English | [中文](README.zh.md)
 
-## 应该放在这里
+This directory contains the complete "switch product strategy" skill bundle. This is a high-risk write: the skill organizes checks, planning, approval, execution, and verification, but a Policy, Hook, or Tool Guard must enforce final authorization instead of relying on the prompt.
 
-- 产品和目标策略确认、前置检查、执行计划和后置验证。
-- 对高风险 Policy、人工审批和审计字段的明确要求。
-- Tool 返回失败、审批拒绝或状态变化时的停止条件。
-- 已审核的回滚引用；如无安全回滚路径，应升级人工处理。
+## What belongs here
 
-## 不应该放在这里
+- Product and target-strategy confirmation, preflight checks, an execution plan, and post-execution verification.
+- Explicit requirements for high-risk Policy decisions, human approval, and audit fields.
+- Stopping conditions for tool failure, approval rejection, or state drift.
+- Reviewed rollback references; escalate to a human when no safe rollback exists.
 
-- 审批人的硬编码身份或长期有效的审批令牌。
-- 绕过 Policy、直接执行 SSH 命令或连续盲目重试的指令。
-- 业务规则的唯一副本；权威规则放在 `../../knowledge/business/`。
-- `switch_product_strategy` Tool 的内部实现。
+## What does not belong here
 
-## `SKILL.md` 示例
+- Hard-coded approver identities or long-lived approval tokens.
+- Instructions to bypass Policy, execute direct SSH commands, or retry blindly.
+- The only copy of a business rule; authoritative rules belong in `../../knowledge/business/`.
+- The internal implementation of the `switch_product_strategy` tool.
+
+## `SKILL.md` example
 
 ```markdown
 ---
 name: switch-strategy
-description: 在完成风险检查和人工审批后切换产品策略，并验证最终状态。
-whenToUse: 用户明确要求把指定产品切换到指定目标策略时。
+description: Switch a product strategy after risk checks and human approval, then verify the final state.
+whenToUse: Use when the user explicitly asks to switch a specified product to a specified target strategy.
 user-invocable: true
 disable-model-invocation: false
 ---
 
 # Switch Strategy
 
-1. 要求用户明确提供产品代码、目标策略和目标环境；任何一项缺失都停止。
-2. 调用只读 Tool 查询当前策略、允许的目标策略、业务时段和冲突变更。
-3. 根据检索到的已审核业务规则生成计划，但不执行写操作。
-4. 提交包含产品、环境、旧策略、目标策略、风险级别和计划的审批请求。
-5. 仅在 Tool Guard 返回有效审批后调用一次 `switch_product_strategy`。
-6. 再次调用只读 Tool 验证绑定和运行状态，并输出审计 ID。
-7. 任一步骤失败、状态漂移或审批过期时立即停止；不得绕过 Guard 或盲目重试。
+1. Require the product code, target strategy, and target environment; stop when any value is missing.
+2. Use read-only tools to query the current strategy, allowed targets, business window, and conflicting changes.
+3. Build a plan from retrieved, reviewed business rules, but do not perform a write.
+4. Submit an approval request with product, environment, old strategy, target strategy, risk level, and plan.
+5. Call `switch_product_strategy` exactly once and only after Tool Guard returns a valid approval.
+6. Call read-only tools again to verify the binding and runtime state, then report the audit ID.
+7. Stop immediately on any failure, state drift, or expired approval; never bypass the Guard or retry blindly.
 ```

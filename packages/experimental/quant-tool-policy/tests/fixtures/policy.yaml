@@ -1,0 +1,23 @@
+version: 1
+status: experimental
+enforced: true
+default: deny
+
+rules:
+  - id: safe-read
+    tools: [safe_read]
+    risk: read_only
+    environments: [development, staging, production]
+    decision: allow
+
+  - id: controlled-write
+    tool_pattern: controlled_*
+    risk: controlled_write
+    environments: [development]
+    decision: require_approval
+
+  - id: destructive
+    tools: [destroy]
+    risk: privileged_operation
+    environments: [development, staging, production]
+    decision: deny
