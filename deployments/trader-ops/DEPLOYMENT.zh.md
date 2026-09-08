@@ -20,7 +20,7 @@
 ## 首次部署
 
 1. 将已评审的 Git revision 解包到新的 release 目录，在该目录运行 `pnpm install --frozen-lockfile` 和项目构建命令，再原子更新 `current` 链接。
-2. 从 `.env.example` 生成 `/etc/deepseek-harness/trader-ops.env`，权限设为 `0600`。替换所有占位值；生产环境将 `OPENVIKING_IMAGE` 固定为已验证的 tag 或 digest。
+2. 从 `.env.example` 生成 `/etc/deepseek-harness/trader-ops.env`，权限设为 `0600`。替换所有占位值，包括模型端点与 root key；生产环境将 `OPENVIKING_IMAGE` 固定为已验证的 tag 或 digest。在创建租户用户前，将 `OPENVIKING_API_KEY` 留空。
 3. 使用部署环境文件启动 OpenViking：
 
    ```bash
@@ -30,8 +30,8 @@
    docker restart trader-ops-openviking
    ```
 
-4. 在初始化向导中配置真实 VLM、embedding 模型和 `server.root_api_key`。环境文件中的 `OPENVIKING_API_KEY` 必须与该 root key 一致。
-5. 加载环境文件并安装固定版本的 DSH 插件：
+4. 在初始化向导中配置真实 VLM 和 embedding 模型。让 `server.root_api_key` 使用 `OPENVIKING_ROOT_API_KEY`，再通过 root CLI 配置创建部署账户和用户。把返回的租户 user key 保存为 `OPENVIKING_API_KEY`；Harness 不得使用 root key。
+5. 激活用户级 CLI 配置并运行 `ov doctor`，然后加载环境文件并安装固定版本的 DSH 插件：
 
    ```bash
    set -a

@@ -20,7 +20,7 @@ Create a dedicated `dsh` user and group and grant them access only to the runtim
 ## First deployment
 
 1. Extract a reviewed Git revision into a new release directory, run `pnpm install --frozen-lockfile` and the project's build command there, then atomically update the `current` symlink.
-2. Create `/etc/deepseek-harness/trader-ops.env` from `.env.example` and set mode `0600`. Replace every placeholder; pin `OPENVIKING_IMAGE` to a validated tag or digest in production.
+2. Create `/etc/deepseek-harness/trader-ops.env` from `.env.example` and set mode `0600`. Replace every placeholder, including the model endpoint and root key; pin `OPENVIKING_IMAGE` to a validated tag or digest in production. Leave `OPENVIKING_API_KEY` empty until the tenant user is created.
 3. Start OpenViking with the deployment environment file:
 
    ```bash
@@ -30,8 +30,8 @@ Create a dedicated `dsh` user and group and grant them access only to the runtim
    docker restart trader-ops-openviking
    ```
 
-4. Configure the real VLM, embedding model, and `server.root_api_key` in the initialization wizard. `OPENVIKING_API_KEY` in the environment file must match that root key.
-5. Load the environment file and install the pinned DSH plugin:
+4. Configure the real VLM and embedding model in the initialization wizard. Set `server.root_api_key` from `OPENVIKING_ROOT_API_KEY`, then create the deployment account and user with the root CLI configuration. Store the returned tenant user key as `OPENVIKING_API_KEY`; Harness must not use the root key.
+5. Activate a user CLI configuration, run `ov doctor`, load the environment file, and install the pinned DSH plugin:
 
    ```bash
    set -a

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Profile commands may reconcile pnpm state. Deployment scripts do not have a
+# terminal available to answer pnpm's module-directory confirmation prompt.
+export CI="${CI:-true}"
+
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 deployment_root="$(CDPATH= cd -- "$script_dir/.." && pwd)"
 repo_root="$(git -C "$deployment_root" rev-parse --show-toplevel)"

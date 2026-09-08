@@ -4,7 +4,7 @@ English | [中文](DEVELOPMENT.zh.md)
 
 ## 1. Prepare the environment
 
-Use Node.js 22.19 or later in the 22.x line, or Node.js 24 or later, together with pnpm, Docker, and Docker Compose. Install repository dependencies from the repository root:
+Use Node.js 22.19 or later in the 22.x line, or Node.js 24 or later, together with pnpm, Docker, Docker Compose, Homebrew, and Ollama. Install repository dependencies from the repository root:
 
 ```bash
 pnpm install
@@ -27,7 +27,7 @@ cp deployments/trader-ops/.env.example deployments/trader-ops/.env
 chmod 600 deployments/trader-ops/.env
 ```
 
-Replace at least `OPENVIKING_HOME`, `DSH_HOME`, and `OPENVIKING_API_KEY`. Load the variables:
+Replace the two persistent directories with absolute host paths, replace `OPENVIKING_ROOT_API_KEY` with a random secret, and set `TRADER_OPS_LOCAL_LLM_ENABLED=true` for the keyless local model path. Keep `OPENVIKING_API_KEY` empty until OpenViking creates the tenant user. Load the variables:
 
 ```bash
 set -a
@@ -35,26 +35,58 @@ source deployments/trader-ops/.env
 set +a
 ```
 
-## 2. Initialize and start OpenViking
+## 2. Start local inference and OpenViking
 
-After the container starts for the first time, the official entrypoint waits for configuration. In another terminal, run the initialization wizard and configure an available VLM, embedding model, and `server.root_api_key`:
+Run Ollama on the macOS host so inference uses Apple Metal. Keep its default loopback listener; Docker Desktop resolves `host.docker.internal` from the OpenViking container:
 
 ```bash
-docker compose --env-file deployments/trader-ops/.env \
-  -f deployments/trader-ops/config/openviking/docker-compose.yml up -d
-
-docker exec -it trader-ops-openviking openviking-server init
+brew install ollama
+brew services start ollama
+ollama pull qwen3-embedding:0.6b
+ollama pull qwen3.5:4b
+ollama pull guoxuter/ov_intent_analysis_sft:v7_q8
+curl --fail http://127.0.0.1:11434/api/tags
 ```
 
-Model providers, model names, and credentials depend on the deployment, so the repository template cannot invent them. Restart the container and check the service after initialization:
+Install the reviewed local configuration into the persistent OpenViking directory, then start the container:
 
 ```bash
-docker restart trader-ops-openviking
+install -d "$OPENVIKING_HOME"
+install -m 600 deployments/trader-ops/config/openviking/ov.conf.local-macos.example \
+  "$OPENVIKING_HOME/ov.conf"
+docker compose --env-file deployments/trader-ops/.env \
+  -f deployments/trader-ops/config/openviking/docker-compose.yml up -d
+```
+
+The root key is only for account administration. Create a root CLI configuration and a tenant admin, copy the returned user key into `OPENVIKING_API_KEY` in the mode-`0600` `.env`, then reload the environment and activate a user CLI configuration:
+
+```bash
+docker exec trader-ops-openviking ov language en
+docker exec trader-ops-openviking ov config add custom \
+  --name trader-ops-root --url http://127.0.0.1:1933 \
+  --root-api-key-env OPENVIKING_ROOT_API_KEY \
+  --account trader-ops --user local-dev --activate --force
+docker exec trader-ops-openviking ov admin create-account trader-ops \
+  --admin local-dev --sudo
+
+set -a
+source deployments/trader-ops/.env
+set +a
+printf '%s' "$OPENVIKING_API_KEY" | docker exec -i trader-ops-openviking \
+  ov config add custom --name trader-ops-local \
+  --url http://127.0.0.1:1933 --api-key-stdin \
+  --account trader-ops --user local-dev --activate --force
+```
+
+Check the model, authentication, storage, and HTTP paths together:
+
+```bash
+docker exec trader-ops-openviking ov doctor
 curl --fail http://127.0.0.1:1933/health
 curl --fail http://127.0.0.1:1933/ready
 ```
 
-The local debugging interface is available at `http://127.0.0.1:1933/studio`.
+The local debugging interface is available at `http://127.0.0.1:1933/studio`. Do not give Harness the root key. Rotate a key immediately if it appears in a terminal capture or log.
 
 ## 3. Install the DSH plugin and validate the Profile
 
@@ -69,18 +101,35 @@ This plugin version requires the related DSH 0.1.x packages to be at least `0.1.
 
 The isolated Profile install currently reports those three DSH packages as missing peer dependencies because the DSH host supplies them rather than the Profile package. The observed install is acceptable only when the host versions satisfy the range and `--dump-config` succeeds; investigate any additional peer warning.
 
+Build the source checkout before starting the Web application:
+
+```bash
+pnpm run build
+```
+
+If `fs-ext` reports a missing native binary and Apple Command Line Tools cannot find the C++ `<memory>` header, rebuild only that dependency with the SDK include directory:
+
+```bash
+CPLUS_INCLUDE_PATH=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1 \
+  pnpm --filter @deepseek-ai/dsh-session-persistence-jsonl rebuild fs-ext
+```
+
 ## 4. Start Harness
 
 ```bash
 pnpm dsh web \
-  --patch deployments/trader-ops/config/dsh/trader-ops.patch.yml
+  --patch deployments/trader-ops/config/dsh/trader-ops.patch.yml \
+  --patch deployments/trader-ops/config/dsh/trader-ops-local-ollama.patch.yml \
+  --no-open
 ```
 
-The service must still start when there is no business knowledge and no `SKILL.md`: the Trader Ops skill count is zero and OpenViking provides an empty recall/memory baseline. This is the expected state.
+The second patch declares Ollama through the supported `llm-pi-ai` OpenAI-compatible route and makes `qwen3.5:4b` the local default. Its `ollama-local` API key value is a non-secret adapter placeholder; Ollama ignores it. Omit that patch and configure a reviewed provider credential when testing the normal DeepSeek model path.
+
+The command prints a local access URL and token. The service must still start when there is no business knowledge and no `SKILL.md`: the Trader Ops skill count is zero and OpenViking provides an empty recall/memory baseline. This is the expected state. A first local turn can take about a minute while models load.
 
 ## 5. Add content later
 
-- Add reviewed Markdown to `knowledge/business`, `knowledge/systems`, or `knowledge/runbooks`, then submit it through an explicit OpenViking ingestion path. Exclude `README.md` and `README.zh.md` from ingestion.
+- Add reviewed, non-empty Markdown to `knowledge/business`, `knowledge/systems`, or `knowledge/runbooks`, then submit it through an explicit OpenViking ingestion path. Exclude `README.md`, `README.zh.md`, and empty or whitespace-only files from ingestion; OpenViking can otherwise derive misleading semantic metadata from the filename alone.
 - Add a complete `SKILL.md` under a direct `skills/<name>/` child. The Loader recognizes direct children as skill bundles; do not add another business-category layer.
 - After a business MCP server exists, copy and review `config/dsh/trader-ops-mcp.patch.yml.example`, remove `.example`, and load it as a second `--patch` argument.
 - Update `policies/tool-access.yaml` when tools are added. The Harness-side plugin enforces it with first-match rules and default deny; `risk-levels.yaml` and `approvals.yaml` remain design contracts until trusted identity and approval stores exist.

@@ -1,0 +1,22 @@
+# Optional local-development layer. The declared pi-ai route uses Ollama's
+# OpenAI-compatible endpoint; its placeholder key is not an external secret.
+
+- id: llm-pi-ai
+  config:
+    providers:
+      trader-ops-local:
+        displayName: Trader Ops local model
+        apiKeyEnv: TRADER_OPS_LOCAL_LLM_API_KEY
+        api: openai-completions
+        baseURL: !!js process.env.TRADER_OPS_LOCAL_LLM_BASE_URL ?? 'http://127.0.0.1:11434/v1'
+        models:
+          - id: !!js process.env.TRADER_OPS_LOCAL_LLM_MODEL ?? 'qwen3.5:4b'
+            name: Trader Ops local model
+            contextWindow: !!js Number(process.env.TRADER_OPS_LOCAL_LLM_CONTEXT_WINDOW ?? 65536)
+            maxTokens: !!js Number(process.env.TRADER_OPS_LOCAL_LLM_MAX_TOKENS ?? 1024)
+            reasoningEfforts: false
+
+- id: agent-default-model
+  config:
+    provider: trader-ops-local
+    model: !!js process.env.TRADER_OPS_LOCAL_LLM_MODEL ?? 'qwen3.5:4b'

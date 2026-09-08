@@ -11,6 +11,7 @@ User / Web UI
       |
       v
 DeepSeek Harness (web profile)
+  |-- Main LLM -----------> optional local Ollama via llm-pi-ai
   |-- Skill Loader --------> deployments/trader-ops/skills/*/SKILL.md
   |                          Loads the complete file; zero is valid
   |
@@ -38,6 +39,7 @@ DeepSeek Harness (web profile)
 |---|---|---|
 | OpenViking service | Deployable | Docker Compose, persistence, and health checks are defined |
 | OpenViking DSH plugin | Installable | Pinned to `@openviking/dsh-memory-plugin@0.3.0` |
+| Local Harness model | Optional, validated | `llm-pi-ai` routes `qwen3.5:4b` to host Ollama without an external key |
 | Trader Ops skill root | Configured | An empty root is valid; adding `SKILL.md` enables discovery |
 | Automatic Git knowledge ingestion | Not implemented | Reviewable add, update, and delete semantics remain required |
 | Trader Ops MCP | Template, disabled | Enable the example patch only after the real service exists |
@@ -47,8 +49,9 @@ DeepSeek Harness (web profile)
 ## Security boundaries
 
 - OpenViking binds to `127.0.0.1:1933` by default. Cross-host access must use a private network or a TLS reverse proxy instead of exposing the port directly.
+- Local Ollama binds to `127.0.0.1:11434`; Docker Desktop reaches it through `host.docker.internal`, while Harness uses the host loopback OpenAI-compatible endpoint.
 - DSH starts with `DSH_PERMISSION_MODE=read-only`. This value controls the local Harness sandbox; it is not a business tool guard.
-- The OpenViking API key enters through the environment only. OpenViking requires `server.root_api_key` in its own configuration when it listens beyond loopback.
+- OpenViking credentials enter through the environment only. `OPENVIKING_ROOT_API_KEY` administers accounts and matches `server.root_api_key`; Harness uses the narrower tenant `OPENVIKING_API_KEY` for data access.
 - `mcp__openviking__forget` permanently deletes data and is explicitly denied by the current policy. OpenViking must still authenticate and authorize direct clients independently of Harness.
 - Dynamic business state must come from live MCP/API queries. Retrieved Markdown must not substitute for current state.
 
@@ -58,6 +61,7 @@ DeepSeek Harness (web profile)
 Built-in DSH web profile
   + installed OpenViking bundle patch
   + config/dsh/trader-ops.patch.yml
+  + (local, optional) config/dsh/trader-ops-local-ollama.patch.yml
   + (future, optional) config/dsh/trader-ops-mcp.patch.yml
 ```
 
