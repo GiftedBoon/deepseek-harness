@@ -1,0 +1,13 @@
+[Unit]
+Description=DeepSeek Harness Trader Ops private-LAN proxy
+Requires=dsh-trader-ops.service
+After=dsh-trader-ops.service
+
+[Service]
+ExecStart=/lib/systemd/systemd-socket-proxyd 127.0.0.1:3180
+DynamicUser=true
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+RestrictAddressFamilies=AF_INET AF_INET6

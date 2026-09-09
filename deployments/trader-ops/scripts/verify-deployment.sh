@@ -6,6 +6,8 @@ deployment_root="$(CDPATH= cd -- "$script_dir/.." && pwd)"
 repo_root="$(CDPATH= cd -- "$deployment_root/../.." && pwd)"
 dsh_cli="$repo_root/apps/cli/lib/bin.js"
 policy_plugin="$repo_root/packages/experimental/quant-tool-policy/lib/index.js"
+lan_proxy_service="$deployment_root/config/systemd/dsh-trader-ops-lan-proxy.service"
+lan_proxy_socket="$deployment_root/config/systemd/dsh-trader-ops-lan-proxy.socket.in"
 profile="${TRADER_OPS_PROFILE:-web}"
 endpoint="${OPENVIKING_URL:-http://127.0.0.1:1933}"
 
@@ -16,6 +18,11 @@ if [[ ! -f "$dsh_cli" ]]; then
 fi
 if [[ ! -f "$policy_plugin" ]]; then
   printf 'Built Trader Ops policy plugin is missing at %s; install a completed release.\n' "$policy_plugin" >&2
+  exit 1
+fi
+if [[ ! -f "$lan_proxy_service" || ! -f "$lan_proxy_socket" ]]; then
+  printf 'Trader Ops private-LAN proxy units are missing from %s.\n' \
+    "$deployment_root/config/systemd" >&2
   exit 1
 fi
 

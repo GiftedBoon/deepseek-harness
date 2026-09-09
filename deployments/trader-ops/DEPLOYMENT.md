@@ -2,7 +2,7 @@
 
 English | [中文](DEPLOYMENT.zh.md)
 
-This runbook deploys the Trader Ops MVP to one Debian 12 `amd64` host. Harness, OpenViking, and host-native Ollama stay on that host; trusted developers reach Harness through its authenticated private-LAN listener or an SSH tunnel. A reverse proxy and public network listener are intentionally outside this MVP.
+This runbook deploys the Trader Ops MVP to one Debian 12 `amd64` host. Harness, OpenViking, and host-native Ollama stay on that host; trusted developers reach Harness through an authenticated private-LAN socket proxy or an SSH tunnel. A public network listener and general-purpose reverse proxy are intentionally outside this MVP.
 
 ## Validated target
 
@@ -22,7 +22,7 @@ The committed bootstrap pins Node.js 24.20.0, pnpm 11.7.0, Ollama 0.33.3, the tw
 /srv/dsh-workspace/                           # agent-accessible workspace
 ```
 
-Harness listens on the host-owned IPv4 address in `TRADER_OPS_WEB_HOST`, which defaults to `127.0.0.1`; the validated target uses `192.168.4.103:3180`. OpenViking publishes only `127.0.0.1:1933`. Native Ollama listens only on Docker's bridge gateway at port 11434; `host.docker.internal` maps the OpenViking container to that address. The configurator rejects wildcard and non-local Harness addresses.
+Harness and OpenViking listen only on `127.0.0.1:3180` and `127.0.0.1:1933`. Native Ollama listens only on Docker's bridge gateway at port 11434; `host.docker.internal` maps the OpenViking container to that address. When `TRADER_OPS_LAN_HOST` names an IPv4 address owned by the host, a systemd socket binds that one address on port 3180 and `systemd-socket-proxyd` forwards it to Harness. The validated target uses `192.168.4.103:3180`; the configurator rejects wildcard and non-local proxy addresses.
 
 ## 1. Bootstrap the Debian host
 
@@ -61,16 +61,16 @@ Rotate any API key previously pasted into chat or logs. Then run the runtime con
 
 ```bash
 ssh -t dsh-server \
-  'sudo env TRADER_OPS_WEB_HOST=192.168.4.103 bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-debian-runtime.sh'
+  'sudo env TRADER_OPS_LAN_HOST=192.168.4.103 bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-debian-runtime.sh'
 ```
 
-Enter the rotated AIHubMix key at the hidden prompt. The script uses `https://api.inferera.com/v1` and `deepseek-v4-flash-0731` by default, generates a separate OpenViking root key, writes the mode-`0600` environment file, starts OpenViking, creates the `trader-ops/remote-admin` tenant identity, stores its narrower user key, installs the pinned DSH plugin, and validates one real remote-model turn with the Trader Ops plugins loaded. It persists an explicitly supplied `TRADER_OPS_WEB_HOST` into that environment file, rejects addresses that the host does not own, and keeps loopback as the default. It then restarts `dsh-trader-ops.service`, requires either a successful Web response or the expected `401` authentication challenge, and confirms that the systemd restart count remains stable for ten seconds. The unit stops retrying after five startup failures in two minutes.
+Enter the rotated AIHubMix key at the hidden prompt. The script uses `https://api.inferera.com/v1` and `deepseek-v4-flash-0731` by default, generates a separate OpenViking root key, writes the mode-`0600` environment file, starts OpenViking, creates the `trader-ops/remote-admin` tenant identity, stores its narrower user key, installs the pinned DSH plugin, and validates one real remote-model turn with the Trader Ops plugins loaded. It persists an explicitly supplied `TRADER_OPS_LAN_HOST`, declares that authority to Harness through `--trusted-host`, and configures the systemd socket proxy without changing Harness's loopback bind. It then requires either a successful Web response or the expected `401` authentication challenge on both routes and confirms that the systemd restart count remains stable for ten seconds. The Harness unit stops retrying after five startup failures in two minutes.
 
 The configurator is resumable: after the environment file exists it reuses it instead of prompting or overwriting credentials. If the OpenViking account already exists while the tenant key is still absent, it regenerates that one admin key and stores the new value. The root key is never given to Harness.
 
 ## 4. Validate and connect
 
-On the server, confirm that Harness uses the selected private address, the supporting services use loopback or Docker-bridge addresses, and all services are active:
+On the server, confirm that Harness and OpenViking use loopback, Ollama uses the Docker bridge, the proxy socket uses the selected private address, and all services are active:
 
 ```bash
 sudo systemctl --no-pager --full status docker ollama dsh-trader-ops

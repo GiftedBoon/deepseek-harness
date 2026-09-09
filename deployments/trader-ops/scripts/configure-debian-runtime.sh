@@ -5,6 +5,8 @@ repo_root="/opt/deepseek-harness/current"
 deployment_root="$repo_root/deployments/trader-ops"
 environment_file="/etc/deepseek-harness/trader-ops.env"
 dsh_cli="$repo_root/apps/cli/lib/bin.js"
+lan_proxy_service="dsh-trader-ops-lan-proxy.service"
+lan_proxy_socket="dsh-trader-ops-lan-proxy.socket"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   printf 'Run this runtime configuration as root through sudo.\n' >&2
@@ -18,17 +20,21 @@ if [[ ! -f "$dsh_cli" ]]; then
   printf 'Built DSH CLI is missing at %s; install a completed release.\n' "$dsh_cli" >&2
   exit 1
 fi
+if [[ ! -x /lib/systemd/systemd-socket-proxyd ]]; then
+  printf 'Debian systemd-socket-proxyd is missing at /lib/systemd/systemd-socket-proxyd.\n' >&2
+  exit 1
+fi
 aihubmix_base_url="${AIHUBMIX_BASE_URL:-https://api.inferera.com/v1}"
 aihubmix_model="${AIHUBMIX_MODEL:-deepseek-v4-flash-0731}"
 openviking_image="${OPENVIKING_IMAGE:-ghcr.io/volcengine/openviking@sha256:68394a4ed13f60e3c0644adda97c16bb1094c8261e12fc2e9e69d5aefaea3da1}"
-requested_web_host="${TRADER_OPS_WEB_HOST:-}"
-trader_ops_web_host="${requested_web_host:-127.0.0.1}"
+requested_lan_host="${TRADER_OPS_LAN_HOST:-}"
+trader_ops_lan_host="$requested_lan_host"
 
-validate_web_host() {
-  if [[ "$trader_ops_web_host" == 127.0.0.1 ]]; then
+validate_lan_host() {
+  if [[ -z "$trader_ops_lan_host" ]]; then
     return
   fi
-  if ! ip -o -4 address show scope global | awk -v expected="$trader_ops_web_host" '
+  if ! ip -o -4 address show scope global | awk -v expected="$trader_ops_lan_host" '
     {
       split($4, address, "/")
       if (address[1] == expected) {
@@ -37,16 +43,25 @@ validate_web_host() {
     }
     END { exit found ? 0 : 1 }
   '; then
-    printf 'TRADER_OPS_WEB_HOST must be 127.0.0.1 or an IPv4 address assigned to this host.\n' >&2
+    printf 'TRADER_OPS_LAN_HOST must be an IPv4 address assigned to this host.\n' >&2
     exit 1
   fi
 }
 
-validate_web_host
+validate_lan_host
 
 harness_http_ready() {
   local status
-  status="$(curl --silent --output /dev/null --write-out '%{http_code}' "http://$trader_ops_web_host:3180/")" \
+  status="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3180/)" \
+    || return 1
+  [[ "$status" == 200 || "$status" == 401 ]]
+}
+
+lan_http_ready() {
+  local status
+  [[ -n "$trader_ops_lan_host" ]] || return 0
+  status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+    --header "Host: $trader_ops_lan_host:3180" "http://$trader_ops_lan_host:3180/")" \
     || return 1
   [[ "$status" == 200 || "$status" == 401 ]]
 }
@@ -61,25 +76,39 @@ if [[ ! "$aihubmix_model" =~ ^[A-Za-z0-9._:/-]+$ ]]; then
 fi
 
 tmp_file="$(mktemp)"
+socket_file="$(mktemp)"
 cleanup() {
-  rm -f -- "$tmp_file"
+  rm -f -- "$tmp_file" "$socket_file"
 }
 trap cleanup EXIT
 umask 077
 
-persist_web_host() {
-  local found=0
+persist_lan_settings() {
+  local authority_found=0
+  local host_found=0
   : >"$tmp_file"
   while IFS= read -r line || [[ -n "$line" ]]; do
-    if [[ "$line" == TRADER_OPS_WEB_HOST=* ]]; then
-      printf 'TRADER_OPS_WEB_HOST=%s\n' "$trader_ops_web_host" >>"$tmp_file"
-      found=1
-    else
-      printf '%s\n' "$line" >>"$tmp_file"
-    fi
+    case "$line" in
+      TRADER_OPS_LAN_HOST=*)
+        printf 'TRADER_OPS_LAN_HOST=%s\n' "$trader_ops_lan_host" >>"$tmp_file"
+        host_found=1
+        ;;
+      TRADER_OPS_WEB_AUTHORITY=*)
+        printf 'TRADER_OPS_WEB_AUTHORITY=%s:3180\n' "$trader_ops_lan_host" >>"$tmp_file"
+        authority_found=1
+        ;;
+      TRADER_OPS_WEB_HOST=*)
+        ;;
+      *)
+        printf '%s\n' "$line" >>"$tmp_file"
+        ;;
+    esac
   done <"$environment_file"
-  if [[ "$found" == 0 ]]; then
-    printf 'TRADER_OPS_WEB_HOST=%s\n' "$trader_ops_web_host" >>"$tmp_file"
+  if [[ "$host_found" == 0 ]]; then
+    printf 'TRADER_OPS_LAN_HOST=%s\n' "$trader_ops_lan_host" >>"$tmp_file"
+  fi
+  if [[ "$authority_found" == 0 ]]; then
+    printf 'TRADER_OPS_WEB_AUTHORITY=%s:3180\n' "$trader_ops_lan_host" >>"$tmp_file"
   fi
   install -o root -g root -m 0600 "$tmp_file" "$environment_file"
 }
@@ -97,7 +126,8 @@ TRADER_OPS_PROFILE=web
 DSH_HOME=/var/lib/deepseek-harness
 DSH_PERMISSION_MODE=read-only
 TRADER_OPS_LLM_PROVIDER=aihubmix
-TRADER_OPS_WEB_HOST=$trader_ops_web_host
+TRADER_OPS_LAN_HOST=$trader_ops_lan_host
+TRADER_OPS_WEB_AUTHORITY=${trader_ops_lan_host:-127.0.0.1}:3180
 AIHUBMIX_BASE_URL=$aihubmix_base_url
 AIHUBMIX_API_KEY=$aihubmix_api_key
 AIHUBMIX_MODEL=$aihubmix_model
@@ -120,8 +150,8 @@ TRADER_OPS_MCP_ENABLED=0
 TRADER_OPS_ENVIRONMENT=development
 EOF
   install -o root -g root -m 0600 "$tmp_file" "$environment_file"
-elif [[ -n "$requested_web_host" ]]; then
-  persist_web_host
+elif [[ -n "$requested_lan_host" ]]; then
+  persist_lan_settings
 fi
 
 set -a
@@ -129,8 +159,13 @@ set -a
 # shellcheck source=/dev/null
 source "$environment_file"
 set +a
-trader_ops_web_host="${TRADER_OPS_WEB_HOST:-127.0.0.1}"
-validate_web_host
+trader_ops_lan_host="${TRADER_OPS_LAN_HOST:-}"
+validate_lan_host
+expected_web_authority="${trader_ops_lan_host:-127.0.0.1}:3180"
+if [[ "${TRADER_OPS_WEB_AUTHORITY:-$expected_web_authority}" != "$expected_web_authority" ]]; then
+  printf 'TRADER_OPS_WEB_AUTHORITY must match the configured Trader Ops listener.\n' >&2
+  exit 1
+fi
 : "${AIHUBMIX_API_KEY:?The deployment environment has no AIHubMix API key}"
 : "${OPENVIKING_ROOT_API_KEY:?The deployment environment has no OpenViking root key}"
 
@@ -140,6 +175,18 @@ install -o root -g root -m 0600 \
 install -o root -g root -m 0644 \
   "$deployment_root/config/systemd/dsh-trader-ops.service" \
   /etc/systemd/system/dsh-trader-ops.service
+install -o root -g root -m 0644 \
+  "$deployment_root/config/systemd/dsh-trader-ops-lan-proxy.service" \
+  "/etc/systemd/system/$lan_proxy_service"
+if [[ -n "$trader_ops_lan_host" ]]; then
+  sed "s/@TRADER_OPS_LAN_HOST@/$trader_ops_lan_host/g" \
+    "$deployment_root/config/systemd/dsh-trader-ops-lan-proxy.socket.in" >"$socket_file"
+  install -o root -g root -m 0644 "$socket_file" "/etc/systemd/system/$lan_proxy_socket"
+else
+  systemctl stop "$lan_proxy_service" >/dev/null 2>&1 || true
+  systemctl disable --now "$lan_proxy_socket" >/dev/null 2>&1 || true
+  rm -f -- "/etc/systemd/system/$lan_proxy_socket"
+fi
 systemctl daemon-reload
 
 docker compose --env-file "$environment_file" \
@@ -218,6 +265,7 @@ model_output="$(/usr/sbin/runuser --preserve-environment -u dsh -- env \
   'Reply only REMOTE-MODEL-OK')"
 grep -q 'REMOTE-MODEL-OK' <<<"$model_output"
 systemctl enable dsh-trader-ops
+systemctl reset-failed dsh-trader-ops
 systemctl restart dsh-trader-ops
 for _ in {1..60}; do
   if harness_http_ready; then
@@ -231,10 +279,29 @@ if [[ "${web_ready:-0}" != 1 ]]; then
   journalctl --no-pager -u dsh-trader-ops -n 100 >&2
   exit 1
 fi
+if [[ -n "$trader_ops_lan_host" ]]; then
+  systemctl enable "$lan_proxy_socket"
+  systemctl reset-failed "$lan_proxy_socket" "$lan_proxy_service"
+  systemctl stop "$lan_proxy_service" >/dev/null 2>&1 || true
+  systemctl restart "$lan_proxy_socket"
+  for _ in {1..30}; do
+    if lan_http_ready; then
+      lan_ready=1
+      break
+    fi
+    sleep 1
+  done
+  if [[ "${lan_ready:-0}" != 1 ]]; then
+    systemctl --no-pager --full status "$lan_proxy_socket" "$lan_proxy_service" >&2 || true
+    journalctl --no-pager -u "$lan_proxy_service" -n 100 >&2
+    exit 1
+  fi
+fi
 systemctl is-active --quiet dsh-trader-ops
 restart_count="$(systemctl show dsh-trader-ops --property=NRestarts --value)"
 sleep 10
 if ! harness_http_ready \
+  || ! lan_http_ready \
   || ! systemctl is-active --quiet dsh-trader-ops \
   || [[ "$(systemctl show dsh-trader-ops --property=NRestarts --value)" != "$restart_count" ]]; then
   printf 'Trader Ops did not remain stable for the 10-second verification window.\n' >&2
@@ -242,5 +309,7 @@ if ! harness_http_ready \
   journalctl --no-pager -u dsh-trader-ops -n 100 >&2
   exit 1
 fi
-printf 'Trader Ops Harness is active at %s:3180; OpenViking is active at 127.0.0.1:1933.\n' \
-  "$trader_ops_web_host"
+printf 'Trader Ops Harness is active at 127.0.0.1:3180; OpenViking is active at 127.0.0.1:1933.\n'
+if [[ -n "$trader_ops_lan_host" ]]; then
+  printf 'The authenticated private-LAN proxy is active at %s:3180.\n' "$trader_ops_lan_host"
+fi

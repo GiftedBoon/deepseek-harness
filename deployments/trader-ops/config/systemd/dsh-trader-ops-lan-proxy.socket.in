@@ -1,0 +1,10 @@
+[Unit]
+Description=DeepSeek Harness Trader Ops private-LAN listener
+
+[Socket]
+ListenStream=@TRADER_OPS_LAN_HOST@:3180
+NoDelay=true
+Service=dsh-trader-ops-lan-proxy.service
+
+[Install]
+WantedBy=sockets.target

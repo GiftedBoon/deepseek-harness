@@ -2,7 +2,7 @@
 
 [English](DEPLOYMENT.md) | 中文
 
-本运行手册把 Trader Ops MVP 部署到一台 Debian 12 `amd64` 主机。Harness、OpenViking 和宿主机原生 Ollama 都保留在该主机，可信开发者通过带身份验证的内网监听或 SSH 隧道访问 Harness。本 MVP 明确不包含反向代理和公网监听。
+本运行手册把 Trader Ops MVP 部署到一台 Debian 12 `amd64` 主机。Harness、OpenViking 和宿主机原生 Ollama 都保留在该主机，可信开发者通过带身份验证的内网 socket proxy 或 SSH 隧道访问 Harness。本 MVP 明确不包含公网监听和通用反向代理。
 
 ## 已验证目标
 
@@ -22,7 +22,7 @@
 /srv/dsh-workspace/                           # Agent 可访问的工作目录
 ```
 
-Harness 监听 `TRADER_OPS_WEB_HOST` 指定且属于本机的 IPv4 地址，该变量默认是 `127.0.0.1`；已验证目标使用 `192.168.4.103:3180`。OpenViking 只发布到 `127.0.0.1:1933`。原生 Ollama 只监听 Docker bridge gateway 的 11434 端口；`host.docker.internal` 把 OpenViking 容器映射到该地址。配置器拒绝通配地址和不属于本机的 Harness 地址。
+Harness 与 OpenViking 分别只监听 `127.0.0.1:3180` 和 `127.0.0.1:1933`。原生 Ollama 只监听 Docker bridge gateway 的 11434 端口；`host.docker.internal` 把 OpenViking 容器映射到该地址。当 `TRADER_OPS_LAN_HOST` 指定属于本机的 IPv4 地址时，一个 systemd socket 只在该地址的 3180 端口监听，并由 `systemd-socket-proxyd` 转发到 Harness。已验证目标使用 `192.168.4.103:3180`；配置器拒绝通配和不属于本机的代理地址。
 
 ## 1. 引导 Debian 主机
 
@@ -61,16 +61,16 @@ ssh dsh-server \
 
 ```bash
 ssh -t dsh-server \
-  'sudo env TRADER_OPS_WEB_HOST=192.168.4.103 bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-debian-runtime.sh'
+  'sudo env TRADER_OPS_LAN_HOST=192.168.4.103 bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-debian-runtime.sh'
 ```
 
-在隐藏提示处输入已轮换的 AIHubMix key。脚本默认使用 `https://api.inferera.com/v1` 和 `deepseek-v4-flash-0731`，生成独立的 OpenViking root key，写入权限为 `0600` 的环境文件，启动 OpenViking，创建 `trader-ops/remote-admin` 租户身份，保存权限更窄的 user key，安装固定版本的 DSH 插件，并在加载 Trader Ops 插件的情况下验证一次真实远程模型回合。脚本会把显式传入的 `TRADER_OPS_WEB_HOST` 持久化到该环境文件，拒绝不属于本机的地址，并在没有指定时保持回环默认值。然后它会重启 `dsh-trader-ops.service`，要求 Web 成功响应或返回预期的 `401` 身份验证挑战，并确认 systemd 重启次数在十秒内保持稳定。该单元在两分钟内启动失败五次后会停止重试。
+在隐藏提示处输入已轮换的 AIHubMix key。脚本默认使用 `https://api.inferera.com/v1` 和 `deepseek-v4-flash-0731`，生成独立的 OpenViking root key，写入权限为 `0600` 的环境文件，启动 OpenViking，创建 `trader-ops/remote-admin` 租户身份，保存权限更窄的 user key，安装固定版本的 DSH 插件，并在加载 Trader Ops 插件的情况下验证一次真实远程模型回合。脚本会持久化显式传入的 `TRADER_OPS_LAN_HOST`，通过 `--trusted-host` 向 Harness 声明该 authority，并配置 systemd socket proxy，而不会改变 Harness 的回环监听。然后它会要求两条访问路径都成功响应或返回预期的 `401` 身份验证挑战，并确认 systemd 重启次数在十秒内保持稳定。Harness 单元在两分钟内启动失败五次后会停止重试。
 
 配置器可继续执行：环境文件存在后会复用它，不会再次询问或覆盖凭据。如果 OpenViking account 已存在但租户 key 仍为空，它会只重新生成该 admin key 并保存新值。Harness 永远不会取得 root key。
 
 ## 4. 验证并连接
 
-在服务器上确认 Harness 使用选定的内网地址、辅助服务使用回环或 Docker bridge 地址，并确认所有服务都处于 active：
+在服务器上确认 Harness 与 OpenViking 使用回环、Ollama 使用 Docker bridge、代理 socket 使用选定内网地址，并确认所有服务都处于 active：
 
 ```bash
 sudo systemctl --no-pager --full status docker ollama dsh-trader-ops
