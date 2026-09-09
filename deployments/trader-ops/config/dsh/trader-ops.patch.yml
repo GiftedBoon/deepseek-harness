@@ -24,7 +24,7 @@
 
 - insert:
     - id: trader-ops-tool-policy
-      name: '@deepseek-ai/dsh-experimental-quant-tool-policy'
+      name: '../../../../packages/experimental/quant-tool-policy/lib/index.js'
       config:
         policyFile: ./deployments/trader-ops/policies/tool-access.yaml
         environment: !!js process.env.TRADER_OPS_ENVIRONMENT

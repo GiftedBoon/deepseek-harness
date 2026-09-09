@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-07-trader-ops-deployment-scaffold.md
-2026-09-07-trader-ops-deployment-scaffold.md: 01dc5e7f2715eee3040e423b10095284ffb47b20
-2026-09-07-trader-ops-deployment-scaffold.zh.md: 6e6645bdb88a428f9518f9e991f4545c0c62d22a
+2026-09-07-trader-ops-deployment-scaffold.md: 425220ce8a0e825306aa063701e0adc53d0a35b3
+2026-09-07-trader-ops-deployment-scaffold.zh.md: 715ffa8f09461cd6a4276bade3ca02c7d3f67643

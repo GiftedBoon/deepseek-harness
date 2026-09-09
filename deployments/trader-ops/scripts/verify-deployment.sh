@@ -5,12 +5,17 @@ script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 deployment_root="$(CDPATH= cd -- "$script_dir/.." && pwd)"
 repo_root="$(CDPATH= cd -- "$deployment_root/../.." && pwd)"
 dsh_cli="$repo_root/apps/cli/lib/bin.js"
+policy_plugin="$repo_root/packages/experimental/quant-tool-policy/lib/index.js"
 profile="${TRADER_OPS_PROFILE:-web}"
 endpoint="${OPENVIKING_URL:-http://127.0.0.1:1933}"
 
 : "${DSH_HOME:?Set DSH_HOME to the Harness configuration directory used by this deployment}"
 if [[ ! -f "$dsh_cli" ]]; then
   printf 'Built DSH CLI is missing at %s; install a completed release.\n' "$dsh_cli" >&2
+  exit 1
+fi
+if [[ ! -f "$policy_plugin" ]]; then
+  printf 'Built Trader Ops policy plugin is missing at %s; install a completed release.\n' "$policy_plugin" >&2
   exit 1
 fi
 

@@ -53,7 +53,7 @@ ssh dsh-server \
 
 如果主机访问 GitHub 过慢，应在可信机器上创建带顶层目录的 `git archive`，其中 `.trader-ops-source-commit` 保存同一个完整 commit SHA。把归档复制到主机并计算 SHA-256，再通过 `TRADER_OPS_RELEASE_ARCHIVE` 传入绝对路径，通过 `TRADER_OPS_RELEASE_ARCHIVE_SHA256` 传入 digest。安装器会先校验两者，再解压和构建；由于源码归档没有 `.git` 目录，安装器会把已校验的 revision 作为 `DSH_CLIENT_COMMIT_HASH` 传给构建过程。
 
-安装器只获取该 commit，运行 `pnpm install --frozen-lockfile` 与 `pnpm run build`，记录构建标记，再原子移动 `/opt/deepseek-harness/current`。部署脚本根据自身安装路径定位仓库，并直接调用已构建的 `apps/cli/lib/bin.js` 入口；因此运行时配置既不要求发布目录保留 Git 元数据，也不会让 pnpm 调整不可变发布。安装器不会重启任何服务。已有目录缺少构建标记时会被视为未完成发布，需要人工检查而不是自动删除。
+安装器只获取该 commit，运行 `pnpm install --frozen-lockfile` 与 `pnpm run build`，记录构建标记，再原子移动 `/opt/deepseek-harness/current`。部署脚本根据自身安装路径定位仓库，并直接调用已构建的 `apps/cli/lib/bin.js` 入口；部署 overlay 也从当前 release 加载私有工具策略插件，不要求外部 Profile 安装它。因此运行时配置既不要求发布目录保留 Git 元数据，也不会让 pnpm 调整不可变发布。安装器不会重启任何服务。已有目录缺少构建标记时会被视为未完成发布，需要人工检查而不是自动删除。
 
 ## 3. 安装密钥并启动运行时
 
@@ -64,7 +64,7 @@ ssh -t dsh-server \
   'sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-debian-runtime.sh'
 ```
 
-在隐藏提示处输入已轮换的 AIHubMix key。脚本默认使用 `https://api.inferera.com/v1` 和 `deepseek-v4-flash-0731`，生成独立的 OpenViking root key，写入权限为 `0600` 的环境文件，启动 OpenViking，创建 `trader-ops/remote-admin` 租户身份，保存权限更窄的 user key，安装固定版本的 DSH 插件，验证有效 Profile 和一次真实远程模型回合，最后启动 `dsh-trader-ops.service`。
+在隐藏提示处输入已轮换的 AIHubMix key。脚本默认使用 `https://api.inferera.com/v1` 和 `deepseek-v4-flash-0731`，生成独立的 OpenViking root key，写入权限为 `0600` 的环境文件，启动 OpenViking，创建 `trader-ops/remote-admin` 租户身份，保存权限更窄的 user key，安装固定版本的 DSH 插件，并在加载 Trader Ops 插件的情况下验证一次真实远程模型回合。然后它会重启 `dsh-trader-ops.service`，要求 Web 成功响应或返回预期的 `401` 身份验证挑战，并确认 systemd 重启次数在十秒内保持稳定。该单元在两分钟内启动失败五次后会停止重试。
 
 配置器可继续执行：环境文件存在后会复用它，不会再次询问或覆盖凭据。如果 OpenViking account 已存在但租户 key 仍为空，它会只重新生成该 admin key 并保存新值。Harness 永远不会取得 root key。
 

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-deployment_root="/opt/deepseek-harness/current/deployments/trader-ops"
+repo_root="/opt/deepseek-harness/current"
+deployment_root="$repo_root/deployments/trader-ops"
 environment_file="/etc/deepseek-harness/trader-ops.env"
-dsh_cli="/opt/deepseek-harness/current/apps/cli/lib/bin.js"
+dsh_cli="$repo_root/apps/cli/lib/bin.js"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   printf 'Run this runtime configuration as root through sudo.\n' >&2
@@ -20,6 +21,13 @@ fi
 aihubmix_base_url="${AIHUBMIX_BASE_URL:-https://api.inferera.com/v1}"
 aihubmix_model="${AIHUBMIX_MODEL:-deepseek-v4-flash-0731}"
 openviking_image="${OPENVIKING_IMAGE:-ghcr.io/volcengine/openviking@sha256:68394a4ed13f60e3c0644adda97c16bb1094c8261e12fc2e9e69d5aefaea3da1}"
+
+harness_http_ready() {
+  local status
+  status="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3180/)" \
+    || return 1
+  [[ "$status" == 200 || "$status" == 401 ]]
+}
 
 if [[ ! "$aihubmix_base_url" =~ ^https://[^[:space:]#]+$ ]]; then
   printf 'AIHUBMIX_BASE_URL must be an HTTPS URL without whitespace or #.\n' >&2
@@ -151,6 +159,7 @@ printf '%s' "$OPENVIKING_API_KEY" | docker exec -i trader-ops-openviking \
   --activate --force >/dev/null
 docker exec trader-ops-openviking ov doctor
 
+cd "$repo_root"
 /usr/sbin/runuser --preserve-environment -u dsh -- env \
   CI=true HOME=/var/lib/deepseek-harness PATH=/usr/local/bin:/usr/bin:/bin \
   "$deployment_root/scripts/bootstrap-profile.sh"
@@ -160,12 +169,14 @@ docker exec trader-ops-openviking ov doctor
 model_output="$(/usr/sbin/runuser --preserve-environment -u dsh -- env \
   CI=true HOME=/var/lib/deepseek-harness PATH=/usr/local/bin:/usr/bin:/bin \
   node "$dsh_cli" --profile headless \
+  --patch "$deployment_root/config/dsh/trader-ops.patch.yml" \
   --patch "$deployment_root/config/dsh/trader-ops-aihubmix.patch.yml" \
   'Reply only REMOTE-MODEL-OK')"
 grep -q 'REMOTE-MODEL-OK' <<<"$model_output"
-systemctl enable --now dsh-trader-ops
+systemctl enable dsh-trader-ops
+systemctl restart dsh-trader-ops
 for _ in {1..60}; do
-  if curl --silent --show-error --output /dev/null http://127.0.0.1:3180/; then
+  if harness_http_ready; then
     web_ready=1
     break
   fi
@@ -177,4 +188,14 @@ if [[ "${web_ready:-0}" != 1 ]]; then
   exit 1
 fi
 systemctl is-active --quiet dsh-trader-ops
+restart_count="$(systemctl show dsh-trader-ops --property=NRestarts --value)"
+sleep 10
+if ! harness_http_ready \
+  || ! systemctl is-active --quiet dsh-trader-ops \
+  || [[ "$(systemctl show dsh-trader-ops --property=NRestarts --value)" != "$restart_count" ]]; then
+  printf 'Trader Ops did not remain stable for the 10-second verification window.\n' >&2
+  systemctl --no-pager --full status dsh-trader-ops >&2 || true
+  journalctl --no-pager -u dsh-trader-ops -n 100 >&2
+  exit 1
+fi
 printf 'Trader Ops runtime is active on host loopback ports 3180 and 1933.\n'

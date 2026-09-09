@@ -2,6 +2,8 @@
 Description=DeepSeek Harness Trader Ops deployment
 Wants=network-online.target
 After=network-online.target docker.service
+StartLimitIntervalSec=120
+StartLimitBurst=5
 
 [Service]
 Type=simple
