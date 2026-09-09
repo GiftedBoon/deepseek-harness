@@ -26,6 +26,7 @@ Trader Ops 部署拥有相互分离的 `knowledge/`、`skills/` 和 `policies/` 
 - 发布时配置与 systemd 直接调用已构建的 DSH CLI。部署 overlay 从该 release 解析私有策略插件，外部 Profile 只拥有树外依赖。由 pnpm 支持的源码启动器仅用于可写的开发检出，不能在不可变发布中调整依赖。
 - 运行时配置在加载 Trader Ops 插件的情况下冒烟测试远程模型，再要求 Web 成功响应或返回预期的身份验证挑战，并保持 systemd 重启次数稳定。该单元会限制反复启动失败的重试速率。
 - Linux 原生 Ollama 只监听 Docker bridge gateway，OpenViking 与 Harness 保持只监听回环地址。一个可选 systemd socket 会绑定一个属于本机的 IPv4 地址并代理到 Harness；`--trusted-host` 允许该 authority 通过浏览器 Host/Origin 围栏，而不启用 CLI 禁止的通配绑定。配置器拒绝通配和不属于本机的代理地址，MVP 不添加公网反向代理。
+- 可选企业微信长连接渠道在现有 Trader Ops Harness 进程内运行，不开放入站监听。部署生成的专用 preset 会禁用交互式提问，渠道采用受限的 `approval: never` 权限 preset，并以准确的用户与群聊白名单替代浏览器身份；启用失败时，root 配置器会恢复此前的环境。
 - 在真实服务和经过评审的工具 schema 存在以前，Trader Ops MCP 配置保持为默认关闭的示例。
 - `tool-access.yaml` 已由私有实验包 `quant-tool-policy` 通过 `tools/pre-execute` 和单调 `ctx.tools.guard()` 兜底强制执行，未匹配工具默认拒绝。在可信身份和审批存储存在前，更广泛的风险与审批文档仍是设计约定。
 
@@ -45,6 +46,7 @@ OpenViking 记忆插件并不意味着自动把 Git 知识入库。后续工作�
 - 让 OpenViking 安装器在每台主机上选择最新版插件。骨架否决该方案，因为远程部署需要可复现的包解析；版本升级应经过显式评审。
 - 添加占位 `SKILL.md` 和知识文档。否决原因是空发现是受支持状态，虚假内容会模糊基础设施就绪与业务就绪的边界。
 - 把描述性 policy YAML 本身当作足够的控制。否决原因是没有执行 hook 的配置会制造虚假安全边界；当前骨架改为加载经过测试的 Harness 插件，并单独记录 MCP 服务承担最终授权责任。
+- 使用第二个 Harness 服务运行企业微信。否决原因是第二个进程会重复模型、记忆、policy、Profile 与持久化配置，还会争用现有 Web 端口；一个可选渠道层可以复用已经验证的运行时，并保持单一服务生命周期。
 
 ## 后果
 
@@ -59,5 +61,7 @@ OpenViking 记忆插件并不意味着自动把 Git 知识入库。后续工作�
 主机引导固定 Node、pnpm、Ollama、它的两个模型 id 与 OpenViking 镜像 digest。Docker Engine 跟随 Docker 的签名 Debian apt 软件源；因此升级时既要评审解析出的 Docker 软件包版本，也要评审显式固定的产物。
 
 Harness 侧的工具名/环境边界已经生效，并显式拒绝 OpenViking 永久遗忘。剩余未完成区域是真实的 Trader Ops MCP 服务，以及它的可信身份、资源/参数授权、持久审批与审计存储。内网代理通过明文 HTTP 传输 bearer URL token 与 session cookie，因此在最终服务边界和 TLS 终止器存在前，其网络与用户都必须可信。
+
+启用企业微信后，每条准入用户消息及其召回上下文都会通过已配置的 AIHubMix 模型路由发送。运维人员必须确保每个 BotID 只有一个活跃进程，保留独立的 Session 身份密钥，并在启用渠道前批准准确的用户与群聊。
 
 固定插件版本 `0.3.0` 提高了可复现性，但也带来一项有意的维护工作：任何 Harness 或 OpenViking 升级都必须重新检查 Node 要求、对等依赖（peer dependency）、有效配置以及健康/就绪行为。

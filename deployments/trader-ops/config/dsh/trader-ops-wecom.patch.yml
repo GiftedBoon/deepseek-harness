@@ -1,0 +1,52 @@
+# Optional enterprise WeCom long-connection channel. The service always loads
+# this layer, while TRADER_OPS_WECOM_ENABLED controls provider activation.
+# Credentials and provider identifiers stay in the root-owned environment file.
+
+- id: agent-presets
+  name: '@deepseek-ai/dsh-agent-presets'
+  config:
+    default: standard
+    roots:
+      - path: !!js (process.env.DSH_HOME ?? '/var/lib/deepseek-harness') + '/profiles/' + (process.env.TRADER_OPS_PROFILE ?? 'web') + '/agent-presets'
+        trust: system
+    includeShippedRoot: true
+    includeUserRoot: true
+
+- id: permission
+  name: '@deepseek-ai/dsh-permission-presets'
+  config:
+    presets:
+      read-only:
+        sandbox: read-only
+        approval: ask
+      workspace-write:
+        sandbox: workspace-write
+        approval: ask
+      danger-full-access:
+        sandbox: danger-full-access
+        approval: never
+      trader-ops-wecom:
+        sandbox: !!js process.env.TRADER_OPS_WECOM_SANDBOX ?? 'read-only'
+        approval: never
+
+- insert:
+    - id: trader-ops-wecom-channel
+      name: '@deepseek-ai/dsh-channel-wecom'
+      disabled: !!js process.env.TRADER_OPS_WECOM_ENABLED !== '1'
+      config:
+        botId: !!js process.env.WECOM_BOT_ID
+        secretEnv: WECOM_BOT_SECRET
+        sessionKeyEnv: WECOM_SESSION_KEY
+        workspacePath: /srv/dsh-workspace
+        agentPreset: trader-ops-wecom
+        permissionPreset: trader-ops-wecom
+        allowedUsers: !!js (process.env.WECOM_ALLOWED_USERS ?? '').split(',').map(value => value.trim()).filter(Boolean)
+        allowedChats: !!js (process.env.WECOM_ALLOWED_CHATS ?? '').split(',').map(value => value.trim()).filter(Boolean)
+        groupConversationMode: !!js process.env.WECOM_GROUP_CONVERSATION_MODE ?? 'shared'
+        messages:
+          processing: '正在处理…'
+          timeout: '处理超时，请稍后重试。'
+          failure: '处理失败，请稍后重试。'
+          emptyReply: '任务已完成，但没有文本回复。'
+          unauthorized: '当前用户或会话未获授权。'
+          duplicate: '该消息正在处理中。'

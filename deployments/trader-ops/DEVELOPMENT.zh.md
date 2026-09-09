@@ -119,10 +119,11 @@ CPLUS_INCLUDE_PATH=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/inclu
 pnpm dsh web \
   --patch deployments/trader-ops/config/dsh/trader-ops.patch.yml \
   --patch deployments/trader-ops/config/dsh/trader-ops-aihubmix.patch.yml \
+  --patch deployments/trader-ops/config/dsh/trader-ops-wecom.patch.yml \
   --no-open
 ```
 
-第二个 patch 通过受支持的 `llm-pi-ai` OpenAI-compatible 路由声明已配置的 AIHubMix 端点，并从环境读取端点、凭据、模型 id、上下文窗口和输出上限。OpenViking 使用同一远程路由进行语义提取，同时保留本地 Ollama 模型用于 embedding 和 query planner。
+第二个 patch 通过受支持的 `llm-pi-ai` OpenAI-compatible 路由声明已配置的 AIHubMix 端点，并从环境读取端点、凭据、模型 id、上下文窗口和输出上限。OpenViking 使用同一远程路由进行语义提取，同时保留本地 Ollama 模型用于 embedding 和 query planner。第三个 patch 在 `TRADER_OPS_WECOM_ENABLED=1` 以前保持企业微信关闭；请使用远程部署配置器，不要在仓库中保存真实机器人凭据。
 
 该命令会输出本地访问 URL 与 token。没有业务知识和 `SKILL.md` 时，服务仍应正常启动：Trader Ops skill 数量为 0，OpenViking 只提供空的检索/记忆基线。这是预期状态。所有模型可见的提示词、检索记忆、工具描述和用户输入都会发送给 AIHubMix，因此在中转站与所选模型通过必要的安全评审前，不要发送受限业务数据。
 

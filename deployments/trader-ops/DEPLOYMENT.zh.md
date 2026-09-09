@@ -94,10 +94,44 @@ ssh -t dsh-server 'sudo journalctl -u dsh-trader-ops -n 100 --no-pager'
 
 URL token 可以访问当前进程的浏览器界面。不要把它粘贴到聊天中，也不要保存在共享日志里。
 
+## 5. 启用可选企业微信渠道
+
+在企业微信管理后台创建智能机器人并启用长连接接收，准备 BotID、secret 以及允许启动 Agent 回合的准确企业微信用户 id。切换前停止其他所有使用该 BotID 的进程，因为企业微信只允许每个机器人存在一个活跃长连接。
+
+在交互式 root 终端中运行专用配置器：
+
+```bash
+ssh -t dsh-server \
+  'sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-wecom-runtime.sh --enable'
+```
+
+配置器通过隐藏提示读取机器人 secret，生成并保留独立的 Session 身份密钥，拒绝通配白名单，安装渠道包及其无人值守 preset，并重启现有 `dsh-trader-ops` 服务。Harness 仍只监听回环地址，并且不会开放新的入站端口。渠道使用 `read-only` 沙箱与 `approval: never`；专用 preset 禁用 `tool-ask-user`。如果启用失败，脚本会恢复此前的环境并重启基础 Trader Ops 服务。
+
+群聊列表为空时不会准入群聊。以后启用经过评审的群聊时，应把准确 chat id 写入 `WECOM_ALLOWED_CHATS`，绝不能使用 `*`。由一名获准用户在首次单聊中发送以下消息进行验证：
+
+```text
+Production verification: reply only PROD-PONG.
+```
+
+机器人必须先发送处理中消息，再返回 `PROD-PONG`，并且服务没有重启。检查状态时不要共享 journal，因为 Web 启动 URL 含有身份验证 token：
+
+```bash
+sudo systemctl show dsh-trader-ops -p ActiveState -p SubState -p NRestarts
+sudo journalctl -u dsh-trader-ops -n 100 --no-pager
+```
+
+使用以下命令停用渠道，同时保留它的凭据与会话身份材料：
+
+```bash
+sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-wecom-runtime.sh --disable
+```
+
+批准生产使用前，应完成渠道自有的 [Linux 验收流程](../../docs/user/guide/wecom-linux-deployment.zh.md#acceptance-procedure)，包括 Session 连续性、沙箱限制、白名单拒绝、重启恢复与 journal 隐私检查。
+
 ## 每次发布
 
 1. 使用新的、已评审的完整 commit SHA 运行 `install-debian-release.sh`。
-2. 加载 `/etc/deepseek-harness/trader-ops.env`，再以 `dsh` 身份针对新发布运行 `bootstrap-profile.sh` 和 `verify-deployment.sh`，然后才重启服务。
+2. 加载 `/etc/deepseek-harness/trader-ops.env`，再以 `dsh` 身份针对新发布运行 `bootstrap-profile.sh` 和 `verify-deployment.sh`，然后才重启服务；这些命令会保留可选企业微信依赖与无人值守 preset。
 3. 执行任何数据迁移前，备份 `/var/lib/openviking` 与 `/var/lib/deepseek-harness`。
 4. 重启 `dsh-trader-ops`，重复监听地址、健康、空 skill 和空 knowledge 检查，并保留上一发布。
 5. 失败时，把 `current` 原子指回上一个已验证发布，再重启 Harness。只有失败发布执行过明确的不兼容迁移时，才恢复持久化数据。
@@ -110,6 +144,7 @@ URL token 可以访问当前进程的浏览器界面。不要把它粘贴到聊�
 - AIHubMix 的端点归属、模型路由、保留策略与数据处理条款必须覆盖每一类模型可见数据并通过评审。
 - 在缺少业务知识、生产 skill、可信用户身份、持久审批与 Trader Ops MCP 授权层时，Harness 保持只读，并只允许可信开发内网或 SSH 隧道访问。
 - `tool-access.yaml` 以 `enforced: true`、显式环境和默认拒绝加载。未来业务 MCP 服务必须重复执行主体、资源与参数级授权。
+- 启用企业微信时，机器人使用准确的用户与群聊白名单、唯一活跃 BotID owner、`trader-ops-wecom` 无人值守 preset 与受限非交互权限 preset。获准用户的单聊消息必须通过真实远程模型完成，才能批准上线。
 
 ## 备份与监控
 

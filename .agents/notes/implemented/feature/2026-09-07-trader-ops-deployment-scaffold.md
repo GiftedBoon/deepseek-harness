@@ -26,6 +26,7 @@ Add a deployment-owned, empty-state scaffold under `deployments/trader-ops/`:
 - Release-time configuration and systemd invoke the built DSH CLI directly. The deployment overlay resolves the private policy plugin from that release, while the external Profile owns only out-of-tree dependencies. The pnpm-backed source launcher remains limited to writable development checkouts and cannot reconcile dependencies inside an immutable release.
 - Runtime configuration smoke-tests the remote model with the Trader Ops plugins loaded, then requires a successful Web response or the expected authentication challenge and a stable systemd restart count. The unit rate-limits repeated startup failures.
 - Native Ollama listens only on the Docker bridge gateway on Linux, and OpenViking and Harness remain loopback-only. An optional systemd socket binds one host-owned IPv4 address and proxies it to Harness; `--trusted-host` admits that authority through the browser Host/Origin fence without enabling the CLI's prohibited wildcard bind. The configurator rejects wildcard and non-local proxy addresses, and the MVP does not add a public reverse proxy.
+- The optional enterprise WeCom long-connection channel runs inside the existing Trader Ops Harness process and opens no inbound listener. A generated deployment preset disables interactive questions, the channel uses a confined `approval: never` permission preset, exact user and chat allowlists replace browser identity, and the root configurator restores the previous environment when activation fails.
 - Trader Ops MCP configuration remains a disabled example until an actual server and reviewed tool schemas exist.
 - `tool-access.yaml` is enforced by the private experimental `quant-tool-policy` package through `tools/pre-execute` and a monotonic `ctx.tools.guard()` fallback. Unmatched tools are denied. The broader risk and approval documents remain design contracts until trusted identity and approval stores exist.
 
@@ -45,6 +46,7 @@ It also does not claim business authorization. DSH sandbox permissions, OpenViki
 - Let the OpenViking installer select the latest plugin on every host. Rejected for the scaffold because remote deployments need reproducible package resolution; version upgrades should be reviewed explicitly.
 - Add placeholder `SKILL.md` and knowledge documents. Rejected because empty discovery is a supported state and fake content would blur the boundary between infrastructure readiness and business readiness.
 - Treat descriptive policy YAML as sufficient on its own. Rejected because configuration without an execution hook creates a false security boundary; the scaffold instead loads a tested Harness plugin and separately documents the MCP server's final authorization responsibility.
+- Run enterprise WeCom as a second Harness service. Rejected because a second process would duplicate model, memory, policy, profile, and persistence configuration while competing for the existing Web port; one optional channel layer reuses the validated runtime and keeps one service lifecycle.
 
 ## Consequences
 
@@ -59,5 +61,7 @@ A remote relay moves every model-visible prompt, recalled memory item, tool desc
 The host bootstrap pins Node, pnpm, Ollama, its two model ids, and the OpenViking image digest. Docker Engine follows Docker's signed Debian apt repository; an upgrade therefore requires reviewing the resolved Docker package versions as well as the explicitly pinned artifacts.
 
 The Harness-side tool-name/environment boundary is active and explicitly denies OpenViking permanent-forget. The remaining unfinished area is the real Trader Ops MCP service and its trusted identity, resource/argument authorization, durable approval, and audit stores. The private-LAN proxy carries a bearer URL token and session cookie over plaintext HTTP, so its network and users stay trusted until that final service boundary and a TLS terminator exist.
+
+Enabling WeCom sends each admitted user message and its recalled context through the configured AIHubMix model route. Operators must keep one active process per BotID, preserve the separate Session identity key, and approve exact users and groups before enabling the channel.
 
 Pinning plugin version `0.3.0` improves repeatability but creates an intentional maintenance task: any Harness or OpenViking upgrade must re-check Node requirements, peer dependencies, effective configuration, and health/readiness behaviour.

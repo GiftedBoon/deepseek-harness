@@ -94,10 +94,44 @@ ssh -t dsh-server 'sudo journalctl -u dsh-trader-ops -n 100 --no-pager'
 
 The URL token grants browser access to this process. Do not paste it into chat or retain it in shared logs.
 
+## 5. Enable the optional enterprise WeCom channel
+
+Create an intelligent bot in the enterprise WeCom administration console and enable long-connection receiving. Collect its BotID and secret, plus the exact WeCom user ids allowed to start Agent turns. Stop every other process that uses this BotID before cutover because WeCom permits one active long connection for each bot.
+
+Run the dedicated configurator in an interactive root terminal:
+
+```bash
+ssh -t dsh-server \
+  'sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-wecom-runtime.sh --enable'
+```
+
+The configurator reads the bot secret through a hidden prompt, generates and preserves a separate Session identity key, rejects wildcard allowlists, installs the channel package and its unattended preset, and restarts the existing `dsh-trader-ops` service. It keeps Harness on loopback and opens no new inbound port. The channel uses `read-only` sandbox access with `approval: never`; its preset disables `tool-ask-user`. If activation fails, the script restores the previous environment and restarts the base Trader Ops service.
+
+An empty group-chat list keeps group access disabled. Enable a reviewed group later by placing its exact chat id in `WECOM_ALLOWED_CHATS`; never use `*`. Validate the initial single chat from one allowed user with:
+
+```text
+Production verification: reply only PROD-PONG.
+```
+
+The bot must send the processing message and then `PROD-PONG` without a service restart. Inspect status without sharing the journal because the Web startup URL contains its authentication token:
+
+```bash
+sudo systemctl show dsh-trader-ops -p ActiveState -p SubState -p NRestarts
+sudo journalctl -u dsh-trader-ops -n 100 --no-pager
+```
+
+Disable the channel while retaining its credentials and conversation identity material:
+
+```bash
+sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-wecom-runtime.sh --disable
+```
+
+Before production approval, complete the channel-owned [Linux acceptance procedure](../../docs/user/guide/wecom-linux-deployment.md#acceptance-procedure), including Session continuity, sandbox confinement, allowlist rejection, restart recovery, and journal privacy.
+
 ## Each release
 
 1. Run `install-debian-release.sh` with a new reviewed full commit SHA.
-2. Load `/etc/deepseek-harness/trader-ops.env`, then run `bootstrap-profile.sh` and `verify-deployment.sh` as `dsh` against the new release before restarting the service.
+2. Load `/etc/deepseek-harness/trader-ops.env`, then run `bootstrap-profile.sh` and `verify-deployment.sh` as `dsh` against the new release before restarting the service; these commands preserve the optional WeCom dependency and unattended preset.
 3. Back up `/var/lib/openviking` and `/var/lib/deepseek-harness` before any data migration.
 4. Restart `dsh-trader-ops`, repeat the listener, health, empty-skill, and empty-knowledge checks, and retain the previous release.
 5. On failure, atomically point `current` to the previous validated release and restart Harness. Restore persistent data only when the failed release performed an explicit incompatible migration.
@@ -110,6 +144,7 @@ The URL token grants browser access to this process. Do not paste it into chat o
 - AIHubMix endpoint ownership, model routing, retention, and data-processing terms are approved for every class of model-visible data.
 - Harness stays read-only and is limited to the trusted private developer network or an SSH tunnel while business knowledge, production skills, trusted user identity, durable approval, and the Trader Ops MCP authorization layer are absent.
 - `tool-access.yaml` loads with `enforced: true`, an explicit environment, and default deny. The future business MCP server must repeat actor-, resource-, and argument-level authorization.
+- When WeCom is enabled, the bot uses exact user and chat allowlists, one active BotID owner, the `trader-ops-wecom` unattended preset, and the confined noninteractive permission preset. An allowed single-chat message completes through the real remote model before approval.
 
 ## Backup and monitoring
 

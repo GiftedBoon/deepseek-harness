@@ -119,10 +119,11 @@ CPLUS_INCLUDE_PATH=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/inclu
 pnpm dsh web \
   --patch deployments/trader-ops/config/dsh/trader-ops.patch.yml \
   --patch deployments/trader-ops/config/dsh/trader-ops-aihubmix.patch.yml \
+  --patch deployments/trader-ops/config/dsh/trader-ops-wecom.patch.yml \
   --no-open
 ```
 
-The second patch declares the configured AIHubMix endpoint through the supported `llm-pi-ai` OpenAI-compatible route. It reads the endpoint, credential, model id, context window, and output limit from the environment. OpenViking uses the same remote route for semantic extraction while retaining local Ollama models for embedding and query planning.
+The second patch declares the configured AIHubMix endpoint through the supported `llm-pi-ai` OpenAI-compatible route. It reads the endpoint, credential, model id, context window, and output limit from the environment. OpenViking uses the same remote route for semantic extraction while retaining local Ollama models for embedding and query planning. The third patch keeps enterprise WeCom disabled unless `TRADER_OPS_WECOM_ENABLED=1`; use the remote deployment configurator rather than storing real bot credentials in the repository.
 
 The command prints a local access URL and token. The service must still start when there is no business knowledge and no `SKILL.md`: the Trader Ops skill count is zero and OpenViking provides an empty recall/memory baseline. This is the expected state. AIHubMix receives all model-visible prompts, recalled memory, tool descriptions, and user input, so do not send restricted business data until the relay and selected model have passed the required security review.
 
