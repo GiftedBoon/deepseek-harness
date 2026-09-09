@@ -2,7 +2,7 @@
 
 English | [中文](DEPLOYMENT.zh.md)
 
-This runbook deploys the Trader Ops MVP to one Debian 12 `amd64` host. Harness, OpenViking, and host-native Ollama stay on that host; users reach Harness only through an SSH tunnel. A reverse proxy and public network listener are intentionally outside this MVP.
+This runbook deploys the Trader Ops MVP to one Debian 12 `amd64` host. Harness, OpenViking, and host-native Ollama stay on that host; trusted developers reach Harness through its authenticated private-LAN listener or an SSH tunnel. A reverse proxy and public network listener are intentionally outside this MVP.
 
 ## Validated target
 
@@ -22,7 +22,7 @@ The committed bootstrap pins Node.js 24.20.0, pnpm 11.7.0, Ollama 0.33.3, the tw
 /srv/dsh-workspace/                           # agent-accessible workspace
 ```
 
-Harness listens on `127.0.0.1:3180`, and OpenViking publishes `127.0.0.1:1933`. Native Ollama listens only on Docker's bridge gateway at port 11434; `host.docker.internal` maps the OpenViking container to that address. No application port binds to the host's LAN address.
+Harness listens on the host-owned IPv4 address in `TRADER_OPS_WEB_HOST`, which defaults to `127.0.0.1`; the validated target uses `192.168.4.103:3180`. OpenViking publishes only `127.0.0.1:1933`. Native Ollama listens only on Docker's bridge gateway at port 11434; `host.docker.internal` maps the OpenViking container to that address. The configurator rejects wildcard and non-local Harness addresses.
 
 ## 1. Bootstrap the Debian host
 
@@ -61,16 +61,16 @@ Rotate any API key previously pasted into chat or logs. Then run the runtime con
 
 ```bash
 ssh -t dsh-server \
-  'sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-debian-runtime.sh'
+  'sudo env TRADER_OPS_WEB_HOST=192.168.4.103 bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-debian-runtime.sh'
 ```
 
-Enter the rotated AIHubMix key at the hidden prompt. The script uses `https://api.inferera.com/v1` and `deepseek-v4-flash-0731` by default, generates a separate OpenViking root key, writes the mode-`0600` environment file, starts OpenViking, creates the `trader-ops/remote-admin` tenant identity, stores its narrower user key, installs the pinned DSH plugin, and validates one real remote-model turn with the Trader Ops plugins loaded. It then restarts `dsh-trader-ops.service`, requires either a successful Web response or the expected `401` authentication challenge, and confirms that the systemd restart count remains stable for ten seconds. The unit stops retrying after five startup failures in two minutes.
+Enter the rotated AIHubMix key at the hidden prompt. The script uses `https://api.inferera.com/v1` and `deepseek-v4-flash-0731` by default, generates a separate OpenViking root key, writes the mode-`0600` environment file, starts OpenViking, creates the `trader-ops/remote-admin` tenant identity, stores its narrower user key, installs the pinned DSH plugin, and validates one real remote-model turn with the Trader Ops plugins loaded. It persists an explicitly supplied `TRADER_OPS_WEB_HOST` into that environment file, rejects addresses that the host does not own, and keeps loopback as the default. It then restarts `dsh-trader-ops.service`, requires either a successful Web response or the expected `401` authentication challenge, and confirms that the systemd restart count remains stable for ten seconds. The unit stops retrying after five startup failures in two minutes.
 
 The configurator is resumable: after the environment file exists it reuses it instead of prompting or overwriting credentials. If the OpenViking account already exists while the tenant key is still absent, it regenerates that one admin key and stores the new value. The root key is never given to Harness.
 
 ## 4. Validate and connect
 
-On the server, confirm that only loopback or Docker-bridge listeners exist and that both services are active:
+On the server, confirm that Harness uses the selected private address, the supporting services use loopback or Docker-bridge addresses, and all services are active:
 
 ```bash
 sudo systemctl --no-pager --full status docker ollama dsh-trader-ops
@@ -80,7 +80,7 @@ sudo docker compose --env-file /etc/deepseek-harness/trader-ops.env \
 sudo docker exec trader-ops-openviking ov doctor
 ```
 
-From the development Mac, create the SSH tunnel and keep that terminal open:
+From a trusted host on the same private network, open `http://192.168.4.103:3180`. A `401` response without the authenticated URL token is the expected healthy response. If the private route is unavailable, create an SSH tunnel and keep that terminal open:
 
 ```bash
 ssh -N -L 3180:127.0.0.1:3180 dsh-server
@@ -108,7 +108,7 @@ The URL token grants browser access to this process. Do not paste it into chat o
 - `dsh --dump-config` contains exactly one expected `openviking-memory-runtime` and includes `trader-ops-tool-policy`, `trader-ops-skills`, and the AIHubMix provider.
 - The real environment contains no template or exposed credentials, and secrets do not appear in Git, logs, process arguments, or shell history.
 - AIHubMix endpoint ownership, model routing, retention, and data-processing terms are approved for every class of model-visible data.
-- Harness stays read-only and SSH-tunnel-only while business knowledge, production skills, trusted user identity, durable approval, and the Trader Ops MCP authorization layer are absent.
+- Harness stays read-only and is limited to the trusted private developer network or an SSH tunnel while business knowledge, production skills, trusted user identity, durable approval, and the Trader Ops MCP authorization layer are absent.
 - `tool-access.yaml` loads with `enforced: true`, an explicit environment, and default deny. The future business MCP server must repeat actor-, resource-, and argument-level authorization.
 
 ## Backup and monitoring

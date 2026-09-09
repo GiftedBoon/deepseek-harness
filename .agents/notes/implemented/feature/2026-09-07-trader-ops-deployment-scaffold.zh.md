@@ -25,7 +25,7 @@ Trader Ops 部署拥有相互分离的 `knowledge/`、`skills/` 和 `policies/` 
 - Debian MVP 使用三个显式阶段：带下载校验的 root 主机引导、非 root 的精确 commit 发布构建，以及从终端隐藏提示读取已轮换中转 key 的 root 运行时配置。
 - 发布时配置与 systemd 直接调用已构建的 DSH CLI。部署 overlay 从该 release 解析私有策略插件，外部 Profile 只拥有树外依赖。由 pnpm 支持的源码启动器仅用于可写的开发检出，不能在不可变发布中调整依赖。
 - 运行时配置在加载 Trader Ops 插件的情况下冒烟测试远程模型，再要求 Web 成功响应或返回预期的身份验证挑战，并保持 systemd 重启次数稳定。该单元会限制反复启动失败的重试速率。
-- Linux 原生 Ollama 只监听 Docker bridge gateway。Harness 与 OpenViking 保持只监听回环地址，并通过 SSH 隧道访问；MVP 不添加公网反向代理。
+- Linux 原生 Ollama 只监听 Docker bridge gateway，OpenViking 保持只监听回环地址。Harness 默认监听回环地址，也可以绑定一个属于本机的 IPv4 地址供可信内网访问；配置器拒绝通配地址和不属于本机的地址，MVP 不添加公网反向代理。
 - 在真实服务和经过评审的工具 schema 存在以前，Trader Ops MCP 配置保持为默认关闭的示例。
 - `tool-access.yaml` 已由私有实验包 `quant-tool-policy` 通过 `tools/pre-execute` 和单调 `ctx.tools.guard()` 兜底强制执行，未匹配工具默认拒绝。在可信身份和审批存储存在前，更广泛的风险与审批文档仍是设计约定。
 
@@ -58,6 +58,6 @@ OpenViking 记忆插件并不意味着自动把 Git 知识入库。后续工作�
 
 主机引导固定 Node、pnpm、Ollama、它的两个模型 id 与 OpenViking 镜像 digest。Docker Engine 跟随 Docker 的签名 Debian apt 软件源；因此升级时既要评审解析出的 Docker 软件包版本，也要评审显式固定的产物。
 
-Harness 侧的工具名/环境边界现已生效，并显式拒绝 OpenViking 永久遗忘。剩余未完成区域是真实的 Trader Ops MCP 服务，以及它的可信身份、资源/参数授权、持久审批与审计存储。在这一最终服务边界存在前，仍只允许可信开发者访问。
+Harness 侧的工具名/环境边界已经生效，并显式拒绝 OpenViking 永久遗忘。剩余未完成区域是真实的 Trader Ops MCP 服务，以及它的可信身份、资源/参数授权、持久审批与审计存储。内网监听依赖 bearer URL token，而不具备可信用户身份，因此在这一最终服务边界存在前，网络访问仍只允许可信开发者。
 
 固定插件版本 `0.3.0` 提高了可复现性，但也带来一项有意的维护工作：任何 Harness 或 OpenViking 升级都必须重新检查 Node 要求、对等依赖（peer dependency）、有效配置以及健康/就绪行为。

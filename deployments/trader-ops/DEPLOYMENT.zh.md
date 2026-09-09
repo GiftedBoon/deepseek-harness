@@ -2,7 +2,7 @@
 
 [English](DEPLOYMENT.md) | 中文
 
-本运行手册把 Trader Ops MVP 部署到一台 Debian 12 `amd64` 主机。Harness、OpenViking 和宿主机原生 Ollama 都保留在该主机，用户只通过 SSH 隧道访问 Harness。本 MVP 明确不包含反向代理和公网监听。
+本运行手册把 Trader Ops MVP 部署到一台 Debian 12 `amd64` 主机。Harness、OpenViking 和宿主机原生 Ollama 都保留在该主机，可信开发者通过带身份验证的内网监听或 SSH 隧道访问 Harness。本 MVP 明确不包含反向代理和公网监听。
 
 ## 已验证目标
 
@@ -22,7 +22,7 @@
 /srv/dsh-workspace/                           # Agent 可访问的工作目录
 ```
 
-Harness 监听 `127.0.0.1:3180`，OpenViking 发布到 `127.0.0.1:1933`。原生 Ollama 只监听 Docker bridge gateway 的 11434 端口；`host.docker.internal` 把 OpenViking 容器映射到该地址。没有应用端口绑定到宿主机的局域网地址。
+Harness 监听 `TRADER_OPS_WEB_HOST` 指定且属于本机的 IPv4 地址，该变量默认是 `127.0.0.1`；已验证目标使用 `192.168.4.103:3180`。OpenViking 只发布到 `127.0.0.1:1933`。原生 Ollama 只监听 Docker bridge gateway 的 11434 端口；`host.docker.internal` 把 OpenViking 容器映射到该地址。配置器拒绝通配地址和不属于本机的 Harness 地址。
 
 ## 1. 引导 Debian 主机
 
@@ -61,16 +61,16 @@ ssh dsh-server \
 
 ```bash
 ssh -t dsh-server \
-  'sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-debian-runtime.sh'
+  'sudo env TRADER_OPS_WEB_HOST=192.168.4.103 bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-debian-runtime.sh'
 ```
 
-在隐藏提示处输入已轮换的 AIHubMix key。脚本默认使用 `https://api.inferera.com/v1` 和 `deepseek-v4-flash-0731`，生成独立的 OpenViking root key，写入权限为 `0600` 的环境文件，启动 OpenViking，创建 `trader-ops/remote-admin` 租户身份，保存权限更窄的 user key，安装固定版本的 DSH 插件，并在加载 Trader Ops 插件的情况下验证一次真实远程模型回合。然后它会重启 `dsh-trader-ops.service`，要求 Web 成功响应或返回预期的 `401` 身份验证挑战，并确认 systemd 重启次数在十秒内保持稳定。该单元在两分钟内启动失败五次后会停止重试。
+在隐藏提示处输入已轮换的 AIHubMix key。脚本默认使用 `https://api.inferera.com/v1` 和 `deepseek-v4-flash-0731`，生成独立的 OpenViking root key，写入权限为 `0600` 的环境文件，启动 OpenViking，创建 `trader-ops/remote-admin` 租户身份，保存权限更窄的 user key，安装固定版本的 DSH 插件，并在加载 Trader Ops 插件的情况下验证一次真实远程模型回合。脚本会把显式传入的 `TRADER_OPS_WEB_HOST` 持久化到该环境文件，拒绝不属于本机的地址，并在没有指定时保持回环默认值。然后它会重启 `dsh-trader-ops.service`，要求 Web 成功响应或返回预期的 `401` 身份验证挑战，并确认 systemd 重启次数在十秒内保持稳定。该单元在两分钟内启动失败五次后会停止重试。
 
 配置器可继续执行：环境文件存在后会复用它，不会再次询问或覆盖凭据。如果 OpenViking account 已存在但租户 key 仍为空，它会只重新生成该 admin key 并保存新值。Harness 永远不会取得 root key。
 
 ## 4. 验证并连接
 
-在服务器上确认只存在回环或 Docker bridge 监听，并确认两个服务都处于 active：
+在服务器上确认 Harness 使用选定的内网地址、辅助服务使用回环或 Docker bridge 地址，并确认所有服务都处于 active：
 
 ```bash
 sudo systemctl --no-pager --full status docker ollama dsh-trader-ops
@@ -80,7 +80,7 @@ sudo docker compose --env-file /etc/deepseek-harness/trader-ops.env \
 sudo docker exec trader-ops-openviking ov doctor
 ```
 
-在开发 Mac 上建立 SSH 隧道，并保持该终端运行：
+在同一内网的可信主机上打开 `http://192.168.4.103:3180`。没有经过身份验证的 URL token 时返回 `401` 是预期的健康响应。如果内网路由不可用，则建立 SSH 隧道并保持该终端运行：
 
 ```bash
 ssh -N -L 3180:127.0.0.1:3180 dsh-server
@@ -108,7 +108,7 @@ URL token 可以访问当前进程的浏览器界面。不要把它粘贴到聊�
 - `dsh --dump-config` 中只有一个预期的 `openviking-memory-runtime`，并包含 `trader-ops-tool-policy`、`trader-ops-skills` 与 AIHubMix 提供方。
 - 实际环境不存在模板或已暴露凭据，密钥不会出现在 Git、日志、进程参数或 shell history 中。
 - AIHubMix 的端点归属、模型路由、保留策略与数据处理条款必须覆盖每一类模型可见数据并通过评审。
-- 在缺少业务知识、生产 skill、可信用户身份、持久审批与 Trader Ops MCP 授权层时，Harness 保持只读且只能经 SSH 隧道访问。
+- 在缺少业务知识、生产 skill、可信用户身份、持久审批与 Trader Ops MCP 授权层时，Harness 保持只读，并只允许可信开发内网或 SSH 隧道访问。
 - `tool-access.yaml` 以 `enforced: true`、显式环境和默认拒绝加载。未来业务 MCP 服务必须重复执行主体、资源与参数级授权。
 
 ## 备份与监控

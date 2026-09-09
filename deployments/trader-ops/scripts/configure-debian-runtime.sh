@@ -21,10 +21,32 @@ fi
 aihubmix_base_url="${AIHUBMIX_BASE_URL:-https://api.inferera.com/v1}"
 aihubmix_model="${AIHUBMIX_MODEL:-deepseek-v4-flash-0731}"
 openviking_image="${OPENVIKING_IMAGE:-ghcr.io/volcengine/openviking@sha256:68394a4ed13f60e3c0644adda97c16bb1094c8261e12fc2e9e69d5aefaea3da1}"
+requested_web_host="${TRADER_OPS_WEB_HOST:-}"
+trader_ops_web_host="${requested_web_host:-127.0.0.1}"
+
+validate_web_host() {
+  if [[ "$trader_ops_web_host" == 127.0.0.1 ]]; then
+    return
+  fi
+  if ! ip -o -4 address show scope global | awk -v expected="$trader_ops_web_host" '
+    {
+      split($4, address, "/")
+      if (address[1] == expected) {
+        found = 1
+      }
+    }
+    END { exit found ? 0 : 1 }
+  '; then
+    printf 'TRADER_OPS_WEB_HOST must be 127.0.0.1 or an IPv4 address assigned to this host.\n' >&2
+    exit 1
+  fi
+}
+
+validate_web_host
 
 harness_http_ready() {
   local status
-  status="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3180/)" \
+  status="$(curl --silent --output /dev/null --write-out '%{http_code}' "http://$trader_ops_web_host:3180/")" \
     || return 1
   [[ "$status" == 200 || "$status" == 401 ]]
 }
@@ -45,6 +67,23 @@ cleanup() {
 trap cleanup EXIT
 umask 077
 
+persist_web_host() {
+  local found=0
+  : >"$tmp_file"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == TRADER_OPS_WEB_HOST=* ]]; then
+      printf 'TRADER_OPS_WEB_HOST=%s\n' "$trader_ops_web_host" >>"$tmp_file"
+      found=1
+    else
+      printf '%s\n' "$line" >>"$tmp_file"
+    fi
+  done <"$environment_file"
+  if [[ "$found" == 0 ]]; then
+    printf 'TRADER_OPS_WEB_HOST=%s\n' "$trader_ops_web_host" >>"$tmp_file"
+  fi
+  install -o root -g root -m 0600 "$tmp_file" "$environment_file"
+}
+
 if [[ ! -e "$environment_file" ]]; then
   read -r -s -p 'Enter the rotated AIHubMix API key: ' aihubmix_api_key
   printf '\n'
@@ -58,6 +97,7 @@ TRADER_OPS_PROFILE=web
 DSH_HOME=/var/lib/deepseek-harness
 DSH_PERMISSION_MODE=read-only
 TRADER_OPS_LLM_PROVIDER=aihubmix
+TRADER_OPS_WEB_HOST=$trader_ops_web_host
 AIHUBMIX_BASE_URL=$aihubmix_base_url
 AIHUBMIX_API_KEY=$aihubmix_api_key
 AIHUBMIX_MODEL=$aihubmix_model
@@ -80,6 +120,8 @@ TRADER_OPS_MCP_ENABLED=0
 TRADER_OPS_ENVIRONMENT=development
 EOF
   install -o root -g root -m 0600 "$tmp_file" "$environment_file"
+elif [[ -n "$requested_web_host" ]]; then
+  persist_web_host
 fi
 
 set -a
@@ -87,6 +129,8 @@ set -a
 # shellcheck source=/dev/null
 source "$environment_file"
 set +a
+trader_ops_web_host="${TRADER_OPS_WEB_HOST:-127.0.0.1}"
+validate_web_host
 : "${AIHUBMIX_API_KEY:?The deployment environment has no AIHubMix API key}"
 : "${OPENVIKING_ROOT_API_KEY:?The deployment environment has no OpenViking root key}"
 
@@ -198,4 +242,5 @@ if ! harness_http_ready \
   journalctl --no-pager -u dsh-trader-ops -n 100 >&2
   exit 1
 fi
-printf 'Trader Ops runtime is active on host loopback ports 3180 and 1933.\n'
+printf 'Trader Ops Harness is active at %s:3180; OpenViking is active at 127.0.0.1:1933.\n' \
+  "$trader_ops_web_host"
