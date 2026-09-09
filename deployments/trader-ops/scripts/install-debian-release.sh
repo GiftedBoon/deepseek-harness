@@ -60,7 +60,11 @@ if [[ ! -f "$build_marker" ]]; then
   (
     cd "$release_dir"
     CI=true pnpm install --frozen-lockfile
-    pnpm run build
+    if [[ -n "$release_archive" ]]; then
+      DSH_CLIENT_COMMIT_HASH="$git_ref" pnpm run build
+    else
+      pnpm run build
+    fi
   )
   printf '%s\n' "$git_ref" >"$build_marker"
 fi
