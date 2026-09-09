@@ -15,13 +15,15 @@ An empty directory layout alone does not establish runtime wiring. Conversely, p
 Add a deployment-owned, empty-state scaffold under `deployments/trader-ops/`:
 
 - Docker Compose runs OpenViking with persistent storage and a loopback-only published port.
-- The macOS MVP runs Ollama natively on the host for Metal acceleration. The OpenViking container reaches it through `host.docker.internal`; the committed local configuration uses environment placeholders rather than credentials.
-- An optional DSH patch declares host Ollama as a self-hosted OpenAI-compatible `llm-pi-ai` route and selects `qwen3.5:4b` as the local main model. The ordinary DeepSeek route remains the default when that patch is absent.
+- The macOS MVP runs Ollama natively on the host for Metal-accelerated embedding and query planning. The OpenViking container reaches it through `host.docker.internal`; the committed local configuration uses environment placeholders rather than credentials.
+- An optional DSH patch declares an AIHubMix endpoint as an OpenAI-compatible `llm-pi-ai` route. `TRADER_OPS_LLM_PROVIDER` selects it; the ordinary Profile model remains the default when the patch is absent. OpenViking uses the same remote route for semantic extraction.
 - OpenViking account administration uses a root key, while Harness and ordinary data commands use a separate tenant user key.
 - A checked-in DSH patch configures the installed OpenViking runtime and adds a dedicated filesystem skill provider for `deployments/trader-ops/skills`.
 - A bootstrap script pins `@openviking/dsh-memory-plugin@0.3.0`, installs it into the selected Profile, and verifies the effective configuration with `--dump-config`.
 - A verification script checks OpenViking health/readiness, DSH configuration composition, and reports zero non-empty knowledge documents or skills as a valid state. Empty and whitespace-only Markdown is excluded from the ingestable count.
 - Environment templates contain no real secrets; remote deployment uses a mode-`0600` environment file and persistent state outside the release directory.
+- The Debian MVP uses three explicit phases: a root host bootstrap with verified downloads, a non-root exact-commit release build, and a root runtime configurator that reads the rotated relay key from a hidden terminal prompt.
+- Native Ollama listens only on the Docker bridge gateway on Linux. Harness and OpenViking remain loopback-only and are reached through an SSH tunnel; the MVP does not add a public reverse proxy.
 - Trader Ops MCP configuration remains a disabled example until an actual server and reviewed tool schemas exist.
 - `tool-access.yaml` is enforced by the private experimental `quant-tool-policy` package through `tools/pre-execute` and a monotonic `ctx.tools.guard()` fallback. Unmatched tools are denied. The broader risk and approval documents remain design contracts until trusted identity and approval stores exist.
 
@@ -29,7 +31,7 @@ The OpenViking memory plugin does not imply automatic Git knowledge ingestion. L
 
 ## Validation boundary
 
-The scaffold validates package installation, patch composition, service health, empty content discovery, a local Ollama-based VLM, embedding, and query-planner path, and an optional end-to-end local Harness turn. Remote providers and credentials remain deployment-specific and stay outside Git.
+The scaffold validates package installation, patch composition, service health, empty content discovery, local Ollama-based embedding and query planning, remote semantic extraction, and an optional end-to-end Harness turn. Remote credentials remain deployment-specific and stay outside Git.
 
 It also does not claim business authorization. DSH sandbox permissions, OpenViking authentication, and Trader Ops tool policy are separate boundaries; all three must be configured before untrusted or production access.
 
@@ -37,7 +39,7 @@ It also does not claim business authorization. DSH sandbox permissions, OpenViki
 
 - Commit a complete `ov.conf` template with guessed model providers. Rejected because the required VLM, embedding model, endpoints, and credentials vary by environment, and a plausible-looking template would encourage invalid or insecure deployments.
 - Run Ollama inside Docker Desktop on macOS. Rejected because that path cannot use Apple Metal acceleration and duplicates model state inside the container environment; native Ollama keeps inference local while the container remains replaceable.
-- Point the direct `deepseek-official` adapter at Ollama. Rejected because that route owns DeepSeek-specific wire behavior; the existing `llm-pi-ai` declared-provider path is the supported abstraction for a self-hosted OpenAI-compatible service.
+- Point the direct `deepseek-official` adapter at a third-party relay. Rejected because that route owns DeepSeek-specific wire behavior; the existing `llm-pi-ai` declared-provider path is the supported abstraction for an OpenAI-compatible service.
 - Let the OpenViking installer select the latest plugin on every host. Rejected for the scaffold because remote deployments need reproducible package resolution; version upgrades should be reviewed explicitly.
 - Add placeholder `SKILL.md` and knowledge documents. Rejected because empty discovery is a supported state and fake content would blur the boundary between infrastructure readiness and business readiness.
 - Treat descriptive policy YAML as sufficient on its own. Rejected because configuration without an execution hook creates a false security boundary; the scaffold instead loads a tested Harness plugin and separately documents the MCP server's final authorization responsibility.
@@ -48,7 +50,11 @@ Developers can bring up and validate the integration before business content exi
 
 OpenViking may derive semantic metadata from a filename even when its file is empty. Deployment validation therefore does not count empty or whitespace-only Markdown, and ingestion must reject it rather than creating misleading searchable resources.
 
-The local 4B model proves composition and basic turns, not production reasoning quality. A 65,536-token declared context avoids immediate compaction from the current Harness system prompt and tool catalog; operators must revalidate capacity, latency, and tool behavior when changing the local model.
+A 65,536-token declared context avoids immediate compaction from the current Harness system prompt and tool catalog. Operators must revalidate capacity, latency, and tool behavior when changing the remote model.
+
+A remote relay moves every model-visible prompt, recalled memory item, tool description, and user message outside the controlled host. Operators must approve endpoint ownership, model routing, retention, and data-processing terms before the route handles restricted data.
+
+The host bootstrap pins Node, pnpm, Ollama, its two model ids, and the OpenViking image digest. Docker Engine follows Docker's signed Debian apt repository; an upgrade therefore requires reviewing the resolved Docker package versions as well as the explicitly pinned artifacts.
 
 The Harness-side tool-name/environment boundary is now active and explicitly denies OpenViking permanent-forget. The remaining unfinished area is the real Trader Ops MCP service and its trusted identity, resource/argument authorization, durable approval, and audit stores. Access stays limited to trusted developers until that final service boundary exists.
 

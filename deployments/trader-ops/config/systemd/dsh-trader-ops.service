@@ -9,7 +9,9 @@ User=dsh
 Group=dsh
 WorkingDirectory=/opt/deepseek-harness/current
 EnvironmentFile=/etc/deepseek-harness/trader-ops.env
-ExecStart=/usr/local/bin/pnpm dsh web --patch /opt/deepseek-harness/current/deployments/trader-ops/config/dsh/trader-ops.patch.yml --port 3180 --no-open
+Environment=CI=true
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/local/bin/pnpm dsh web --patch /opt/deepseek-harness/current/deployments/trader-ops/config/dsh/trader-ops.patch.yml --patch /opt/deepseek-harness/current/deployments/trader-ops/config/dsh/trader-ops-aihubmix.patch.yml --host 127.0.0.1 --port 3180 --no-open
 Restart=on-failure
 RestartSec=5s
 TimeoutStopSec=30s

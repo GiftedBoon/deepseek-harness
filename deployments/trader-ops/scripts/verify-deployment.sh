@@ -18,22 +18,33 @@ curl --fail --silent --show-error "$endpoint/ready" >/dev/null
 
 cd "$repo_root"
 patch_args=(--patch "$deployment_root/config/dsh/trader-ops.patch.yml")
-if [[ "${TRADER_OPS_LOCAL_LLM_ENABLED:-false}" == true ]]; then
-  : "${TRADER_OPS_LOCAL_LLM_API_KEY:?Set the non-secret Ollama adapter placeholder key}"
-  : "${TRADER_OPS_LOCAL_LLM_BASE_URL:?Set the local Ollama OpenAI-compatible endpoint}"
-  : "${TRADER_OPS_LOCAL_LLM_MODEL:?Set the local Ollama model id}"
-  patch_args+=(--patch "$deployment_root/config/dsh/trader-ops-local-ollama.patch.yml")
-fi
+llm_provider="${TRADER_OPS_LLM_PROVIDER:-default}"
+case "$llm_provider" in
+  default)
+    ;;
+  aihubmix)
+    : "${AIHUBMIX_BASE_URL:?Set the AIHubMix OpenAI-compatible endpoint}"
+    : "${AIHUBMIX_API_KEY:?Set the AIHubMix API key}"
+    : "${AIHUBMIX_MODEL:?Set the AIHubMix model id}"
+    patch_args+=(--patch "$deployment_root/config/dsh/trader-ops-aihubmix.patch.yml")
+    ;;
+  *)
+    printf 'Unsupported TRADER_OPS_LLM_PROVIDER: %s\n' "$llm_provider" >&2
+    exit 1
+    ;;
+esac
 dump_output="$(pnpm dsh --profile "$profile" "${patch_args[@]}" --dump-config)"
 
 grep -q 'openviking-memory-runtime' <<<"$dump_output"
 grep -q 'trader-ops-tool-policy' <<<"$dump_output"
 grep -q 'trader-ops-skills' <<<"$dump_output"
-if [[ "${TRADER_OPS_LOCAL_LLM_ENABLED:-false}" == true ]]; then
-  grep -q 'provider: trader-ops-local' <<<"$dump_output"
-  grep -q 'apiKeyEnv: TRADER_OPS_LOCAL_LLM_API_KEY' <<<"$dump_output"
-  grep -q 'TRADER_OPS_LOCAL_LLM_MODEL' <<<"$dump_output"
-fi
+case "$llm_provider" in
+  aihubmix)
+    grep -q 'provider: trader-ops-aihubmix' <<<"$dump_output"
+    grep -q 'apiKeyEnv: AIHUBMIX_API_KEY' <<<"$dump_output"
+    grep -q 'AIHUBMIX_MODEL' <<<"$dump_output"
+    ;;
+esac
 
 skill_count="$(find "$deployment_root/skills" -mindepth 2 -maxdepth 2 -name SKILL.md -type f | wc -l | tr -d ' ')"
 knowledge_count=0

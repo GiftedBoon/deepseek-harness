@@ -11,7 +11,7 @@ User / Web UI
       |
       v
 DeepSeek Harness (web profile)
-  |-- Main LLM -----------> optional local Ollama via llm-pi-ai
+  |-- Main LLM -----------> selected OpenAI-compatible route via llm-pi-ai
   |-- Skill Loader --------> deployments/trader-ops/skills/*/SKILL.md
   |                          Loads the complete file; zero is valid
   |
@@ -39,7 +39,7 @@ DeepSeek Harness (web profile)
 |---|---|---|
 | OpenViking service | Deployable | Docker Compose, persistence, and health checks are defined |
 | OpenViking DSH plugin | Installable | Pinned to `@openviking/dsh-memory-plugin@0.3.0` |
-| Local Harness model | Optional, validated | `llm-pi-ai` routes `qwen3.5:4b` to host Ollama without an external key |
+| AIHubMix model | Optional, validated | `llm-pi-ai` serves Harness and OpenViking semantic extraction through an environment-provided endpoint and key |
 | Trader Ops skill root | Configured | An empty root is valid; adding `SKILL.md` enables discovery |
 | Automatic Git knowledge ingestion | Not implemented | Reviewable add, update, and delete semantics remain required |
 | Trader Ops MCP | Template, disabled | Enable the example patch only after the real service exists |
@@ -49,7 +49,9 @@ DeepSeek Harness (web profile)
 ## Security boundaries
 
 - OpenViking binds to `127.0.0.1:1933` by default. Cross-host access must use a private network or a TLS reverse proxy instead of exposing the port directly.
-- Local Ollama binds to `127.0.0.1:11434`; Docker Desktop reaches it through `host.docker.internal`, while Harness uses the host loopback OpenAI-compatible endpoint.
+- AIHubMix receives all model-visible prompts, recalled memory, tool descriptions, and user input. Its endpoint, selected model, retention policy, and data-processing terms require review before restricted data is allowed.
+- Local Ollama binds to `127.0.0.1:11434`; Docker Desktop reaches its embedding and query-planner models through `host.docker.internal`.
+- On the Debian MVP, native Ollama binds only to the Docker bridge gateway. Compose maps `host.docker.internal` to that gateway, while Harness and OpenViking publish only loopback ports for an SSH tunnel.
 - DSH starts with `DSH_PERMISSION_MODE=read-only`. This value controls the local Harness sandbox; it is not a business tool guard.
 - OpenViking credentials enter through the environment only. `OPENVIKING_ROOT_API_KEY` administers accounts and matches `server.root_api_key`; Harness uses the narrower tenant `OPENVIKING_API_KEY` for data access.
 - `mcp__openviking__forget` permanently deletes data and is explicitly denied by the current policy. OpenViking must still authenticate and authorize direct clients independently of Harness.
@@ -61,8 +63,10 @@ DeepSeek Harness (web profile)
 Built-in DSH web profile
   + installed OpenViking bundle patch
   + config/dsh/trader-ops.patch.yml
-  + (local, optional) config/dsh/trader-ops-local-ollama.patch.yml
+  + (optional) config/dsh/trader-ops-aihubmix.patch.yml
   + (future, optional) config/dsh/trader-ops-mcp.patch.yml
 ```
 
 A later patch replaces the complete `config` of a matching row; it does not deep-merge that object. Any change to `openviking-memory-runtime` must retain every field that still needs to apply, then use `--dump-config` to inspect the final composition.
+
+The Debian deployment separates root-owned host and secret configuration from a non-root immutable release build. `bootstrap-debian-host.sh` owns system packages, service users, persistent directories, and the restricted Ollama listener; `install-debian-release.sh` owns exact-revision checkout and build; `configure-debian-runtime.sh` owns mode-`0600` secrets, OpenViking tenant creation, Profile bootstrap, and systemd activation.

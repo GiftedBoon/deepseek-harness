@@ -7,13 +7,19 @@ services:
       # Keep OpenViking private by default. Use a TLS reverse proxy or a private
       # network when Harness and OpenViking run on different hosts.
       - "127.0.0.1:${OPENVIKING_SERVER_PORT:-1933}:1933"
+    extra_hosts:
+      # Docker Desktop provides this name automatically. Linux maps it to the
+      # default bridge gateway where the host-native Ollama service listens.
+      - "host.docker.internal:host-gateway"
     environment:
       OPENVIKING_API_KEY: "${OPENVIKING_API_KEY:-}"
       OPENVIKING_ROOT_API_KEY: "${OPENVIKING_ROOT_API_KEY:?set OPENVIKING_ROOT_API_KEY}"
+      AIHUBMIX_API_KEY: "${AIHUBMIX_API_KEY:?set AIHUBMIX_API_KEY}"
+      AIHUBMIX_BASE_URL: "${AIHUBMIX_BASE_URL:?set AIHUBMIX_BASE_URL}"
+      AIHUBMIX_MODEL: "${AIHUBMIX_MODEL:?set AIHUBMIX_MODEL}"
       OPENVIKING_EMBEDDING_MODEL: "${OPENVIKING_EMBEDDING_MODEL:-qwen3-embedding:0.6b}"
       OPENVIKING_OLLAMA_BASE_URL: "${OPENVIKING_OLLAMA_BASE_URL:-http://host.docker.internal:11434}"
       OPENVIKING_QUERY_PLANNER_MODEL: "${OPENVIKING_QUERY_PLANNER_MODEL:-guoxuter/ov_intent_analysis_sft:v7_q8}"
-      OPENVIKING_VLM_MODEL: "${OPENVIKING_VLM_MODEL:-qwen3.5:4b}"
       OPENVIKING_WITH_BOT: "${OPENVIKING_WITH_BOT:-0}"
     volumes:
       - "${OPENVIKING_HOME:?set OPENVIKING_HOME}:/app/.openviking"

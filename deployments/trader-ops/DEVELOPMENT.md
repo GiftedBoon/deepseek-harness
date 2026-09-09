@@ -27,7 +27,7 @@ cp deployments/trader-ops/.env.example deployments/trader-ops/.env
 chmod 600 deployments/trader-ops/.env
 ```
 
-Replace the two persistent directories with absolute host paths, replace `OPENVIKING_ROOT_API_KEY` with a random secret, and set `TRADER_OPS_LOCAL_LLM_ENABLED=true` for the keyless local model path. Keep `OPENVIKING_API_KEY` empty until OpenViking creates the tenant user. Load the variables:
+Replace the two persistent directories with absolute host paths and replace `OPENVIKING_ROOT_API_KEY` with a random secret. Set `TRADER_OPS_LLM_PROVIDER` to `aihubmix` for the remote OpenAI-compatible route, and keep real provider keys only in this file. Keep `OPENVIKING_API_KEY` empty until OpenViking creates the tenant user. Load the variables:
 
 ```bash
 set -a
@@ -43,7 +43,6 @@ Run Ollama on the macOS host so inference uses Apple Metal. Keep its default loo
 brew install ollama
 brew services start ollama
 ollama pull qwen3-embedding:0.6b
-ollama pull qwen3.5:4b
 ollama pull guoxuter/ov_intent_analysis_sft:v7_q8
 curl --fail http://127.0.0.1:11434/api/tags
 ```
@@ -119,13 +118,13 @@ CPLUS_INCLUDE_PATH=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/inclu
 ```bash
 pnpm dsh web \
   --patch deployments/trader-ops/config/dsh/trader-ops.patch.yml \
-  --patch deployments/trader-ops/config/dsh/trader-ops-local-ollama.patch.yml \
+  --patch deployments/trader-ops/config/dsh/trader-ops-aihubmix.patch.yml \
   --no-open
 ```
 
-The second patch declares Ollama through the supported `llm-pi-ai` OpenAI-compatible route and makes `qwen3.5:4b` the local default. Its `ollama-local` API key value is a non-secret adapter placeholder; Ollama ignores it. Omit that patch and configure a reviewed provider credential when testing the normal DeepSeek model path.
+The second patch declares the configured AIHubMix endpoint through the supported `llm-pi-ai` OpenAI-compatible route. It reads the endpoint, credential, model id, context window, and output limit from the environment. OpenViking uses the same remote route for semantic extraction while retaining local Ollama models for embedding and query planning.
 
-The command prints a local access URL and token. The service must still start when there is no business knowledge and no `SKILL.md`: the Trader Ops skill count is zero and OpenViking provides an empty recall/memory baseline. This is the expected state. A first local turn can take about a minute while models load.
+The command prints a local access URL and token. The service must still start when there is no business knowledge and no `SKILL.md`: the Trader Ops skill count is zero and OpenViking provides an empty recall/memory baseline. This is the expected state. AIHubMix receives all model-visible prompts, recalled memory, tool descriptions, and user input, so do not send restricted business data until the relay and selected model have passed the required security review.
 
 ## 5. Add content later
 

@@ -27,7 +27,7 @@ cp deployments/trader-ops/.env.example deployments/trader-ops/.env
 chmod 600 deployments/trader-ops/.env
 ```
 
-把两个持久化目录替换为宿主机绝对路径，把 `OPENVIKING_ROOT_API_KEY` 替换为随机秘密，并为无外部 key 的本地模型路径设置 `TRADER_OPS_LOCAL_LLM_ENABLED=true`。在 OpenViking 创建租户用户前，将 `OPENVIKING_API_KEY` 留空。加载变量：
+把两个持久化目录替换为宿主机绝对路径，并把 `OPENVIKING_ROOT_API_KEY` 替换为随机秘密。需要远程 OpenAI-compatible 路由时，把 `TRADER_OPS_LLM_PROVIDER` 设为 `aihubmix`，并只在本文件保存真实提供方 key。在 OpenViking 创建租户用户前，将 `OPENVIKING_API_KEY` 留空。加载变量：
 
 ```bash
 set -a
@@ -43,7 +43,6 @@ set +a
 brew install ollama
 brew services start ollama
 ollama pull qwen3-embedding:0.6b
-ollama pull qwen3.5:4b
 ollama pull guoxuter/ov_intent_analysis_sft:v7_q8
 curl --fail http://127.0.0.1:11434/api/tags
 ```
@@ -119,13 +118,13 @@ CPLUS_INCLUDE_PATH=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/inclu
 ```bash
 pnpm dsh web \
   --patch deployments/trader-ops/config/dsh/trader-ops.patch.yml \
-  --patch deployments/trader-ops/config/dsh/trader-ops-local-ollama.patch.yml \
+  --patch deployments/trader-ops/config/dsh/trader-ops-aihubmix.patch.yml \
   --no-open
 ```
 
-第二个 patch 通过受支持的 `llm-pi-ai` OpenAI-compatible 路由声明 Ollama，并把 `qwen3.5:4b` 设为本地默认模型。它的 `ollama-local` API key 值只是非秘密的适配器占位符，Ollama 会忽略它。测试常规 DeepSeek 模型路径时，应省略这个 patch，并配置经过评审的提供方凭据。
+第二个 patch 通过受支持的 `llm-pi-ai` OpenAI-compatible 路由声明已配置的 AIHubMix 端点，并从环境读取端点、凭据、模型 id、上下文窗口和输出上限。OpenViking 使用同一远程路由进行语义提取，同时保留本地 Ollama 模型用于 embedding 和 query planner。
 
-该命令会输出本地访问 URL 与 token。没有业务知识和 `SKILL.md` 时，服务仍应正常启动：Trader Ops skill 数量为 0，OpenViking 只提供空的检索/记忆基线。这是预期状态。首次本地回合加载模型时可能需要约一分钟。
+该命令会输出本地访问 URL 与 token。没有业务知识和 `SKILL.md` 时，服务仍应正常启动：Trader Ops skill 数量为 0，OpenViking 只提供空的检索/记忆基线。这是预期状态。所有模型可见的提示词、检索记忆、工具描述和用户输入都会发送给 AIHubMix，因此在中转站与所选模型通过必要的安全评审前，不要发送受限业务数据。
 
 ## 5. 后续添加内容
 

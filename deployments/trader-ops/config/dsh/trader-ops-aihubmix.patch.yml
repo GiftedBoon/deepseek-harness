@@ -1,0 +1,22 @@
+# Optional remote-model layer. The API key is resolved from the deployment
+# environment for each request and must never be committed to this file.
+
+- id: llm-pi-ai
+  config:
+    providers:
+      trader-ops-aihubmix:
+        displayName: Trader Ops AIHubMix model
+        apiKeyEnv: AIHUBMIX_API_KEY
+        api: openai-completions
+        baseURL: !!js process.env.AIHUBMIX_BASE_URL
+        models:
+          - id: !!js process.env.AIHUBMIX_MODEL
+            name: Trader Ops AIHubMix model
+            contextWindow: !!js Number(process.env.AIHUBMIX_CONTEXT_WINDOW ?? 65536)
+            maxTokens: !!js Number(process.env.AIHUBMIX_MAX_TOKENS ?? 4096)
+            reasoningEfforts: false
+
+- id: agent-default-model
+  config:
+    provider: trader-ops-aihubmix
+    model: !!js process.env.AIHUBMIX_MODEL
