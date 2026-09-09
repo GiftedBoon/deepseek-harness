@@ -26,7 +26,7 @@ Trader Ops 部署拥有相互分离的 `knowledge/`、`skills/` 和 `policies/` 
 - 发布时配置与 systemd 直接调用已构建的 DSH CLI。部署 overlay 从该 release 解析私有策略插件，外部 Profile 只拥有树外依赖。由 pnpm 支持的源码启动器仅用于可写的开发检出，不能在不可变发布中调整依赖。
 - 运行时配置在加载 Trader Ops 插件的情况下冒烟测试远程模型，再要求 Web 成功响应或返回预期的身份验证挑战，并保持 systemd 重启次数稳定。该单元会限制反复启动失败的重试速率。
 - Linux 原生 Ollama 只监听 Docker bridge gateway，OpenViking 与 Harness 保持只监听回环地址。一个可选 systemd socket 会绑定一个属于本机的 IPv4 地址并代理到 Harness；`--trusted-host` 允许该 authority 通过浏览器 Host/Origin 围栏，而不启用 CLI 禁止的通配绑定。配置器拒绝通配和不属于本机的代理地址，MVP 不添加公网反向代理。
-- 可选企业微信长连接渠道在现有 Trader Ops Harness 进程内运行，不开放入站监听。部署生成的专用 preset 会禁用交互式提问，渠道采用受限的 `approval: never` 权限 preset，并以准确的用户与群聊白名单替代浏览器身份；启用失败时，root 配置器会恢复此前的环境。
+- 可选企业微信长连接渠道在现有 Trader Ops Harness 进程内运行，不开放入站监听。部署生成的专用 preset 会禁用交互式提问、隐藏通用 Harness 身份，并把 Agent 标识为 CFI 股票交易组助手。渠道采用受限的 `approval: never` 权限 preset，并以准确的用户与群聊白名单替代浏览器身份；启用失败时，root 配置器会恢复此前的环境。
 - 在真实服务和经过评审的工具 schema 存在以前，Trader Ops MCP 配置保持为默认关闭的示例。
 - `tool-access.yaml` 已由私有实验包 `quant-tool-policy` 通过 `tools/pre-execute` 和单调 `ctx.tools.guard()` 兜底强制执行，未匹配工具默认拒绝。在可信身份和审批存储存在前，更广泛的风险与审批文档仍是设计约定。
 

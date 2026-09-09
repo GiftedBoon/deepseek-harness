@@ -105,7 +105,7 @@ ssh -t dsh-server \
   'sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-wecom-runtime.sh --enable'
 ```
 
-配置器通过隐藏提示读取机器人 secret，生成并保留独立的 Session 身份密钥，拒绝通配白名单，安装渠道包及其无人值守 preset，并重启现有 `dsh-trader-ops` 服务。Harness 仍只监听回环地址，并且不会开放新的入站端口。渠道使用 `read-only` 沙箱与 `approval: never`；专用 preset 禁用 `tool-ask-user`。如果启用失败，脚本会恢复此前的环境并重启基础 Trader Ops 服务。
+配置器通过隐藏提示读取机器人 secret，生成并保留独立的 Session 身份密钥，拒绝通配白名单，安装渠道包及其无人值守 preset，并重启现有 `dsh-trader-ops` 服务。Harness 仍只监听回环地址，并且不会开放新的入站端口。渠道使用 `read-only` 沙箱与 `approval: never`；专用 preset 禁用 `tool-ask-user`、隐藏通用 Harness 身份，并以 `我是CFI 股票交易组的 AI Agent 智能助手` 介绍自己。如果启用失败，脚本会恢复此前的环境并重启基础 Trader Ops 服务。
 
 群聊列表为空时不会准入群聊。以后启用经过评审的群聊时，应把准确 chat id 写入 `WECOM_ALLOWED_CHATS`，绝不能使用 `*`。由一名获准用户在首次单聊中发送以下消息进行验证：
 

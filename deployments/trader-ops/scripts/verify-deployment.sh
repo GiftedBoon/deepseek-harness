@@ -60,6 +60,8 @@ grep -q 'openviking-memory-runtime' <<<"$dump_output"
 grep -q 'trader-ops-tool-policy' <<<"$dump_output"
 grep -q 'trader-ops-skills' <<<"$dump_output"
 grep -q 'trader-ops-wecom' <<<"$dump_output"
+grep -q 'includeHarnessIdentity: false' <<<"$dump_output"
+grep -Fq '我是CFI 股票交易组的 AI Agent 智能助手' "$wecom_preset"
 awk '
   $0 == "- id: tool-ask-user" {
     getline

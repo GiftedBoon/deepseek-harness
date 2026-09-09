@@ -105,7 +105,7 @@ ssh -t dsh-server \
   'sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-wecom-runtime.sh --enable'
 ```
 
-The configurator reads the bot secret through a hidden prompt, generates and preserves a separate Session identity key, rejects wildcard allowlists, installs the channel package and its unattended preset, and restarts the existing `dsh-trader-ops` service. It keeps Harness on loopback and opens no new inbound port. The channel uses `read-only` sandbox access with `approval: never`; its preset disables `tool-ask-user`. If activation fails, the script restores the previous environment and restarts the base Trader Ops service.
+The configurator reads the bot secret through a hidden prompt, generates and preserves a separate Session identity key, rejects wildcard allowlists, installs the channel package and its unattended preset, and restarts the existing `dsh-trader-ops` service. It keeps Harness on loopback and opens no new inbound port. The channel uses `read-only` sandbox access with `approval: never`; its preset disables `tool-ask-user`, suppresses the generic Harness identity, and identifies itself as `我是CFI 股票交易组的 AI Agent 智能助手`. If activation fails, the script restores the previous environment and restarts the base Trader Ops service.
 
 An empty group-chat list keeps group access disabled. Enable a reviewed group later by placing its exact chat id in `WECOM_ALLOWED_CHATS`; never use `*`. Validate the initial single chat from one allowed user with:
 

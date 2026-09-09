@@ -1,0 +1,9 @@
+version: 1
+scenario: trader-ops-wecom-identity
+profile: headless
+composition: trader-ops-wecom-identity
+recording: authored
+header:
+  class: trader-ops-wecom-identity
+  pin: true
+  toolSchemasSource: text-turn
