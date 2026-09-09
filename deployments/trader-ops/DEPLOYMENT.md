@@ -51,6 +51,8 @@ ssh dsh-server \
   '/home/boon/trader-ops-install-release.sh <40-character-git-commit>'
 ```
 
+When the host's GitHub route is too slow, create a `git archive` on a trusted machine with a top-level directory and `.trader-ops-source-commit` containing the same full commit SHA. Copy it to the host, calculate its SHA-256, and pass its absolute path through `TRADER_OPS_RELEASE_ARCHIVE` and the digest through `TRADER_OPS_RELEASE_ARCHIVE_SHA256`. The installer verifies both before extracting and building it.
+
 The installer fetches exactly that commit, runs `pnpm install --frozen-lockfile` and `pnpm run build`, records a build marker, and atomically moves `/opt/deepseek-harness/current`. It does not restart any service. An existing directory without its build marker is treated as an incomplete release and requires inspection instead of automatic deletion.
 
 ## 3. Install secrets and start the runtime
