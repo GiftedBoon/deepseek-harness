@@ -5,6 +5,7 @@ node_version="${TRADER_OPS_NODE_VERSION:-24.20.0}"
 pnpm_version="${TRADER_OPS_PNPM_VERSION:-11.7.0}"
 ollama_version="${TRADER_OPS_OLLAMA_VERSION:-0.33.3}"
 ollama_sha256="${TRADER_OPS_OLLAMA_SHA256:-c13cea8f3389db4145f8a6cb88d1747242a48639d7c13e3bda7c1ebdc6eebb2f}"
+ollama_archive_source="${TRADER_OPS_OLLAMA_ARCHIVE:-}"
 deploy_operator="${TRADER_OPS_DEPLOY_OPERATOR:-${SUDO_USER:-}}"
 
 if [[ "$(id -u)" -ne 0 ]]; then
@@ -100,11 +101,19 @@ if [[ -n "$installed_ollama_version" && "$installed_ollama_version" != "$ollama_
 fi
 if [[ -z "$installed_ollama_version" ]]; then
   ollama_archive="ollama-linux-amd64.tar.zst"
-  curl --fail --show-error --location \
-    "https://github.com/ollama/ollama/releases/download/v${ollama_version}/${ollama_archive}" \
-    --output "$tmp_dir/$ollama_archive"
-  printf '%s  %s\n' "$ollama_sha256" "$tmp_dir/$ollama_archive" | sha256sum --check -
-  tar --use-compress-program=unzstd -xf "$tmp_dir/$ollama_archive" -C /usr
+  if [[ -n "$ollama_archive_source" ]]; then
+    if [[ ! -f "$ollama_archive_source" ]]; then
+      printf 'TRADER_OPS_OLLAMA_ARCHIVE is not a regular file: %s\n' "$ollama_archive_source" >&2
+      exit 1
+    fi
+  else
+    ollama_archive_source="$tmp_dir/$ollama_archive"
+    curl --http1.1 --fail --show-error --location --retry 8 --retry-all-errors --continue-at - \
+      "https://github.com/ollama/ollama/releases/download/v${ollama_version}/${ollama_archive}" \
+      --output "$ollama_archive_source"
+  fi
+  printf '%s  %s\n' "$ollama_sha256" "$ollama_archive_source" | sha256sum --check -
+  tar --use-compress-program=unzstd -xf "$ollama_archive_source" -C /usr
 fi
 
 if ! id dsh >/dev/null 2>&1; then

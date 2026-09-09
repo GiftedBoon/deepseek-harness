@@ -26,11 +26,11 @@ Harness listens on `127.0.0.1:3180`, and OpenViking publishes `127.0.0.1:1933`. 
 
 ## 1. Bootstrap the Debian host
 
-Copy `scripts/bootstrap-debian-host.sh` to the remote operator's home directory, review it, and run it in an interactive SSH terminal:
+Copy `scripts/bootstrap-debian-host.sh` to the remote operator's home directory, review it, and run it in an interactive SSH terminal. Name the non-root operator explicitly because `$USER` is `root` inside an existing root shell:
 
 ```bash
 ssh -t dsh-server \
-  'sudo env TRADER_OPS_DEPLOY_OPERATOR="$USER" bash /home/boon/trader-ops-bootstrap-debian.sh'
+  'sudo env TRADER_OPS_DEPLOY_OPERATOR=boon bash /home/boon/bootstrap-debian-host.sh'
 ```
 
 The script validates Debian 12/amd64, refuses conflicting container packages, installs Docker from its signed apt repository, verifies the Node and Ollama downloads, creates the `dsh` and `ollama` service users, configures persistent directories, restricts Ollama to the Docker bridge address, and pulls only these models:
@@ -40,7 +40,7 @@ qwen3-embedding:0.6b
 guoxuter/ov_intent_analysis_sft:v7_q8
 ```
 
-The 1.3 GB Ollama runtime and model downloads make this the longest phase. The script is safe to retry after a network failure unless it reports an incomplete or conflicting installation; inspect the exact reported path before changing or removing anything.
+The 1.3 GB Ollama runtime and model downloads make this the longest phase. The network download uses HTTP/1.1 with retry and resume support. When the target host has a slow GitHub route, copy the verified archive to it and set `TRADER_OPS_OLLAMA_ARCHIVE=/path/to/ollama-linux-amd64.tar.zst`; the script still enforces the pinned SHA-256. The script is safe to retry after a network failure unless it reports an incomplete or conflicting installation; inspect the exact reported path before changing or removing anything.
 
 ## 2. Build and activate an immutable release
 

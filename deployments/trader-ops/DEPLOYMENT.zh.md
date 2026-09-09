@@ -26,11 +26,11 @@ Harness 监听 `127.0.0.1:3180`，OpenViking 发布到 `127.0.0.1:1933`。原生
 
 ## 1. 引导 Debian 主机
 
-把 `scripts/bootstrap-debian-host.sh` 复制到远程运维用户的 home，评审脚本后在交互式 SSH 终端中运行：
+把 `scripts/bootstrap-debian-host.sh` 复制到远程运维用户的 home，评审脚本后在交互式 SSH 终端中运行。应显式填写非 root 运维用户，因为进入 root shell 后 `$USER` 的值是 `root`：
 
 ```bash
 ssh -t dsh-server \
-  'sudo env TRADER_OPS_DEPLOY_OPERATOR="$USER" bash /home/boon/trader-ops-bootstrap-debian.sh'
+  'sudo env TRADER_OPS_DEPLOY_OPERATOR=boon bash /home/boon/bootstrap-debian-host.sh'
 ```
 
 脚本会验证 Debian 12/amd64，拒绝冲突的容器软件包，从签名 apt 软件源安装 Docker，校验 Node 与 Ollama 下载，创建 `dsh` 和 `ollama` 服务用户，配置持久化目录，把 Ollama 限制到 Docker bridge 地址，并且只拉取以下模型：
@@ -40,7 +40,7 @@ qwen3-embedding:0.6b
 guoxuter/ov_intent_analysis_sft:v7_q8
 ```
 
-1.3 GB 的 Ollama 运行时和模型下载使本阶段耗时最长。网络失败后可以安全重试；如果脚本报告安装不完整或软件冲突，应先检查它指出的精确路径，不要自动修改或删除内容。
+1.3 GB 的 Ollama 运行时和模型下载使本阶段耗时最长。网络下载强制使用 HTTP/1.1，并支持重试和断点续传。如果目标主机访问 GitHub 很慢，可以把已校验的安装包复制过去，再设置 `TRADER_OPS_OLLAMA_ARCHIVE=/path/to/ollama-linux-amd64.tar.zst`；脚本仍会执行固定 SHA-256 校验。网络失败后可以安全重试；如果脚本报告安装不完整或软件冲突，应先检查它指出的精确路径，不要自动修改或删除内容。
 
 ## 2. 构建并激活不可变发布
 
