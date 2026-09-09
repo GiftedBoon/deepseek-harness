@@ -7,7 +7,7 @@ export CI="${CI:-true}"
 
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 deployment_root="$(CDPATH= cd -- "$script_dir/.." && pwd)"
-repo_root="$(git -C "$deployment_root" rev-parse --show-toplevel)"
+repo_root="$(CDPATH= cd -- "$deployment_root/../.." && pwd)"
 profile="${TRADER_OPS_PROFILE:-web}"
 plugin_version="${OPENVIKING_DSH_PLUGIN_VERSION:-0.3.0}"
 
