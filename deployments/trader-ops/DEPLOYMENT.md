@@ -53,7 +53,7 @@ ssh dsh-server \
 
 When the host's GitHub route is too slow, create a `git archive` on a trusted machine with a top-level directory and `.trader-ops-source-commit` containing the same full commit SHA. Copy it to the host, calculate its SHA-256, and pass its absolute path through `TRADER_OPS_RELEASE_ARCHIVE` and the digest through `TRADER_OPS_RELEASE_ARCHIVE_SHA256`. The installer verifies both before extracting and building it, and supplies the verified revision as `DSH_CLIENT_COMMIT_HASH` because a source archive has no `.git` directory.
 
-The installer fetches exactly that commit, runs `pnpm install --frozen-lockfile` and `pnpm run build`, records a build marker, and atomically moves `/opt/deepseek-harness/current`. Deployment scripts resolve the repository from their installed path and do not require release-time Git metadata. The installer does not restart any service. An existing directory without its build marker is treated as an incomplete release and requires inspection instead of automatic deletion.
+The installer fetches exactly that commit, runs `pnpm install --frozen-lockfile` and `pnpm run build`, records a build marker, and atomically moves `/opt/deepseek-harness/current`. Deployment scripts resolve the repository from their installed path and invoke the built `apps/cli/lib/bin.js` entry directly; runtime configuration therefore neither requires release-time Git metadata nor asks pnpm to reconcile the immutable release. The installer does not restart any service. An existing directory without its build marker is treated as an incomplete release and requires inspection instead of automatic deletion.
 
 ## 3. Install secrets and start the runtime
 

@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Profile commands may reconcile pnpm state. Deployment scripts do not have a
-# terminal available to answer pnpm's module-directory confirmation prompt.
-export CI="${CI:-true}"
-
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 deployment_root="$(CDPATH= cd -- "$script_dir/.." && pwd)"
 repo_root="$(CDPATH= cd -- "$deployment_root/../.." && pwd)"
+dsh_cli="$repo_root/apps/cli/lib/bin.js"
 profile="${TRADER_OPS_PROFILE:-web}"
 endpoint="${OPENVIKING_URL:-http://127.0.0.1:1933}"
 
 : "${DSH_HOME:?Set DSH_HOME to the Harness configuration directory used by this deployment}"
+if [[ ! -f "$dsh_cli" ]]; then
+  printf 'Built DSH CLI is missing at %s; install a completed release.\n' "$dsh_cli" >&2
+  exit 1
+fi
 
 curl --fail --silent --show-error "$endpoint/health" >/dev/null
 curl --fail --silent --show-error "$endpoint/ready" >/dev/null
@@ -33,7 +34,7 @@ case "$llm_provider" in
     exit 1
     ;;
 esac
-dump_output="$(pnpm dsh --profile "$profile" "${patch_args[@]}" --dump-config)"
+dump_output="$(node "$dsh_cli" --profile "$profile" "${patch_args[@]}" --dump-config)"
 
 grep -q 'openviking-memory-runtime' <<<"$dump_output"
 grep -q 'trader-ops-tool-policy' <<<"$dump_output"

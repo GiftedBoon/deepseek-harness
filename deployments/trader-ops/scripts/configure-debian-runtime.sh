@@ -3,6 +3,7 @@ set -euo pipefail
 
 deployment_root="/opt/deepseek-harness/current/deployments/trader-ops"
 environment_file="/etc/deepseek-harness/trader-ops.env"
+dsh_cli="/opt/deepseek-harness/current/apps/cli/lib/bin.js"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   printf 'Run this runtime configuration as root through sudo.\n' >&2
@@ -10,6 +11,10 @@ if [[ "$(id -u)" -ne 0 ]]; then
 fi
 if [[ ! -d "$deployment_root" ]]; then
   printf 'No active Trader Ops release exists at %s.\n' "$deployment_root" >&2
+  exit 1
+fi
+if [[ ! -f "$dsh_cli" ]]; then
+  printf 'Built DSH CLI is missing at %s; install a completed release.\n' "$dsh_cli" >&2
   exit 1
 fi
 aihubmix_base_url="${AIHUBMIX_BASE_URL:-https://api.inferera.com/v1}"
@@ -154,7 +159,7 @@ docker exec trader-ops-openviking ov doctor
   "$deployment_root/scripts/verify-deployment.sh"
 model_output="$(/usr/sbin/runuser --preserve-environment -u dsh -- env \
   CI=true HOME=/var/lib/deepseek-harness PATH=/usr/local/bin:/usr/bin:/bin \
-  pnpm dsh --profile headless \
+  node "$dsh_cli" --profile headless \
   --patch "$deployment_root/config/dsh/trader-ops-aihubmix.patch.yml" \
   'Reply only REMOTE-MODEL-OK')"
 grep -q 'REMOTE-MODEL-OK' <<<"$model_output"
