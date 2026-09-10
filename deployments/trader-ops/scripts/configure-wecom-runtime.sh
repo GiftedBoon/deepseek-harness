@@ -23,7 +23,12 @@ fi
 requested_bot_id="${WECOM_BOT_ID:-}"
 requested_bot_secret="${WECOM_BOT_SECRET:-}"
 requested_allowed_users="${WECOM_ALLOWED_USERS:-}"
-requested_allowed_chats="${WECOM_ALLOWED_CHATS:-}"
+requested_allowed_chats_set=0
+requested_allowed_chats=""
+if [[ "${WECOM_ALLOWED_CHATS+x}" == x ]]; then
+  requested_allowed_chats_set=1
+  requested_allowed_chats="$WECOM_ALLOWED_CHATS"
+fi
 requested_group_mode="${WECOM_GROUP_CONVERSATION_MODE:-}"
 requested_wecom_sandbox="${TRADER_OPS_WECOM_SANDBOX:-}"
 
@@ -37,7 +42,11 @@ bot_id="${requested_bot_id:-${WECOM_BOT_ID:-}}"
 bot_secret="${requested_bot_secret:-${WECOM_BOT_SECRET:-}}"
 session_key="${WECOM_SESSION_KEY:-}"
 allowed_users="${requested_allowed_users:-${WECOM_ALLOWED_USERS:-}}"
-allowed_chats="${requested_allowed_chats:-${WECOM_ALLOWED_CHATS:-}}"
+if [[ "$requested_allowed_chats_set" == 1 ]]; then
+  allowed_chats="$requested_allowed_chats"
+else
+  allowed_chats="${WECOM_ALLOWED_CHATS:-}"
+fi
 group_mode="${requested_group_mode:-${WECOM_GROUP_CONVERSATION_MODE:-shared}}"
 wecom_sandbox="${requested_wecom_sandbox:-${TRADER_OPS_WECOM_SANDBOX:-read-only}}"
 
@@ -87,7 +96,7 @@ if [[ "$action" == --enable ]]; then
   if [[ -z "$allowed_users" ]]; then
     read -r -p 'Enter comma-separated allowed WeCom user ids: ' allowed_users
   fi
-  if [[ -z "$requested_allowed_chats" && -z "${WECOM_ALLOWED_CHATS:-}" ]]; then
+  if [[ "$requested_allowed_chats_set" == 0 && -z "${WECOM_ALLOWED_CHATS:-}" ]]; then
     read -r -p 'Enter comma-separated allowed WeCom group chat ids, or leave empty: ' allowed_chats
   fi
   if [[ -z "$session_key" ]]; then

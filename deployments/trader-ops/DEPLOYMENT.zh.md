@@ -129,6 +129,35 @@ sudo systemctl show dsh-trader-ops -p ActiveState -p SubState -p NRestarts
 sudo journalctl -u dsh-trader-ops -n 100 --no-pager
 ```
 
+### 企业微信日常运维
+
+使用专用日志脚本列出过去 24 小时内最近 20 个被拒绝的用户 id；该脚本不会打印消息内容或无关启动日志。添加 `--follow` 可等待下一个被拒绝的发送者，也可以用 `--since '10 minutes ago'` 指定其他 journal 时间范围：
+
+```bash
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/list-rejected-wecom-users.sh
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/list-rejected-wecom-users.sh --follow
+```
+
+使用白名单脚本列出或修改准确的用户和群聊白名单条目：
+
+```bash
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/update-wecom-allowlists.sh --list
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/update-wecom-allowlists.sh --add-user USER_ID
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/update-wecom-allowlists.sh --remove-user OLD_USER_ID --add-user NEW_USER_ID
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/update-wecom-allowlists.sh --add-chat CHAT_ID
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/update-wecom-allowlists.sh --remove-chat CHAT_ID
+```
+
+每次修改都会保留未指定条目、拒绝通配符并要求至少存在一个用户；仅当结果发生变化时才调用企业微信配置器。配置器以 `0600` 权限写入环境文件，重启 Harness，并验证就绪状态与重启稳定性。删除最后一个群聊 id 后，群聊访问保持禁用。
+
+配置没有变化而只需重启 Harness 进程时，使用重启脚本：
+
+```bash
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/restart-runtime.sh
+```
+
+重启脚本不接受配置参数。它会等待回环端点返回 `200` 或预期的 `401`，再确认 systemd 在五秒稳定期内没有自动重启该进程。
+
 使用以下命令停用渠道，同时保留它的凭据与会话身份材料：
 
 ```bash

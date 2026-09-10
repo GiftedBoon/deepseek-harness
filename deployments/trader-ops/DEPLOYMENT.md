@@ -129,6 +129,35 @@ sudo systemctl show dsh-trader-ops -p ActiveState -p SubState -p NRestarts
 sudo journalctl -u dsh-trader-ops -n 100 --no-pager
 ```
 
+### Routine WeCom operations
+
+Use the focused log script to list the 20 most recent rejected user ids from the last 24 hours without printing message content or unrelated startup logs. Add `--follow` to wait for the next rejected sender, or set a different journal window with `--since '10 minutes ago'`:
+
+```bash
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/list-rejected-wecom-users.sh
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/list-rejected-wecom-users.sh --follow
+```
+
+List or change exact user and group-chat allowlist entries with the allowlist script:
+
+```bash
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/update-wecom-allowlists.sh --list
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/update-wecom-allowlists.sh --add-user USER_ID
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/update-wecom-allowlists.sh --remove-user OLD_USER_ID --add-user NEW_USER_ID
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/update-wecom-allowlists.sh --add-chat CHAT_ID
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/update-wecom-allowlists.sh --remove-chat CHAT_ID
+```
+
+Each mutation preserves unspecified entries, rejects wildcards, requires at least one user, and invokes the WeCom configurator only when the result changed. The configurator writes the environment file with mode `0600`, restarts Harness, and verifies readiness and restart stability. Removing the last group-chat id leaves group access disabled.
+
+Use the restart script when configuration has not changed and only the Harness process needs a restart:
+
+```bash
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/restart-runtime.sh
+```
+
+The restart script accepts no configuration arguments. It waits for the loopback endpoint to return `200` or the expected `401`, then confirms that systemd did not automatically restart the process during a five-second stability period.
+
 Disable the channel while retaining its credentials and conversation identity material:
 
 ```bash
