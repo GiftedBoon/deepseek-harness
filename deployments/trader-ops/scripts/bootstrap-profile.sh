@@ -10,6 +10,7 @@ repo_root="$(CDPATH= cd -- "$deployment_root/../.." && pwd)"
 profile="${TRADER_OPS_PROFILE:-web}"
 dsh_cli="$repo_root/apps/cli/lib/bin.js"
 policy_plugin="$repo_root/packages/experimental/quant-tool-policy/lib/index.js"
+logger_plugin="$repo_root/vendor/logger-console/lib/index.js"
 wecom_plugin="$repo_root/packages/channel/channel-wecom/lib/index.js"
 wecom_patch="$deployment_root/config/dsh/trader-ops-wecom.patch.yml"
 wecom_preset_source="$repo_root/packages/preset/agent-presets/presets/standard"
@@ -24,8 +25,8 @@ if [[ ! -f "$dsh_cli" ]]; then
   printf 'Built DSH CLI is missing at %s; install a completed release.\n' "$dsh_cli" >&2
   exit 1
 fi
-if [[ ! -f "$policy_plugin" ]]; then
-  printf 'Built Trader Ops policy plugin is missing at %s; install a completed release.\n' "$policy_plugin" >&2
+if [[ ! -f "$policy_plugin" || ! -f "$logger_plugin" ]]; then
+  printf 'Built Trader Ops policy or console logger plugin is missing; install a completed release.\n' >&2
   exit 1
 fi
 if [[ ! -f "$wecom_plugin" || ! -f "$wecom_patch" ]]; then
@@ -58,9 +59,10 @@ dump_output="$(node "$dsh_cli" --profile "$profile" \
 
 grep -q 'openviking-memory-runtime' <<<"$dump_output"
 grep -q 'trader-ops-tool-policy' <<<"$dump_output"
+grep -q 'trader-ops-console-logger' <<<"$dump_output"
 grep -q 'trader-ops-skills' <<<"$dump_output"
 grep -q 'trader-ops-wecom' <<<"$dump_output"
 
 printf 'Profile %s is ready in %s.\n' "$profile" "$DSH_HOME"
 printf 'OpenViking plugin: @openviking/dsh-memory-plugin@%s\n' "$plugin_version"
-printf 'Effective configuration contains OpenViking, the Trader Ops tool policy, the skill provider, and the optional WeCom channel.\n'
+printf 'Effective configuration contains OpenViking, the Trader Ops tool policy, journal logging, the skill provider, and the optional WeCom channel.\n'

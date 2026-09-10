@@ -23,6 +23,16 @@
     mcpToolCallTimeoutMs: 60000
 
 - insert:
+    # Export operational warnings to stdout so the systemd service journal can
+    # expose rejected WeCom sender ids without logging message content.
+    - id: trader-ops-console-logger
+      name: '../../../../vendor/logger-console/lib/index.js'
+      config:
+        colors: false
+        levels:
+          default: 0
+          channel-wecom: 2
+
     - id: trader-ops-tool-policy
       name: '../../../../packages/experimental/quant-tool-policy/lib/index.js'
       config:

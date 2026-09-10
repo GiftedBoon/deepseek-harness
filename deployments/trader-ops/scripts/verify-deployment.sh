@@ -7,6 +7,7 @@ repo_root="$(CDPATH= cd -- "$deployment_root/../.." && pwd)"
 profile="${TRADER_OPS_PROFILE:-web}"
 dsh_cli="$repo_root/apps/cli/lib/bin.js"
 policy_plugin="$repo_root/packages/experimental/quant-tool-policy/lib/index.js"
+logger_plugin="$repo_root/vendor/logger-console/lib/index.js"
 wecom_plugin="$repo_root/packages/channel/channel-wecom/lib/index.js"
 wecom_patch="$deployment_root/config/dsh/trader-ops-wecom.patch.yml"
 lan_proxy_service="$deployment_root/config/systemd/dsh-trader-ops-lan-proxy.service"
@@ -19,8 +20,8 @@ if [[ ! -f "$dsh_cli" ]]; then
   printf 'Built DSH CLI is missing at %s; install a completed release.\n' "$dsh_cli" >&2
   exit 1
 fi
-if [[ ! -f "$policy_plugin" ]]; then
-  printf 'Built Trader Ops policy plugin is missing at %s; install a completed release.\n' "$policy_plugin" >&2
+if [[ ! -f "$policy_plugin" || ! -f "$logger_plugin" ]]; then
+  printf 'Built Trader Ops policy or console logger plugin is missing; install a completed release.\n' >&2
   exit 1
 fi
 if [[ ! -f "$wecom_plugin" || ! -f "$wecom_patch" || ! -f "$wecom_preset" ]]; then
@@ -58,6 +59,8 @@ dump_output="$(node "$dsh_cli" --profile "$profile" "${patch_args[@]}" --dump-co
 
 grep -q 'openviking-memory-runtime' <<<"$dump_output"
 grep -q 'trader-ops-tool-policy' <<<"$dump_output"
+grep -q 'trader-ops-console-logger' <<<"$dump_output"
+grep -q 'channel-wecom: 2' <<<"$dump_output"
 grep -q 'trader-ops-skills' <<<"$dump_output"
 grep -q 'trader-ops-wecom' <<<"$dump_output"
 grep -q 'includeHarnessIdentity: false' <<<"$dump_output"
