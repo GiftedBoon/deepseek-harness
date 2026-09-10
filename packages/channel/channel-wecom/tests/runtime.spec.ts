@@ -338,6 +338,12 @@ describe('WeComChannelRuntime', () => {
     await vi.waitFor(() => { expect(test.client.replies.at(-1)?.content).toBe('unauthorized') })
     expect(test.warnings).toHaveBeenCalledWith(expect.stringContaining('rejected inbound frame'))
 
+    test.client.emitText(frame({ from: { userid: 'denied\nforged' }, text: { content: 'private rejection text' } }))
+    await vi.waitFor(() => { expect(test.client.replies).toHaveLength(2) })
+    expect(test.warnings).toHaveBeenCalledWith(
+      'channel-wecom: rejected inbound frame: WeCom sender is not allowed: userid="denied\\nforged"',
+    )
+
     test.client.failFinal = true
     test.client.emitText({ invalid: true })
     await vi.waitFor(() => {

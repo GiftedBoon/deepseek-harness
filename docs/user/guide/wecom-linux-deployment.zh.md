@@ -488,7 +488,14 @@ sudo -u dsh test "$(cat /srv/dsh-workspace/deployment-smoke.txt)" = "wecom-linux
 
 ### 6. 准入策略
 
-存在测试身份时，分别测试一个允许的单聊用户、一个未允许用户和一个未允许群聊。允许的用户能够对话，且其他发送方均收到配置的未授权回复而不启动模型轮次时通过。
+存在测试身份时，分别测试一个允许的单聊用户、一个未允许用户和一个未允许群聊。未允许用户发送一条消息后，使用以下命令读取被拒绝的 `userid`，且不显示无关 journal 记录：
+
+```sh
+sudo journalctl -u dsh-wecom --since '10 minutes ago' --no-pager \
+  | grep -F 'WeCom sender is not allowed'
+```
+
+warning 包含准确的 JSON 引号 `userid`、允许的用户能够对话，且其他发送方均收到配置的未授权回复而不启动模型轮次时通过。只把 `userid` 复制到完整的已评审白名单；不得使用 `*`。
 
 ### 7. 重启恢复
 
@@ -511,7 +518,7 @@ systemd 启动替代进程、服务恢复为 `active` 和 `running`，且新的�
 
 ### 9. 日志隐私
 
-完成全部测试后检查服务 journal。其中没有模型凭据、机器人 secret、Session 身份密钥、已接受的原始消息文本、原始 provider 用户 id 或 provider 调试帧时通过。
+完成全部测试后检查服务 journal。被拒绝发送者的 warning 会有意包含该用户的 JSON 引号 `userid`；应按员工身份数据限制 journal 访问权与保留期。journal 中没有模型凭据、机器人 secret、Session 身份密钥、已接受的原始消息文本、已接受的原始 provider 用户 id 或 provider 调试帧时通过。
 
 ### 验收记录
 
@@ -528,7 +535,7 @@ systemd 启动替代进程、服务恢复为 `active` 和 `running`，且新的�
 | 持久化 | 验证码 7391 在服务重启后保留 |
 | 沙箱 | 工作区写入成功，外部写入失败 |
 | 准入 | 精确 allowlist 按配置允许和拒绝 |
-| 隐私 | Journal 检查未发现 secret 或已接受的原始消息数据 |
+| 隐私 | Journal 检查未发现 secret 或已接受的原始消息数据；被拒绝 `userid` 的访问与保留受控 |
 
 <a id="operations-and-rollback"></a>
 ## 运维与回滚
@@ -566,7 +573,7 @@ sudo systemctl start dsh-wecom
 ## 安全检查表
 
 - 服务以 `dsh` 而不是 root 运行。
-- Git 和日志中没有凭据值或真实 provider 标识符。
+- Git 和日志中没有凭据值或已接受的 provider 标识符；被拒绝 `userid` warning 的访问与保留受限。
 - `/etc/deepseek-harness/wecom.env` 为 `root:dsh`、mode `0640` 或更严格。
 - profile 使用精确的 `allowedUsers` 和 `allowedChats` 配置项；两个列表均不包含 `"*"`。
 - 企业微信 permission preset 使用 `workspace-write` 或 `read-only`、`approval: never`，且绝不使用 `danger-full-access`。

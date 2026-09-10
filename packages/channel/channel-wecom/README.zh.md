@@ -74,7 +74,7 @@ kind: "package-reference"
 <a id="security"></a>
 ## 安全
 
-生产环境应使用明确的用户与群聊白名单。让 `sessionKeyEnv` 与企业微信机器人 secret 保持独立，并把它作为部署身份材料备份。插件记录验证与传输失败，但不会记录已准入的原始提供方 id 或消息文本。Agent 工具仍具有所选 preset 的权限，因此渠道 preset 应只授予机器人确实需要的 Workspace 和命令。
+生产环境应使用明确的用户与群聊白名单。让 `sessionKeyEnv` 与企业微信机器人 secret 保持独立，并把它作为部署身份材料备份。发送者被拒绝时，warning 会把准确 `userid` 记录为 JSON 引号字符串，供运维人员建立白名单；因此 journal 访问权与保留期必须保护员工标识符。插件绝不记录已准入的原始提供方 id 或消息文本。Agent 工具仍具有所选 preset 的权限，因此渠道 preset 应只授予机器人确实需要的 Workspace 和命令。
 
 <a id="model-experience"></a>
 ## Model Experience

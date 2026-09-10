@@ -42,7 +42,9 @@ export function admitTextFrame(frame: unknown, config: ResolvedConfig): WeComTex
   const userId = stringField(from['userid'], 'sender user id')
   const content = stringField(text['content'], 'text content')
   if (Buffer.byteLength(content) > config.maxInputBytes) throw new TypeError('WeCom text content exceeds maxInputBytes')
-  if (!allowed(config.allowedUsers, userId)) throw new TypeError('WeCom sender is not allowed')
+  if (!allowed(config.allowedUsers, userId)) {
+    throw new TypeError(`WeCom sender is not allowed: userid=${JSON.stringify(userId)}`)
+  }
   const chatId = chatType === 'group' ? stringField(body['chatid'], 'group chat id') : undefined
   if (chatId !== undefined && !allowed(config.allowedChats, chatId)) throw new TypeError('WeCom group chat is not allowed')
   return {

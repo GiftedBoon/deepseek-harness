@@ -109,6 +109,15 @@ The configurator reads the bot secret through a hidden prompt, generates and pre
 
 An empty group-chat list keeps group access disabled. Enable a reviewed group later by placing its exact chat id in `WECOM_ALLOWED_CHATS`; never use `*`. Validate the initial single chat from one allowed user with:
 
+To discover a non-admitted employee's exact `userid`, ask the employee to send one message and inspect only rejection warnings:
+
+```bash
+sudo journalctl -u dsh-trader-ops --since '10 minutes ago' --no-pager \
+  | grep -F 'WeCom sender is not allowed'
+```
+
+The JSON-quoted `userid` is employee identity data. Restrict journal access and retention, and never copy message content or unrelated journal entries into an allowlist ticket.
+
 ```text
 Production verification: reply only PROD-PONG.
 ```

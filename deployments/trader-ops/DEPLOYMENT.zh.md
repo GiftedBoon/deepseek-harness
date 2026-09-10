@@ -109,6 +109,15 @@ ssh -t dsh-server \
 
 群聊列表为空时不会准入群聊。以后启用经过评审的群聊时，应把准确 chat id 写入 `WECOM_ALLOWED_CHATS`，绝不能使用 `*`。由一名获准用户在首次单聊中发送以下消息进行验证：
 
+如需发现一名未准入员工的准确 `userid`，请该员工发送一条消息，然后只检查拒绝 warning：
+
+```bash
+sudo journalctl -u dsh-trader-ops --since '10 minutes ago' --no-pager \
+  | grep -F 'WeCom sender is not allowed'
+```
+
+JSON 引号中的 `userid` 属于员工身份数据。应限制 journal 访问权与保留期，且绝不得把消息内容或无关 journal 记录复制到白名单工单。
+
 ```text
 Production verification: reply only PROD-PONG.
 ```

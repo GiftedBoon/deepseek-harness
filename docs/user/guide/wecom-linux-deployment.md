@@ -488,7 +488,14 @@ Pass when the file exists with the exact content. Run a separately approved nega
 
 ### 6. Admission policy
 
-Test an admitted direct user, one non-admitted user, and one non-admitted group when test identities are available. Pass when the admitted user can converse and every other sender receives the configured unauthorized response without starting a model turn.
+Test an admitted direct user, one non-admitted user, and one non-admitted group when test identities are available. After a non-admitted user sends one message, read the rejected `userid` without exposing unrelated journal entries:
+
+```sh
+sudo journalctl -u dsh-wecom --since '10 minutes ago' --no-pager \
+  | grep -F 'WeCom sender is not allowed'
+```
+
+Pass when the warning contains the exact JSON-quoted `userid`, the admitted user can converse, and every other sender receives the configured unauthorized response without starting a model turn. Copy only the `userid` into the complete reviewed allowlist; do not use `*`.
 
 ### 7. Restart recovery
 
@@ -511,7 +518,7 @@ Pass when systemd starts a replacement process, the service returns to `active` 
 
 ### 9. Log privacy
 
-Review the service journal after all tests. Pass when it contains no model credential, bot secret, Session identity key, accepted raw message text, raw provider user id, or provider debug frame.
+Review the service journal after all tests. A denied sender warning intentionally contains that sender's JSON-quoted `userid`; restrict journal access and retention as employee identity data. Pass when the journal contains no model credential, bot secret, Session identity key, accepted raw message text, accepted raw provider user id, or provider debug frame.
 
 ### Acceptance record
 
@@ -528,7 +535,7 @@ Record these fields in the release ticket:
 | Persistence | Code 7391 survives service restart |
 | Sandbox | Workspace write succeeds and outside write fails |
 | Admission | Exact allowlist accepts and rejects as configured |
-| Privacy | Journal review finds no secret or accepted raw message data |
+| Privacy | Journal review finds no secret or accepted raw message data; denied `userid` access and retention are controlled |
 
 <a id="operations-and-rollback"></a>
 ## Operations and rollback
@@ -566,7 +573,7 @@ Do not roll an existing persistent data directory back across an incompatible sc
 ## Security checklist
 
 - The service runs as `dsh`, not root.
-- Git and logs contain no credential values or real provider identifiers.
+- Git and logs contain no credential values or accepted provider identifiers; denied `userid` warnings have restricted access and retention.
 - `/etc/deepseek-harness/wecom.env` is `root:dsh` mode `0640` or stricter.
 - The profile uses exact `allowedUsers` and `allowedChats` entries; neither list contains `"*"`.
 - The WeCom permission preset uses `workspace-write` or `read-only`, `approval: never`, and never `danger-full-access`.

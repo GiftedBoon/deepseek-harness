@@ -34,7 +34,21 @@ describe('WeCom frame admission', () => {
     expect(() => admitTextFrame({ ...(frame() as object), body: { ...(frame() as { body: object }).body, aibotid: 'other' } }, config))
       .toThrow(/bot id/)
     expect(() => admitTextFrame({ ...(frame() as object), body: { ...(frame() as { body: object }).body, from: { userid: 'denied' } } }, config))
-      .toThrow(/not allowed/)
+      .toThrow('WeCom sender is not allowed: userid="denied"')
     expect(() => admitTextFrame(frame('界'.repeat(6)), config)).toThrow(/maxInputBytes/)
+  })
+
+  it('rejects malformed fields, unsupported messages, and denied groups', () => {
+    const groupBody = (frame() as { body: Record<string, unknown> }).body
+    expect(() => admitTextFrame({ ...(frame() as object), headers: { req_id: 1 } }, config))
+      .toThrow(/request id/)
+    expect(() => admitTextFrame({ ...(frame() as object), headers: { req_id: ' ' } }, config))
+      .toThrow(/request id/)
+    expect(() => admitTextFrame({ ...(frame() as object), body: { ...groupBody, msgtype: 'image' } }, config))
+      .toThrow(/text messages/)
+    expect(() => admitTextFrame({ ...(frame() as object), body: { ...groupBody, chattype: 'other' } }, config))
+      .toThrow(/chat type/)
+    expect(() => admitTextFrame({ ...(frame() as object), body: { ...groupBody, chatid: 'denied' } }, config))
+      .toThrow(/group chat/)
   })
 })
