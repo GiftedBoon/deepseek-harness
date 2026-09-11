@@ -94,6 +94,7 @@ interface RuntimeHarness {
   readonly config: ResolvedConfig
   readonly calls: string[]
   readonly modelResults: unknown[]
+  readonly persistedSessions: Set<string>
   readonly warnings: ReturnType<typeof vi.fn>
   emit(name: string, ...args: unknown[]): void
 }
@@ -144,6 +145,7 @@ function harness(options: {
   const domain = options.domain ?? new Domain()
   const calls: string[] = []
   const modelResults: unknown[] = []
+  const persistedSessions = new Set<string>()
   const warnings = vi.fn()
   const listeners = new Map<string, Set<(...args: unknown[]) => void>>()
   const emit = (name: string, ...args: unknown[]): void => {
@@ -216,19 +218,26 @@ function harness(options: {
     agents: {
       get: () => behavior.activeConflict ? {} : undefined,
       create: (agentOptions: never) => createHandle(agentOptions, 'create'),
-      resume: (agentOptions: never) => createHandle(agentOptions, 'resume'),
+      resume: (agentOptions: { resumeSessionId: string }) => persistedSessions.has(agentOptions.resumeSessionId)
+        ? createHandle(agentOptions, 'resume')
+        : Promise.reject(new Error(`missing persisted Session ${agentOptions.resumeSessionId}`)),
     },
     agentPresets: { mount: async () => { calls.push('preset') } },
     permissionPresets: { set: () => { calls.push('permission') } },
+    sessionPersistence: {
+      stat: async (sessionId: string) => {
+        calls.push('stat')
+        return persistedSessions.has(sessionId) ? { header: { id: sessionId } } : undefined
+      },
+    },
     sessionTitle: { rename: () => { calls.push('title') } },
-    sessions: { flush: async () => { calls.push('flush') } },
+    sessions: { flush: async (session: { id: string }) => { calls.push('flush'); persistedSessions.add(session.id) } },
   }
   const workspace = {
     path: '/workspace',
     attachSession: async () => { calls.push('attach') },
   }
-  const persisted = new Set<string>()
-  if (options.persisted) persisted.add(conversationIdentity('bot', 'identity', 'shared', {
+  if (options.persisted) persistedSessions.add(conversationIdentity('bot', 'identity', 'shared', {
     messageId: 'message', requestId: 'request', botId: 'bot', chatType: 'single', userId: 'allowed',
     target: 'allowed', text: 'hello', frame: {},
   }).sessionId)
@@ -239,10 +248,9 @@ function harness(options: {
     identitySecret: 'identity',
     workspace: workspace as never,
     modelSelection: { provider: 'provider', model: 'model', reasoningEffort: ReasoningEffortId('high') },
-    persisted: persisted as never,
   })
   runtimes.push(runtime)
-  return { runtime, client, domain, config, calls, modelResults, warnings, emit }
+  return { runtime, client, domain, config, calls, modelResults, persistedSessions, warnings, emit }
 }
 
 async function waitForDelivery(domain: Domain, state: DeliveryRecord['state']): Promise<DeliveryRecord> {
@@ -289,6 +297,17 @@ describe('WeComChannelRuntime', () => {
     expect(test.calls).toContain('resume')
     expect(test.calls).not.toContain('title')
     expect(test.modelResults[0]).toMatchObject({ reasoningEffort: 'low' })
+  })
+
+  it('recreates a mapped Session deleted after channel startup', async () => {
+    const test = harness({ persisted: true, behavior: { output: 'fresh' } })
+    await test.runtime.start()
+    test.persistedSessions.clear()
+    test.client.emitText(frame())
+    expect((await waitForDelivery(test.domain, 'completed')).reply).toBe('fresh')
+    expect(test.calls).toContain('stat')
+    expect(test.calls).toContain('create')
+    expect(test.calls).not.toContain('resume')
   })
 
   it('replays completed and processing duplicates without another Agent', async () => {

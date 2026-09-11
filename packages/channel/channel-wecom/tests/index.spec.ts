@@ -58,7 +58,7 @@ function context(options: { permission?: { approval: string; sandbox: string }; 
       },
     },
     workspaceRegistry: { create: async (path: string) => ({ path }) },
-    sessionPersistence: { list: async () => [{ header: { id: 'persisted' }, revision: 'revision' }] },
+    sessionPersistence: {},
     storageDomain: { open: async () => ({ close: async () => {} }) },
     agentDefaultModel: { currentSelection: () => ({ provider: 'provider', model: 'model' }) },
     effect: (factory: () => () => Promise<void>) => {

@@ -5,8 +5,6 @@ import type {} from '@deepseek-ai/dsh-agent-default-model'
 import type {} from '@deepseek-ai/dsh-agent-presets'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-permission-presets'
-import type { SessionId } from '@deepseek-ai/dsh-session'
-import type {} from '@deepseek-ai/dsh-session-persistence'
 import { isAbsolute } from 'node:path'
 import { OfficialWeComClient } from './client.ts'
 import { Config, type ResolvedConfig } from './config.ts'
@@ -40,7 +38,6 @@ export function apply(ctx: Context, config: Config): Promise<void> {
     const identity = await ctx.credentials.resolve(credentialRef(resolved.sessionKeyEnv))
     if (identity === undefined) throw new Error(`channel-wecom: credential ${resolved.sessionKeyEnv} is not configured`)
     const workspace = await ctx.workspaceRegistry.create(resolved.workspacePath)
-    const persisted = new Set<SessionId>((await ctx.sessionPersistence.list()).map(snapshot => snapshot.header.id))
     const domain = await ctx.storageDomain.open(channelWeComDomainSpec)
     const runtime = new WeComChannelRuntime(ctx, {
       config: resolved,
@@ -53,7 +50,6 @@ export function apply(ctx: Context, config: Config): Promise<void> {
       identitySecret: identity.value,
       workspace,
       modelSelection: ctx.agentDefaultModel.currentSelection(),
-      persisted,
     })
     const dispose = ctx.effect(() => () => runtime.close(), 'channel-wecom.lifecycle()')
     try {

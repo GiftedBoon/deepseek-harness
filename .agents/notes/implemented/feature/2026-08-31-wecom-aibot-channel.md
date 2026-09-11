@@ -14,7 +14,7 @@ An internal DSH deployment needs users to continue ordinary Agent conversations 
 
 HMAC-SHA-256 maps provider conversation and delivery ids to stable opaque keys. Single chats belong to a user; group chats are deployment-selected as shared or per-user. The key secret is separate from the bot credential and is durable identity material.
 
-Each conversation has a process-local promise queue. One delivery creates or resumes one Agent, mounts the preset before publication, applies a confined noninteractive permission preset, and queues one ordinary user message. Exact Agent, Session, message, allocated-turn, and attempt correlation admits only that turn's `agent/assistant-stream` text deltas. The runtime waits for its `turn/end`, reaches quiescence, flushes the Session, and disposes the handle before processing the next message in that conversation.
+Each conversation has a process-local promise queue. One delivery observes its deterministic Session id through `SessionPersistence.stat()`, creates or resumes one Agent from that current result, mounts the preset before publication, applies a confined noninteractive permission preset, and queues one ordinary user message. A Session deleted while the channel remains active is recreated under the same id on the next delivery. Exact Agent, Session, message, allocated-turn, and attempt correlation admits only that turn's `agent/assistant-stream` text deltas. The runtime waits for its `turn/end`, reaches quiescence, flushes the Session, and disposes the handle before processing the next message in that conversation.
 
 The `channel_wecom` domain stores conversation routing, delivery state, and an active-send outbox. Completed and failed duplicates replay stored text without another model call. Passive stream updates are cumulative, coalesced, ordered, and UTF-8 bounded. Final passive failure falls back to active Markdown; another failure commits the result to the outbox for bounded retry.
 
@@ -42,7 +42,7 @@ This decision does not supersede [Fire-and-forget webhook Sessions](2026-08-22-f
 
 ## Verification
 
-Tests cover opaque identity and group ownership, hostile wire admission, SDK log suppression, UTF-8 bounds, cumulative coalescing, and ordered finalization. Type checking covers the SDK adapter and Host services. Repository gates cover metadata, documentation pairing, generated catalogs, dependency policy, and the invariant companion.
+Tests cover opaque identity and group ownership, fresh creation after deletion, hostile wire admission, SDK log suppression, UTF-8 bounds, cumulative coalescing, and ordered finalization. Type checking covers the SDK adapter and Host services. Repository gates cover metadata, documentation pairing, generated catalogs, dependency policy, and the invariant companion.
 
 ## Consequences
 

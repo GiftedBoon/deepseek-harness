@@ -6,6 +6,7 @@ import type {} from '@deepseek-ai/dsh-agent-presets'
 import { createUserMessage, errorChain, type LlmCallConfig, type UserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId, TurnEndReason } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-permission-presets'
+import type {} from '@deepseek-ai/dsh-session-persistence'
 import type {} from '@deepseek-ai/dsh-session-title'
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type { ResolvedConfig } from './config.ts'
@@ -33,7 +34,6 @@ interface RuntimeOptions {
   readonly identitySecret: string
   readonly workspace: Workspace
   readonly modelSelection: ModelSelection
-  readonly persisted: Set<SessionId>
 }
 
 /** Apply the creation-time model selection until the first request header exists. */
@@ -205,7 +205,7 @@ export class WeComChannelRuntime {
 
   private async runAgent(sessionId: SessionId, delivery: WeComTextDelivery, stream: WeComReplyStream): Promise<string> {
     if (this.ctx.agents.get(sessionId) !== undefined) throw new Error(`channel-wecom: Session is already active: ${sessionId}`)
-    const existing = this.options.persisted.has(sessionId)
+    const existing = await this.ctx.sessionPersistence.stat(sessionId, { signal: this.controller.signal }) !== undefined
     const setup = async (agentCtx: Context): Promise<void> => {
       await this.ctx.agentPresets.mount(agentCtx, this.options.config.agentPreset)
       installInitialModelSelection(agentCtx, this.options.modelSelection)
@@ -257,7 +257,6 @@ export class WeComChannelRuntime {
       this.active.delete(sessionId)
       try {
         await this.ctx.sessions.flush(handle.agent.session)
-        this.options.persisted.add(sessionId)
       } finally {
         await handle.dispose()
         this.handles.delete(handle)
