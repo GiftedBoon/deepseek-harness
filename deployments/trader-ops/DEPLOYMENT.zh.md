@@ -142,7 +142,7 @@ sudo journalctl -u dsh-trader-ops -n 100 --no-pager
 
 部署中已包含默认关闭的 Streamable HTTP 层，地址为 `http://192.168.3.213:8095/mcp`。它从 root 所有的环境文件读取 `X-API-Key`，只有在该地址经可信内网或 VPN 可达时才应启用。
 
-运行仅限 root 的配置器。它会隐藏提示读取 key、更新 Profile、验证策略与 Skill 层并重启 Harness：
+运行仅限 root 的配置器。它会隐藏提示读取 key、更新 Profile、验证策略与 Skill 层、安装当前发布包中的 systemd unit 并重启 Harness：
 
 ```bash
 sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-bssh-ops-mcp.sh --enable

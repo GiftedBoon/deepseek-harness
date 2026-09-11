@@ -12,7 +12,7 @@ Trader Ops 部署需要受控连接到现有 bssh_ops HTTP MCP 服务，以检�
 
 新增可选的 `@deepseek-ai/dsh-mcp-client` 层 `config/dsh/trader-ops-bssh-ops-mcp.patch.yml`。它使用 `bssh-ops-remote` 命名空间、Streamable HTTP 和从 root 所有部署环境读取的 `X-API-Key`。每个 Trader Ops profile 命令都会加载该 patch，但只有环境启用后才会激活。
 
-新增 `configure-bssh-ops-mcp.sh`，通过隐藏提示读取 key，更新权限为 0600 的环境文件，重建 profile，验证策略和 Skill 层，并在检查成功后重启。bssh_ops 只读工具允许调用；远程执行工具要求审批，并且仍受下游授权约束。
+新增 `configure-bssh-ops-mcp.sh`，通过隐藏提示读取 key，更新权限为 0600 的环境文件，重建 profile，验证策略和 Skill 层，安装当前 systemd unit，并在检查成功后重启。策略允许只读的 Harness `skill` 加载器和 bssh_ops 检查工具；远程执行工具要求审批，并且仍受下游授权约束。
 
 `bssh-ops` Skill 固化产品操作必须遵循的“预览—确认—执行”流程、单中心/双中心合理性检查、自定义 shell 语法检查、机器级命令限制和 `run_id` 审计处理。Skill 不包含端点凭据或实时业务状态。
 
@@ -30,7 +30,7 @@ bssh_ops 端点是私网中的明文 HTTP，不得暴露到公网。API key 保�
 
 ## 验证
 
-Skill 通过 Skill Creator 校验器。Profile 渲染确认 MCP 层会插入且默认关闭。配置器和部署脚本通过 shell 语法与静态检查；发布前还必须通过仓库文档门禁。
+Skill 通过 Skill Creator 校验器。Profile 渲染确认 MCP 层会插入且默认关闭。静态检查确认策略允许 `skill` 加载器，并确认配置器会先安装包含 bssh_ops patch 的 unit 再重新加载 systemd。配置器通过 shell 语法检查，发布前还必须通过仓库文档门禁。
 
 ## 影响
 

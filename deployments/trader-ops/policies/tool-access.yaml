@@ -5,6 +5,13 @@ enforced: true
 default: deny
 
 rules:
+  - id: harness-skill-loader
+    tools:
+      - skill
+    risk: read_only
+    environments: [development, staging, production]
+    decision: allow
+
   - id: openviking-read
     tools:
       - mcp__openviking__read

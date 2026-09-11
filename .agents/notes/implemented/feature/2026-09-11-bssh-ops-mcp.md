@@ -12,7 +12,7 @@ The Trader Ops deployment needs a controlled connection to the existing bssh_ops
 
 Add an optional `@deepseek-ai/dsh-mcp-client` layer at `config/dsh/trader-ops-bssh-ops-mcp.patch.yml`. It uses the `bssh-ops-remote` namespace, Streamable HTTP, and the `X-API-Key` header resolved from the root-owned deployment environment. The patch is loaded by every Trader Ops profile command but remains disabled until the environment enables it.
 
-Add `configure-bssh-ops-mcp.sh` to prompt for the key, update the mode-0600 environment file, rebuild the profile, verify the policy and Skill layers, and restart only after successful checks. Read-only bssh_ops tools are allowed; remote execution tools require approval and remain subject to downstream authorization.
+Add `configure-bssh-ops-mcp.sh` to prompt for the key, update the mode-0600 environment file, rebuild the profile, verify the policy and Skill layers, install the current systemd unit, and restart only after successful checks. The policy allows the read-only Harness `skill` loader and bssh_ops inspection tools; remote execution tools require approval and remain subject to downstream authorization.
 
 The `bssh-ops` Skill records the mandatory preview-confirm-execute sequence for product actions, single/dual-center sanity checks, custom-shell syntax checks, machine-level command restrictions, and `run_id` audit handling. It contains no endpoint credential or live business state.
 
@@ -30,7 +30,7 @@ The bssh_ops endpoint is plain HTTP on a private network and must not be exposed
 
 ## Verification
 
-The Skill passes the Skill Creator validator. Profile rendering confirms the MCP layer is inserted and disabled by default. Shell syntax and static checks cover the configurator and deployment scripts; repository documentation checks must pass before publishing.
+The Skill passes the Skill Creator validator. Profile rendering confirms the MCP layer is inserted and disabled by default. Static checks confirm that the policy allows the `skill` loader and that the configurator installs the unit containing the bssh_ops patch before reloading systemd. Shell syntax and repository documentation checks must pass before publishing.
 
 ## Consequences
 

@@ -142,7 +142,7 @@ sudo journalctl -u dsh-trader-ops -n 100 --no-pager
 
 The deployment includes a disabled Streamable HTTP layer for `bssh_ops` at `http://192.168.3.213:8095/mcp`. It sends the `X-API-Key` header from the root-owned environment file and should only be enabled when this address is reachable through the trusted private network or VPN.
 
-Run the root-only configurator. It prompts for the key without putting it in shell history, updates the Profile, verifies the policy and skill layers, and restarts Harness:
+Run the root-only configurator. It prompts for the key without putting it in shell history, updates the Profile, verifies the policy and Skill layers, installs the current release's systemd unit, and restarts Harness:
 
 ```bash
 sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-bssh-ops-mcp.sh --enable

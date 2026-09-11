@@ -4,6 +4,7 @@ set -euo pipefail
 repo_root="/opt/deepseek-harness/current"
 deployment_root="$repo_root/deployments/trader-ops"
 environment_file="/etc/deepseek-harness/trader-ops.env"
+service_file="/etc/systemd/system/dsh-trader-ops.service"
 action="${1:---enable}"
 default_url="http://192.168.3.213:8095/mcp"
 
@@ -76,6 +77,8 @@ cd "$repo_root"
   CI=true HOME=/var/lib/deepseek-harness PATH=/usr/local/bin:/usr/bin:/bin \
   "$deployment_root/scripts/verify-deployment.sh"
 
+install -o root -g root -m 0644 \
+  "$deployment_root/config/systemd/dsh-trader-ops.service" "$service_file"
 systemctl daemon-reload
 systemctl reset-failed dsh-trader-ops
 systemctl restart dsh-trader-ops
