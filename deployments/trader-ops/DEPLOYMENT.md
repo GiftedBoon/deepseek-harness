@@ -138,6 +138,24 @@ sudo systemctl show dsh-trader-ops -p ActiveState -p SubState -p NRestarts
 sudo journalctl -u dsh-trader-ops -n 100 --no-pager
 ```
 
+## 6. Enable the optional bssh_ops MCP
+
+The deployment includes a disabled Streamable HTTP layer for `bssh_ops` at `http://192.168.3.213:8095/mcp`. It sends the `X-API-Key` header from the root-owned environment file and should only be enabled when this address is reachable through the trusted private network or VPN.
+
+Run the root-only configurator. It prompts for the key without putting it in shell history, updates the Profile, verifies the policy and skill layers, and restarts Harness:
+
+```bash
+sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-bssh-ops-mcp.sh --enable
+```
+
+Disable the connection while retaining the stored key for a later rotation or re-enable:
+
+```bash
+sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-bssh-ops-mcp.sh --disable
+```
+
+After enablement, tools appear with the `mcp__bssh-ops-remote__` prefix. Read-only tools are allowed by `policies/tool-access.yaml`; `run_quick_command`, `run_scp`, and `execute_product_action` require approval and remain subject to the MCP server's own authorization. Do not put the API key in a patch, Skill, command argument, or ticket.
+
 ### Routine WeCom operations
 
 Use the focused log script to list the 20 most recent rejected user ids from the last 24 hours without printing message content or unrelated startup logs. Add `--follow` to wait for the next rejected sender, or set a different journal window with `--since '10 minutes ago'`:

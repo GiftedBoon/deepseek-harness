@@ -120,6 +120,7 @@ pnpm dsh web \
   --patch deployments/trader-ops/config/dsh/trader-ops.patch.yml \
   --patch deployments/trader-ops/config/dsh/trader-ops-aihubmix.patch.yml \
   --patch deployments/trader-ops/config/dsh/trader-ops-wecom.patch.yml \
+  --patch deployments/trader-ops/config/dsh/trader-ops-bssh-ops-mcp.patch.yml \
   --no-open
 ```
 
@@ -131,7 +132,7 @@ pnpm dsh web \
 
 - 在 `knowledge/business`、`knowledge/systems` 或 `knowledge/runbooks` 添加评审后的非空 Markdown，再通过明确的入库流程提交给 OpenViking。不要把 `README.md`、`README.zh.md` 和空白或只含空白字符的文件纳入索引；否则 OpenViking 可能仅根据文件名派生出误导性的语义元数据。
 - 在某个 `skills/<name>/` 中添加完整 `SKILL.md`。Loader 只将直接子目录识别为 skill bundle，不要再嵌套业务分类层。
-- 业务 MCP 服务可用后，复制并审查 `config/dsh/trader-ops-mcp.patch.yml.example`，去掉 `.example`，再作为第二个 `--patch` 参数加载。
+- bssh_ops MCP 层已经通过 `config/dsh/trader-ops-bssh-ops-mcp.patch.yml` 接通；使用 `sudo bash scripts/configure-bssh-ops-mcp.sh --enable` 启用，脚本会隐藏提示读取 key，避免进入 shell history。每个 profile 命令都应保留该 patch，让环境变量控制其 `disabled` 状态。
 - 新增工具时同步更新 `policies/tool-access.yaml`。Harness 侧插件已经按首条匹配和默认拒绝执行它；在可信身份与审批存储存在前，`risk-levels.yaml` 和 `approvals.yaml` 仍是设计约定。
 
 ## 6. 停止本地服务

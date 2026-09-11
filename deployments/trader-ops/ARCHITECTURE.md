@@ -23,7 +23,7 @@ DeepSeek Harness (web profile)
   |        | recall                +--> future knowledge/*.md input
   |        + session capture            currently empty is valid
   |
-  +-- future MCP client ----> Trader Ops MCP server ----> DB / API / NAS
+  +-- bssh_ops MCP client ---> bssh_ops HTTP server ------> colo hosts
            disabled by default
 ```
 
@@ -42,7 +42,7 @@ DeepSeek Harness (web profile)
 | AIHubMix model | Optional, validated | `llm-pi-ai` serves Harness and OpenViking semantic extraction through an environment-provided endpoint and key |
 | Trader Ops skill root | Configured | An empty root is valid; adding `SKILL.md` enables discovery |
 | Automatic Git knowledge ingestion | Not implemented | Reviewable add, update, and delete semantics remain required |
-| Trader Ops MCP | Template, disabled | Enable the example patch only after the real service exists |
+| bssh_ops MCP | Optional, disabled by default | Enable `trader-ops-bssh-ops-mcp.patch.yml` with a root-owned API key |
 | Harness tool policy | Experimental, enforced | First-match allow/ask/deny plus default deny and an anti-bypass guard |
 | Identity, resource authorization, audit | Not implemented | The Trader Ops MCP server and approval store must enforce them |
 
@@ -64,7 +64,7 @@ Built-in DSH web profile
   + installed OpenViking bundle patch
   + config/dsh/trader-ops.patch.yml
   + (optional) config/dsh/trader-ops-aihubmix.patch.yml
-  + (future, optional) config/dsh/trader-ops-mcp.patch.yml
+  + (optional) config/dsh/trader-ops-bssh-ops-mcp.patch.yml
 ```
 
 A later patch replaces the complete `config` of a matching row; it does not deep-merge that object. Any change to `openviking-memory-runtime` must retain every field that still needs to apply, then use `--dump-config` to inspect the final composition.

@@ -1,0 +1,20 @@
+# Optional bssh_ops remote operations MCP layer. The endpoint and API key are
+# resolved from the deployment environment; never commit the API key here.
+
+- insert:
+    - id: trader-ops-bssh-ops-mcp
+      name: '@deepseek-ai/dsh-mcp-client'
+      disabled: !!js process.env.TRADER_OPS_BSSH_MCP_ENABLED !== '1'
+      config:
+        serverName: bssh-ops-remote
+        transport: streamable-http
+        url: !!js process.env.TRADER_OPS_BSSH_MCP_URL
+        headers:
+          X-API-Key: !!js process.env.TRADER_OPS_BSSH_MCP_API_KEY
+        toolCallTimeoutMs: 60000
+        failOnStartupError: true
+        reconnect:
+          enabled: true
+          maxAttempts: 5
+          initialDelayMs: 1000
+          maxDelayMs: 30000

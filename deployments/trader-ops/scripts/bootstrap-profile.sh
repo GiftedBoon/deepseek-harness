@@ -13,6 +13,7 @@ policy_plugin="$repo_root/packages/experimental/quant-tool-policy/lib/index.js"
 logger_plugin="$repo_root/vendor/logger-console/lib/index.js"
 wecom_plugin="$repo_root/packages/channel/channel-wecom/lib/index.js"
 wecom_patch="$deployment_root/config/dsh/trader-ops-wecom.patch.yml"
+bssh_mcp_patch="$deployment_root/config/dsh/trader-ops-bssh-ops-mcp.patch.yml"
 wecom_preset_source="$repo_root/packages/preset/agent-presets/presets/standard"
 lan_proxy_service="$deployment_root/config/systemd/dsh-trader-ops-lan-proxy.service"
 lan_proxy_socket="$deployment_root/config/systemd/dsh-trader-ops-lan-proxy.socket.in"
@@ -29,8 +30,8 @@ if [[ ! -f "$policy_plugin" || ! -f "$logger_plugin" ]]; then
   printf 'Built Trader Ops policy or console logger plugin is missing; install a completed release.\n' >&2
   exit 1
 fi
-if [[ ! -f "$wecom_plugin" || ! -f "$wecom_patch" ]]; then
-  printf 'Built WeCom channel or its Trader Ops patch is missing from %s.\n' "$deployment_root" >&2
+if [[ ! -f "$wecom_plugin" || ! -f "$wecom_patch" || ! -f "$bssh_mcp_patch" ]]; then
+  printf 'Built WeCom channel or a Trader Ops MCP patch is missing from %s.\n' "$deployment_root" >&2
   exit 1
 fi
 if [[ ! -f "$lan_proxy_service" || ! -f "$lan_proxy_socket" ]]; then
@@ -55,6 +56,7 @@ node "$deployment_root/scripts/render-wecom-preset.mjs" "$wecom_preset_source" "
 dump_output="$(node "$dsh_cli" --profile "$profile" \
   --patch "$deployment_root/config/dsh/trader-ops.patch.yml" \
   --patch "$wecom_patch" \
+  --patch "$bssh_mcp_patch" \
   --dump-config)"
 
 grep -q 'openviking-memory-runtime' <<<"$dump_output"

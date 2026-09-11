@@ -45,3 +45,32 @@ rules:
     risk: privileged_operation
     environments: [production]
     decision: require_approval
+
+  - id: bssh-ops-read
+    tool_pattern: mcp__bssh-ops-remote__list_*
+    risk: read_only
+    environments: [development, staging, production]
+    decision: allow
+
+  - id: bssh-ops-status
+    tool_pattern: mcp__bssh-ops-remote__get_*
+    risk: read_only
+    environments: [development, staging, production]
+    decision: allow
+
+  - id: bssh-ops-preview
+    tools:
+      - mcp__bssh-ops-remote__preview_product_action
+      - mcp__bssh-ops-remote__check_shell_syntax
+    risk: read_only
+    environments: [development, staging, production]
+    decision: allow
+
+  - id: bssh-ops-mutation
+    tools:
+      - mcp__bssh-ops-remote__run_quick_command
+      - mcp__bssh-ops-remote__run_scp
+      - mcp__bssh-ops-remote__execute_product_action
+    risk: privileged_operation
+    environments: [development, staging, production]
+    decision: require_approval

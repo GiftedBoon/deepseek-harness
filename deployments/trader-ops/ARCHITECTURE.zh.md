@@ -23,7 +23,7 @@ DeepSeek Harness (web profile)
   |        | recall                +--> 后续接收 knowledge/*.md
   |        + session capture            当前允许为空
   |
-  +-- future MCP client ----> Trader Ops MCP server ----> DB / API / NAS
+  +-- bssh_ops MCP client ---> bssh_ops HTTP 服务 -------> colo 主机
            默认禁用
 ```
 
@@ -42,7 +42,7 @@ DeepSeek Harness (web profile)
 | AIHubMix 模型 | 可选、已验证 | `llm-pi-ai` 通过环境提供的端点和 key 为 Harness 与 OpenViking 语义提取提供模型 |
 | Trader Ops skill 根目录 | 已配置 | 空目录是合法状态，未来添加 `SKILL.md` 即可发现 |
 | Git 知识自动入库 | 未实现 | 必须单独实现评审、提交、更新和删除语义 |
-| Trader Ops MCP | 模板、默认关闭 | 真实服务存在后再启用示例 patch |
+| bssh_ops MCP | 可选、默认关闭 | 使用 root 所有的 API key 启用 `trader-ops-bssh-ops-mcp.patch.yml` |
 | Harness 工具策略 | 实验性、已强制执行 | 首条匹配 allow/ask/deny、默认拒绝，并带防绕过 guard |
 | 身份、资源授权、审计 | 未实现 | 必须由 Trader Ops MCP 服务和审批存储强制执行 |
 
@@ -64,7 +64,7 @@ DSH 内置 web profile
   + profile 中安装的 OpenViking bundle patch
   + config/dsh/trader-ops.patch.yml
   + （可选）config/dsh/trader-ops-aihubmix.patch.yml
-  + （未来可选）config/dsh/trader-ops-mcp.patch.yml
+  + （可选）config/dsh/trader-ops-bssh-ops-mcp.patch.yml
 ```
 
 后加载的 patch 会覆盖同一配置项的完整 `config`，不是深度合并。因此修改 `openviking-memory-runtime` 时必须保留本文件中仍需生效的全部字段，并用 `--dump-config` 检查最终配置。

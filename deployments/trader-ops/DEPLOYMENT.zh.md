@@ -138,6 +138,24 @@ sudo systemctl show dsh-trader-ops -p ActiveState -p SubState -p NRestarts
 sudo journalctl -u dsh-trader-ops -n 100 --no-pager
 ```
 
+## 6. 启用可选 bssh_ops MCP
+
+部署中已包含默认关闭的 Streamable HTTP 层，地址为 `http://192.168.3.213:8095/mcp`。它从 root 所有的环境文件读取 `X-API-Key`，只有在该地址经可信内网或 VPN 可达时才应启用。
+
+运行仅限 root 的配置器。它会隐藏提示读取 key、更新 Profile、验证策略与 Skill 层并重启 Harness：
+
+```bash
+sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-bssh-ops-mcp.sh --enable
+```
+
+停用连接但保留已保存的 key，便于后续轮换或重新启用：
+
+```bash
+sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-bssh-ops-mcp.sh --disable
+```
+
+启用后，工具会以 `mcp__bssh-ops-remote__` 为前缀出现。`policies/tool-access.yaml` 允许只读工具；`run_quick_command`、`run_scp` 与 `execute_product_action` 要求审批，并且仍受 MCP 服务自身授权约束。不要把 API key 写入 patch、Skill、命令参数或工单。
+
 ### 企业微信日常运维
 
 使用专用日志脚本列出过去 24 小时内最近 20 个被拒绝的用户 id；该脚本不会打印消息内容或无关启动日志。添加 `--follow` 可等待下一个被拒绝的发送者，也可以用 `--since '10 minutes ago'` 指定其他 journal 时间范围：

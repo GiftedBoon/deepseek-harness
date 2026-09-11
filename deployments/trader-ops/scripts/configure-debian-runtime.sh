@@ -147,6 +147,9 @@ OPENVIKING_PEER_ID=trader-ops
 OPENVIKING_WORKSPACE_PEER=0
 OPENVIKING_RECALL_PEER_SCOPE=actor
 TRADER_OPS_MCP_ENABLED=0
+TRADER_OPS_BSSH_MCP_ENABLED=0
+TRADER_OPS_BSSH_MCP_URL=http://192.168.3.213:8095/mcp
+TRADER_OPS_BSSH_MCP_API_KEY=
 TRADER_OPS_ENVIRONMENT=development
 TRADER_OPS_WECOM_ENABLED=0
 TRADER_OPS_WECOM_SANDBOX=read-only
@@ -270,6 +273,7 @@ model_output="$(/usr/sbin/runuser --preserve-environment -u dsh -- env \
   node "$dsh_cli" --profile headless \
   --patch "$deployment_root/config/dsh/trader-ops.patch.yml" \
   --patch "$deployment_root/config/dsh/trader-ops-aihubmix.patch.yml" \
+  --patch "$deployment_root/config/dsh/trader-ops-bssh-ops-mcp.patch.yml" \
   'Reply only REMOTE-MODEL-OK')"
 grep -q 'REMOTE-MODEL-OK' <<<"$model_output"
 systemctl enable dsh-trader-ops

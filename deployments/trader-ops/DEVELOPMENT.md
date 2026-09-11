@@ -120,6 +120,7 @@ pnpm dsh web \
   --patch deployments/trader-ops/config/dsh/trader-ops.patch.yml \
   --patch deployments/trader-ops/config/dsh/trader-ops-aihubmix.patch.yml \
   --patch deployments/trader-ops/config/dsh/trader-ops-wecom.patch.yml \
+  --patch deployments/trader-ops/config/dsh/trader-ops-bssh-ops-mcp.patch.yml \
   --no-open
 ```
 
@@ -131,7 +132,7 @@ The command prints a local access URL and token. The service must still start wh
 
 - Add reviewed, non-empty Markdown to `knowledge/business`, `knowledge/systems`, or `knowledge/runbooks`, then submit it through an explicit OpenViking ingestion path. Exclude `README.md`, `README.zh.md`, and empty or whitespace-only files from ingestion; OpenViking can otherwise derive misleading semantic metadata from the filename alone.
 - Add a complete `SKILL.md` under a direct `skills/<name>/` child. The Loader recognizes direct children as skill bundles; do not add another business-category layer.
-- After a business MCP server exists, copy and review `config/dsh/trader-ops-mcp.patch.yml.example`, remove `.example`, and load it as a second `--patch` argument.
+- The bssh_ops MCP layer is already wired through `config/dsh/trader-ops-bssh-ops-mcp.patch.yml`; enable it with `sudo bash scripts/configure-bssh-ops-mcp.sh --enable`, which prompts for the key without putting it in shell history. Keep the patch loaded in every profile command so its `disabled` flag is controlled by the environment.
 - Update `policies/tool-access.yaml` when tools are added. The Harness-side plugin enforces it with first-match rules and default deny; `risk-levels.yaml` and `approvals.yaml` remain design contracts until trusted identity and approval stores exist.
 
 ## 6. Stop the local service

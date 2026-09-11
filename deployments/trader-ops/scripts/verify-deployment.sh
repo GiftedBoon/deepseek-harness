@@ -10,6 +10,7 @@ policy_plugin="$repo_root/packages/experimental/quant-tool-policy/lib/index.js"
 logger_plugin="$repo_root/vendor/logger-console/lib/index.js"
 wecom_plugin="$repo_root/packages/channel/channel-wecom/lib/index.js"
 wecom_patch="$deployment_root/config/dsh/trader-ops-wecom.patch.yml"
+bssh_mcp_patch="$deployment_root/config/dsh/trader-ops-bssh-ops-mcp.patch.yml"
 lan_proxy_service="$deployment_root/config/systemd/dsh-trader-ops-lan-proxy.service"
 lan_proxy_socket="$deployment_root/config/systemd/dsh-trader-ops-lan-proxy.socket.in"
 endpoint="${OPENVIKING_URL:-http://127.0.0.1:1933}"
@@ -24,8 +25,8 @@ if [[ ! -f "$policy_plugin" || ! -f "$logger_plugin" ]]; then
   printf 'Built Trader Ops policy or console logger plugin is missing; install a completed release.\n' >&2
   exit 1
 fi
-if [[ ! -f "$wecom_plugin" || ! -f "$wecom_patch" || ! -f "$wecom_preset" ]]; then
-  printf 'Trader Ops WeCom plugin, patch, or generated preset is missing.\n' >&2
+if [[ ! -f "$wecom_plugin" || ! -f "$wecom_patch" || ! -f "$bssh_mcp_patch" || ! -f "$wecom_preset" ]]; then
+  printf 'Trader Ops WeCom plugin, MCP patch, or generated preset is missing.\n' >&2
   exit 1
 fi
 if [[ ! -f "$lan_proxy_service" || ! -f "$lan_proxy_socket" ]]; then
@@ -55,6 +56,7 @@ case "$llm_provider" in
     ;;
 esac
 patch_args+=(--patch "$wecom_patch")
+patch_args+=(--patch "$bssh_mcp_patch")
 dump_output="$(node "$dsh_cli" --profile "$profile" "${patch_args[@]}" --dump-config)"
 
 grep -q 'openviking-memory-runtime' <<<"$dump_output"
@@ -63,6 +65,7 @@ grep -q 'trader-ops-console-logger' <<<"$dump_output"
 grep -q 'channel-wecom: 2' <<<"$dump_output"
 grep -q 'trader-ops-skills' <<<"$dump_output"
 grep -q 'trader-ops-wecom' <<<"$dump_output"
+grep -q 'trader-ops-bssh-ops-mcp' <<<"$dump_output"
 grep -q 'includeHarnessIdentity: false' <<<"$dump_output"
 grep -Fq '我是CFI 股票交易组的 AI Agent 智能助手' "$wecom_preset"
 awk '
