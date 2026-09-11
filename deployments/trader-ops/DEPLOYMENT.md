@@ -154,7 +154,7 @@ Disable the connection while retaining the stored key for a later rotation or re
 sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-bssh-ops-mcp.sh --disable
 ```
 
-After enablement, tools appear with the `mcp__bssh-ops-remote__` prefix. Read-only tools are allowed by `policies/tool-access.yaml`; `run_quick_command`, `run_scp`, and `execute_product_action` require approval and remain subject to the MCP server's own authorization. Do not put the API key in a patch, Skill, command argument, or ticket.
+After enablement, tools appear with the `mcp__bssh-ops-remote__` prefix. `policies/tool-access.yaml` allows the three exact mutation tools without a Harness approval prompt; the `bssh-ops` Skill still requires preview and explicit user confirmation, and the MCP server owns downstream authorization and audit. Do not put the API key in a patch, Skill, command argument, or ticket.
 
 ### Routine WeCom operations
 

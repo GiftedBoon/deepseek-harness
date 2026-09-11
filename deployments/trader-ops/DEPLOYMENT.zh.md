@@ -154,7 +154,7 @@ sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure
 sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-bssh-ops-mcp.sh --disable
 ```
 
-启用后，工具会以 `mcp__bssh-ops-remote__` 为前缀出现。`policies/tool-access.yaml` 允许只读工具；`run_quick_command`、`run_scp` 与 `execute_product_action` 要求审批，并且仍受 MCP 服务自身授权约束。不要把 API key 写入 patch、Skill、命令参数或工单。
+启用后，工具会以 `mcp__bssh-ops-remote__` 为前缀出现。`policies/tool-access.yaml` 允许三个精确的写工具直接通过 Harness policy；`bssh-ops` Skill 仍要求预览和用户明确确认，MCP 服务负责下游授权与审计。不要把 API key 写入 patch、Skill、命令参数或工单。
 
 ### 企业微信日常运维
 

@@ -12,7 +12,7 @@ The Trader Ops deployment needs a controlled connection to the existing bssh_ops
 
 Add an optional `@deepseek-ai/dsh-mcp-client` layer at `config/dsh/trader-ops-bssh-ops-mcp.patch.yml`. It uses the `bssh-ops-remote` namespace, Streamable HTTP, and the `X-API-Key` header resolved from the root-owned deployment environment. The patch is loaded by every Trader Ops profile command but remains disabled until the environment enables it.
 
-Add `configure-bssh-ops-mcp.sh` to prompt for the key, update the mode-0600 environment file, rebuild the profile, verify the policy and Skill layers, install the current systemd unit, and restart only after successful checks. The policy allows the read-only Harness `skill` loader and bssh_ops inspection tools; remote execution tools require approval and remain subject to downstream authorization.
+Add `configure-bssh-ops-mcp.sh` to prompt for the key, update the mode-0600 environment file, rebuild the profile, verify the policy and Skill layers, install the current systemd unit, and restart only after successful checks. The policy allows the read-only Harness `skill` loader, bssh_ops inspection tools, and three exact remote execution tools. The Skill requires preview and explicit user confirmation, while the MCP service owns downstream authorization and audit.
 
 The `bssh-ops` Skill records the mandatory preview-confirm-execute sequence for product actions, single/dual-center sanity checks, custom-shell syntax checks, machine-level command restrictions, and `run_id` audit handling. It contains no endpoint credential or live business state.
 
@@ -20,17 +20,17 @@ The `bssh-ops` Skill records the mandatory preview-confirm-execute sequence for 
 
 **Put the API key in the MCP patch.** Rejected because patches are source-controlled and can be copied into logs or release archives; the key belongs in the root-owned environment file.
 
-**Expose mutation tools without a preview step.** Rejected because product actions may target one or two physical colo hosts and can affect production processes; the Skill and policy require review before execution.
+**Expose mutation tools without a preview step.** Rejected because product actions may target one or two physical colo hosts and can affect production processes; the Skill requires review before execution, and the allowlist names only the three audited MCP mutation tools.
 
 **Use a generic server name such as `trader_ops`.** Rejected because the stable `bssh-ops-remote` namespace identifies this external service and avoids collisions with another Trader Ops MCP server.
 
 ## Security and lifecycle
 
-The bssh_ops endpoint is plain HTTP on a private network and must not be exposed to the public Internet. The API key stays in `/etc/deepseek-harness/trader-ops.env` with mode `0600`; configuration prompts avoid shell history. The Harness policy is not a replacement for bssh_ops actor-, resource-, and argument-level authorization.
+The bssh_ops endpoint is plain HTTP on a private network and must not be exposed to the public Internet. The API key stays in `/etc/deepseek-harness/trader-ops.env` with mode `0600`; configuration prompts avoid shell history. Harness does not issue a second approval prompt for the allowlisted mutation tools, so the deployment relies on the Skill confirmation workflow and bssh_ops actor-, resource-, argument-level authorization, and audit.
 
 ## Verification
 
-The Skill passes the Skill Creator validator. Profile rendering confirms the MCP layer is inserted and disabled by default. Static checks confirm that the policy allows the `skill` loader and that the configurator installs the unit containing the bssh_ops patch before reloading systemd. Shell syntax and repository documentation checks must pass before publishing.
+The Skill passes the Skill Creator validator. Profile rendering confirms the MCP layer is inserted and disabled by default. Static policy resolution confirms that the `skill` loader, inspection tools, and three exact mutation tools are allowed while an unlisted bssh_ops tool remains denied. The configurator installs the unit containing the bssh_ops patch before reloading systemd. Shell syntax and repository documentation checks must pass before publishing.
 
 ## Consequences
 
