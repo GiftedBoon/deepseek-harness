@@ -14,7 +14,7 @@ Status: implemented
 
 HMAC-SHA-256 把提供方会话和交付 id 映射为稳定的不透明键。单聊归属于用户；群聊由部署选择共享或按用户隔离。键密钥与机器人凭据分离，并作为持久身份材料。
 
-每个会话拥有一条进程内 Promise 队列。一次交付创建或恢复一个 Agent，在发布前挂载 preset，应用受限的非交互权限 preset，并排入一条普通用户消息。准确的 Agent、Session、消息、已分配 turn 和 attempt 关联只允许该 turn 的 `agent/assistant-stream` 文本增量通过。runtime 等待对应 `turn/end`，达到静止后 flush Session，并在处理该会话下一条消息前释放 handle。
+每个会话拥有一条进程内 Promise 队列。一次交付通过 `SessionPersistence.stat()` 观察其确定性 Session id，根据该实时结果创建或恢复一个 Agent，在发布前挂载 preset，应用受限的非交互权限 preset，并排入一条普通用户消息。如果 Session 在渠道持续运行期间被删除，下一次交付会使用同一个 id 重新创建它。准确的 Agent、Session、消息、已分配 turn 和 attempt 关联只允许该 turn 的 `agent/assistant-stream` 文本增量通过。runtime 等待对应 `turn/end`，达到静止后 flush Session，并在处理该会话下一条消息前释放 handle。
 
 `channel_wecom` domain 存储会话路由、交付状态与主动发送 outbox。已完成和已失败的重复交付会重放存储文本，不再调用模型。被动流更新采用累计内容、合并刷新、顺序发送与 UTF-8 长度限制。最终被动回复失败时退回到主动 Markdown；再次失败会把结果提交到 outbox 进行有界重试。
 
@@ -42,7 +42,7 @@ Trader Ops 运维脚本只从 journal 投影被拒绝用户的时间戳和 id，
 
 ## 验证
 
-测试覆盖不透明身份与群聊归属、敌对 wire 准入、SDK 日志抑制、UTF-8 限制、累计合并与顺序结束。类型检查覆盖 SDK 适配器与 Host service。仓库 gate 覆盖元数据、文档配对、生成目录、依赖策略与 invariant companion。
+测试覆盖不透明身份与群聊归属、删除后重新创建、敌对 wire 准入、SDK 日志抑制、UTF-8 限制、累计合并与顺序结束。类型检查覆盖 SDK 适配器与 Host service。仓库 gate 覆盖元数据、文档配对、生成目录、依赖策略与 invariant companion。
 
 ## 结果
 
