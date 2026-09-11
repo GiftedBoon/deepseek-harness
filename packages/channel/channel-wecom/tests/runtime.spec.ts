@@ -363,6 +363,12 @@ describe('WeComChannelRuntime', () => {
       'channel-wecom: rejected inbound frame: WeCom sender is not allowed: userid="denied\\nforged"',
     )
 
+    test.client.emitText(frame({ chattype: 'group', chatid: 'denied-chat' }))
+    await vi.waitFor(() => { expect(test.client.replies).toHaveLength(3) })
+    expect(test.warnings).toHaveBeenCalledWith(
+      'channel-wecom: rejected inbound frame: WeCom group chat is not allowed: chatid="denied-chat"',
+    )
+
     test.client.failFinal = true
     test.client.emitText({ invalid: true })
     await vi.waitFor(() => {

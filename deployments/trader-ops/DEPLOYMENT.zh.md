@@ -116,6 +116,15 @@ sudo journalctl -u dsh-trader-ops --since '10 minutes ago' --no-pager \
   | grep -F 'WeCom sender is not allowed'
 ```
 
+如需发现未准入群聊的准确 `chatid`，请让一名已获准用户在该群聊中发送一条消息，然后只检查群聊拒绝 warning：
+
+```bash
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/list-rejected-wecom-users.sh \
+  --kind group --since '10 minutes ago'
+```
+
+专用脚本只输出时间戳和 `CHAT_ID`。确认该群聊后，把准确值传给 `update-wecom-allowlists.sh --add-chat`。如需查看原始 warning，可使用 `journalctl` 并 grep `WeCom group chat is not allowed`。
+
 JSON 引号中的 `userid` 属于员工身份数据。应限制 journal 访问权与保留期，且绝不得把消息内容或无关 journal 记录复制到白名单工单。
 
 ```text
@@ -136,6 +145,7 @@ sudo journalctl -u dsh-trader-ops -n 100 --no-pager
 ```bash
 sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/list-rejected-wecom-users.sh
 sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/list-rejected-wecom-users.sh --follow
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/list-rejected-wecom-users.sh --kind group --since '10 minutes ago'
 ```
 
 使用白名单脚本列出或修改准确的用户和群聊白名单条目：

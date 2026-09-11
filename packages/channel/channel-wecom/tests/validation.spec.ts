@@ -49,6 +49,6 @@ describe('WeCom frame admission', () => {
     expect(() => admitTextFrame({ ...(frame() as object), body: { ...groupBody, chattype: 'other' } }, config))
       .toThrow(/chat type/)
     expect(() => admitTextFrame({ ...(frame() as object), body: { ...groupBody, chatid: 'denied' } }, config))
-      .toThrow(/group chat/)
+      .toThrow('WeCom group chat is not allowed: chatid="denied"')
   })
 })

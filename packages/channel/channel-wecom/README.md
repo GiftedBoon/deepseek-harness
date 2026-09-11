@@ -74,7 +74,7 @@ The first passive reply is `messages.processing`; later cumulative updates conta
 <a id="security"></a>
 ## Security
 
-Use explicit user and group allowlists in production. Keep `sessionKeyEnv` distinct from the WeCom bot secret and back it up as deployment identity material. A rejected sender warning contains the exact `userid` as a JSON-quoted value so an operator can build the allowlist; journal access and retention must therefore protect employee identifiers. The plugin never logs accepted raw provider ids or message text. Agent tools still have the authority of the selected preset, so a channel preset should grant only the workspace and commands the bot actually needs.
+Use explicit user and group allowlists in production. Keep `sessionKeyEnv` distinct from the WeCom bot secret and back it up as deployment identity material. A rejected sender or group warning contains the exact `userid` or `chatid` as a JSON-quoted value so an operator can build the corresponding allowlist; journal access and retention must therefore protect identity data. The plugin never logs accepted raw provider ids or message text. Agent tools still have the authority of the selected preset, so a channel preset should grant only the workspace and commands the bot actually needs.
 
 <a id="model-experience"></a>
 ## Model Experience

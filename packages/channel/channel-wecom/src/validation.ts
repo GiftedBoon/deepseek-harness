@@ -46,7 +46,9 @@ export function admitTextFrame(frame: unknown, config: ResolvedConfig): WeComTex
     throw new TypeError(`WeCom sender is not allowed: userid=${JSON.stringify(userId)}`)
   }
   const chatId = chatType === 'group' ? stringField(body['chatid'], 'group chat id') : undefined
-  if (chatId !== undefined && !allowed(config.allowedChats, chatId)) throw new TypeError('WeCom group chat is not allowed')
+  if (chatId !== undefined && !allowed(config.allowedChats, chatId)) {
+    throw new TypeError(`WeCom group chat is not allowed: chatid=${JSON.stringify(chatId)}`)
+  }
   return {
     messageId,
     requestId,

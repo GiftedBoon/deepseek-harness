@@ -20,9 +20,9 @@ The `channel_wecom` domain stores conversation routing, delivery state, and an a
 
 ## Security and lifecycle
 
-Wire admission checks BotID, text type, UTF-8 size, sender allowlist, and group allowlist. Raw provider ids remain absent from DSH identifiers. A denied sender warning records only the exact JSON-quoted `userid` needed to build an allowlist; accepted provider ids, message text, and callback frames remain absent from logs. Trader Ops mounts a console exporter at the channel warning level so systemd records the warning. The plugin rejects permission presets with interactive approval or `danger-full-access`.
+Wire admission checks BotID, text type, UTF-8 size, sender allowlist, and group allowlist. Raw provider ids remain absent from DSH identifiers. A denied sender or group warning records only the exact JSON-quoted `userid` or `chatid` needed to build the corresponding allowlist; accepted provider ids, message text, and callback frames remain absent from logs. Trader Ops mounts a console exporter at the channel warning level so systemd records the warning. The plugin rejects permission presets with interactive approval or `danger-full-access`.
 
-Trader Ops operator scripts project only rejected-user timestamps and ids from the journal, apply exact user and group-chat allowlist additions or removals through the validated configurator, and restart Harness with readiness and restart-stability checks. Allowlist changes preserve unspecified entries and require at least one admitted user.
+Trader Ops operator scripts project only rejected-user or rejected-group timestamps and ids from the journal, apply exact user and group-chat allowlist additions or removals through the validated configurator, and restart Harness with readiness and restart-stability checks. Allowlist changes preserve unspecified entries and require at least one admitted user.
 
 Disposal hides listeners, stops retries, aborts active intervals, disconnects the SDK, drains conversation queues and Agent handles, then closes storage. The SDK owns authentication, heartbeat, and reconnect behavior. One active process per BotID is required; distributed leader election is outside this package.
 

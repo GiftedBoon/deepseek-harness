@@ -116,6 +116,15 @@ sudo journalctl -u dsh-trader-ops --since '10 minutes ago' --no-pager \
   | grep -F 'WeCom sender is not allowed'
 ```
 
+To discover an unadmitted group chat's exact `chatid`, ask an allowed user to send one message in that group and inspect only the group rejection warning:
+
+```bash
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/list-rejected-wecom-users.sh \
+  --kind group --since '10 minutes ago'
+```
+
+The focused script prints only the timestamp and `CHAT_ID`. Pass the exact value to `update-wecom-allowlists.sh --add-chat` after the group has been reviewed. For the raw warning, use `journalctl` and grep for `WeCom group chat is not allowed`.
+
 The JSON-quoted `userid` is employee identity data. Restrict journal access and retention, and never copy message content or unrelated journal entries into an allowlist ticket.
 
 ```text
@@ -136,6 +145,7 @@ Use the focused log script to list the 20 most recent rejected user ids from the
 ```bash
 sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/list-rejected-wecom-users.sh
 sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/list-rejected-wecom-users.sh --follow
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/list-rejected-wecom-users.sh --kind group --since '10 minutes ago'
 ```
 
 List or change exact user and group-chat allowlist entries with the allowlist script:

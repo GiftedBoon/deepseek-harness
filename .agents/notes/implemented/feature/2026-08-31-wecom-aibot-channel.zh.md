@@ -20,9 +20,9 @@ HMAC-SHA-256 把提供方会话和交付 id 映射为稳定的不透明键。单
 
 ## 安全与生命周期
 
-Wire 准入检查 BotID、文本类型、UTF-8 大小、发送者白名单与群聊白名单。原始提供方 id 仍不会出现在 DSH 标识符中。发送者被拒绝时，warning 只记录建立白名单所需的准确 JSON 引号 `userid`；已准入的提供方 id、消息文本与回调帧仍不会出现在日志中。Trader Ops 在渠道 warning 级别挂载控制台 exporter，使 systemd 能记录该 warning。插件拒绝带交互审批或 `danger-full-access` 的权限 preset。
+Wire 准入检查 BotID、文本类型、UTF-8 大小、发送者白名单与群聊白名单。原始提供方 id 仍不会出现在 DSH 标识符中。发送者或群聊被拒绝时，warning 只记录建立对应白名单所需的准确 JSON 引号 `userid` 或 `chatid`；已准入的提供方 id、消息文本与回调帧仍不会出现在日志中。Trader Ops 在渠道 warning 级别挂载控制台 exporter，使 systemd 能记录该 warning。插件拒绝带交互审批或 `danger-full-access` 的权限 preset。
 
-Trader Ops 运维脚本只从 journal 投影被拒绝用户的时间戳和 id，通过经过验证的配置器准确增删用户与群聊白名单，并在重启 Harness 时检查就绪状态和重启稳定性。白名单修改会保留未指定条目，并要求至少存在一个获准用户。
+Trader Ops 运维脚本只从 journal 投影被拒绝用户或群聊的时间戳和 id，通过经过验证的配置器准确增删用户与群聊白名单，并在重启 Harness 时检查就绪状态和重启稳定性。白名单修改会保留未指定条目，并要求至少存在一个获准用户。
 
 释放过程会隐藏 listener、停止重试、中止活动区间、断开 SDK、排空会话队列与 Agent handle，最后关闭 storage。SDK 负责认证、心跳与重连行为。每个 BotID 只允许一个活动进程；分布式 leader election 不属于本包。
 
