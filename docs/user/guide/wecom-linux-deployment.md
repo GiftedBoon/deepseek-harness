@@ -284,6 +284,7 @@ Create `/var/lib/deepseek-harness/profiles/wecom/cordis.patch.yml`. Replace ever
           - '<admitted-user-id>'
         allowedChats: []
         groupConversationMode: shared
+        scheduledActionUtcOffset: '+08:00'
         messages:
           processing: '正在处理…'
           timeout: '处理超时，请稍后重试。'
@@ -291,9 +292,15 @@ Create `/var/lib/deepseek-harness/profiles/wecom/cordis.patch.yml`. Replace ever
           emptyReply: '任务已完成，但没有文本回复。'
           unauthorized: '当前用户或会话未获授权。'
           duplicate: '该消息正在处理中。'
+          scheduledActionSuccess: '定时动作执行成功'
+          scheduledActionFailure: '定时动作执行失败'
+          scheduledActionUncertain: '定时动作的执行结果不确定；系统未自动重放'
+          scheduledActionDefinitionUnavailable: '定时动作的配置已变更或被移除'
 ```
 
 Use `allowedChats: []` until group access is separately approved. Add exact group ids instead of `"*"` when group access is enabled.
+
+`scheduledActions` defaults to an empty list. Configure it only when this unattended channel must execute a narrow deployment-allowlisted tool at a future time; each entry fixes the tool name and static arguments, validates the model-supplied target with an anchored expression, and still passes through dispatch-time tool policy. `targetArgumentFormat` defaults to `scalar`; set it to `singleton-array` only for a downstream argument that requires a one-element target array. Never expose an arbitrary-shell action or store a secret in static arguments.
 
 Protect the profile files:
 

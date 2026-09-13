@@ -19,6 +19,8 @@
     { "path": "../../session/session-persistence" },
     { "path": "../../session/session-title" },
     { "path": "../../storage/storage-domain" },
+    { "path": "../../core/tools" },
+    { "path": "../../util/values" },
     { "path": "../../workspace/workspace" },
     { "path": "../../runtime-diagnostics/invariants" }
   ]

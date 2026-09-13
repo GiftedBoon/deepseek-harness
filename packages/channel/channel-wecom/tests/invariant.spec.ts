@@ -22,9 +22,14 @@ describe('channel-wecom invariant', () => {
     }, vi.fn())
     if (changed === undefined) throw new Error('domain listener was not registered')
     expect(() => changed?.({ domain: 'other' })).not.toThrow()
+    expect(() => changed?.({ domain: 'channel_wecom', operation: 'delete' })).not.toThrow()
     expect(() => changed?.({ domain: 'channel_wecom', table: 'outbox', operation: 'put' })).not.toThrow()
     expect(() => changed?.({
       domain: 'channel_wecom', table: 'deliveries', operation: 'put', key: 'delivery',
+      value: { conversationKey: 'conversation' },
+    })).not.toThrow()
+    expect(() => changed?.({
+      domain: 'channel_wecom_scheduled_action', table: 'actions', operation: 'put', key: 'action',
       value: { conversationKey: 'conversation' },
     })).not.toThrow()
   })
@@ -52,5 +57,9 @@ describe('channel-wecom invariant', () => {
       domain: 'channel_wecom', table: 'deliveries', operation: 'put', key: 'delivery',
       value: { conversationKey: 'missing' },
     })).toThrow(/references a missing conversation/)
+    expect(() => missingConversation?.({
+      domain: 'channel_wecom_scheduled_action', table: 'actions', operation: 'put', key: 'action',
+      value: { conversationKey: 'missing' },
+    })).toThrow(/scheduled action.*references a missing conversation/)
   })
 })

@@ -156,6 +156,8 @@ sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure
 
 After enablement, tools appear with the `mcp__bssh-ops-remote__` prefix. `policies/tool-access.yaml` allows the three exact mutation tools without a Harness approval prompt; the `bssh-ops` Skill still requires preview and explicit user confirmation, and the MCP server owns downstream authorization and audit. Do not put the API key in a patch, Skill, command argument, or ticket.
 
+The WeCom patch exposes one durable scheduled action, `ps_check`. It accepts only `cf-sh-1` or `cf-sh-2`, passes the target as the singleton `colos` array, and fixes the bssh_ops quick-command key to `check`; it cannot select `custom_shell` or any start/stop command. A time-only request such as `15:01` resolves to the next occurrence at `+08:00`. The due notification reports that the action was triggered and includes the bssh_ops result, normally its `run_id`; because `run_quick_command` returns before remote completion, query that id through `get_run_status` when the final process snapshot is needed. Generic Schedule remains reminder-only and does not execute this operation.
+
 ### Routine WeCom operations
 
 Use the focused log script to list the 20 most recent rejected user ids from the last 24 hours without printing message content or unrelated startup logs. Add `--follow` to wait for the next rejected sender, or set a different journal window with `--since '10 minutes ago'`:
@@ -199,13 +201,13 @@ Before production approval, complete the channel-owned [Linux acceptance procedu
 1. Run `install-debian-release.sh` with a new reviewed full commit SHA.
 2. Load `/etc/deepseek-harness/trader-ops.env`, then run `bootstrap-profile.sh` and `verify-deployment.sh` as `dsh` against the new release before restarting the service; these commands preserve the optional WeCom dependency and unattended preset.
 3. Back up `/var/lib/openviking` and `/var/lib/deepseek-harness` before any data migration.
-4. Restart `dsh-trader-ops`, repeat the listener, health, empty-skill, and empty-knowledge checks, and retain the previous release.
+4. Restart `dsh-trader-ops` through `restart-runtime.sh`; it installs the current release's systemd unit before restarting. Repeat the listener, health, empty-skill, and empty-knowledge checks, and retain the previous release.
 5. On failure, atomically point `current` to the previous validated release and restart Harness. Restore persistent data only when the failed release performed an explicit incompatible migration.
 
 ## Pre-production gates
 
 - OpenViking `/health` and `/ready` succeed, `ov doctor` passes, and data survives a container restart.
-- `dsh --dump-config` contains exactly one expected `openviking-memory-runtime` and includes `trader-ops-tool-policy`, `trader-ops-skills`, and the AIHubMix provider.
+- `dsh --dump-config` contains exactly one expected `openviking-memory-runtime` and includes `trader-ops-tool-policy`, `trader-ops-skills`, the AIHubMix provider, and `@deepseek-ai/dsh-schedule`.
 - The real environment contains no template or exposed credentials, and secrets do not appear in Git, logs, process arguments, or shell history.
 - AIHubMix endpoint ownership, model routing, retention, and data-processing terms are approved for every class of model-visible data.
 - Harness stays read-only and is limited to the trusted private developer network or an SSH tunnel while business knowledge, production skills, trusted user identity, durable approval, and the Trader Ops MCP authorization layer are absent.

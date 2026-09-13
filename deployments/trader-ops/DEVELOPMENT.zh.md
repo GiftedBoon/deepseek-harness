@@ -121,10 +121,11 @@ pnpm dsh web \
   --patch deployments/trader-ops/config/dsh/trader-ops-aihubmix.patch.yml \
   --patch deployments/trader-ops/config/dsh/trader-ops-wecom.patch.yml \
   --patch deployments/trader-ops/config/dsh/trader-ops-bssh-ops-mcp.patch.yml \
+  --patch apps/cli/config/examples/schedule/cordis.yml \
   --no-open
 ```
 
-第二个 patch 通过受支持的 `llm-pi-ai` OpenAI-compatible 路由声明已配置的 AIHubMix 端点，并从环境读取端点、凭据、模型 id、上下文窗口和输出上限。OpenViking 使用同一远程路由进行语义提取，同时保留本地 Ollama 模型用于 embedding 和 query planner。第三个 patch 在 `TRADER_OPS_WECOM_ENABLED=1` 以前保持企业微信关闭；请使用远程部署配置器，不要在仓库中保存真实机器人凭据。
+第二个 patch 通过受支持的 `llm-pi-ai` OpenAI-compatible 路由声明已配置的 AIHubMix 端点，并从环境读取端点、凭据、模型 id、上下文窗口和输出上限。OpenViking 使用同一远程路由进行语义提取，同时保留本地 Ollama 模型用于 embedding 和 query planner。第三个 patch 在 `TRADER_OPS_WECOM_ENABLED=1` 以前保持企业微信关闭；请使用远程部署配置器，不要在仓库中保存真实机器人凭据。最后的 Schedule overlay 增加 Session 内提醒工具和浏览器时间上下文；到期提醒只会返回普通会话内容，不会自行执行命令。
 
 该命令会输出本地访问 URL 与 token。没有业务知识和 `SKILL.md` 时，服务仍应正常启动：Trader Ops skill 数量为 0，OpenViking 只提供空的检索/记忆基线。这是预期状态。所有模型可见的提示词、检索记忆、工具描述和用户输入都会发送给 AIHubMix，因此在中转站与所选模型通过必要的安全评审前，不要发送受限业务数据。
 
@@ -133,6 +134,7 @@ pnpm dsh web \
 - 在 `knowledge/business`、`knowledge/systems` 或 `knowledge/runbooks` 添加评审后的非空 Markdown，再通过明确的入库流程提交给 OpenViking。不要把 `README.md`、`README.zh.md` 和空白或只含空白字符的文件纳入索引；否则 OpenViking 可能仅根据文件名派生出误导性的语义元数据。
 - 在某个 `skills/<name>/` 中添加完整 `SKILL.md`。Loader 只将直接子目录识别为 skill bundle，不要再嵌套业务分类层。
 - bssh_ops MCP 层已经通过 `config/dsh/trader-ops-bssh-ops-mcp.patch.yml` 接通；使用 `sudo bash scripts/configure-bssh-ops-mcp.sh --enable` 启用，脚本会隐藏提示读取 key，避免进入 shell history。每个 profile 命令都应保留该 patch，让环境变量控制其 `disabled` 状态。
+- 企业微信 patch 只把持久 `ps_check` 动作映射到 bssh_ops `run_quick_command`，参数固定为 `colos: [target]` 与 `command: check`。目标表达式必须保持收窄，不得把 `custom_shell` 或启停动作加入这条无人值守路径。
 - 新增工具时同步更新 `policies/tool-access.yaml`。Harness 侧插件已经按首条匹配和默认拒绝执行它；在可信身份与审批存储存在前，`risk-levels.yaml` 和 `approvals.yaml` 仍是设计约定。
 
 ## 6. 停止本地服务

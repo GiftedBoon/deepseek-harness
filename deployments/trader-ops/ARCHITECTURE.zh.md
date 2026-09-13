@@ -43,6 +43,8 @@ DeepSeek Harness (web profile)
 | Trader Ops skill 根目录 | 已配置 | 空目录是合法状态，未来添加 `SKILL.md` 即可发现 |
 | Git 知识自动入库 | 未实现 | 必须单独实现评审、提交、更新和删除语义 |
 | bssh_ops MCP | 可选、默认关闭 | 使用 root 所有的 API key 启用 `trader-ops-bssh-ops-mcp.patch.yml` |
+| Schedule 提醒 | 已启用 | Web 服务应用 Schedule overlay，策略允许其 Session 内管理工具；到期 prompt 绝不直接执行 |
+| 企业微信定时 `ps_check` | 随企业微信启用 | 持久动作只把 `cf-sh-1` 或 `cf-sh-2` 映射到 bssh_ops `run_quick_command` 的 `command: check`；执行时仍经过工具策略 |
 | Harness 工具策略 | 实验性、已强制执行 | 首条匹配 allow/ask/deny、默认拒绝，并带防绕过 guard |
 | 身份、资源授权、审计 | 未实现 | 必须由 Trader Ops MCP 服务和审批存储强制执行 |
 
@@ -65,6 +67,7 @@ DSH 内置 web profile
   + config/dsh/trader-ops.patch.yml
   + （可选）config/dsh/trader-ops-aihubmix.patch.yml
   + （可选）config/dsh/trader-ops-bssh-ops-mcp.patch.yml
+  + apps/cli/config/examples/schedule/cordis.yml
 ```
 
 后加载的 patch 会覆盖同一配置项的完整 `config`，不是深度合并。因此修改 `openviking-memory-runtime` 时必须保留本文件中仍需生效的全部字段，并用 `--dump-config` 检查最终配置。

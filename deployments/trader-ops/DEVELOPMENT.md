@@ -121,10 +121,11 @@ pnpm dsh web \
   --patch deployments/trader-ops/config/dsh/trader-ops-aihubmix.patch.yml \
   --patch deployments/trader-ops/config/dsh/trader-ops-wecom.patch.yml \
   --patch deployments/trader-ops/config/dsh/trader-ops-bssh-ops-mcp.patch.yml \
+  --patch apps/cli/config/examples/schedule/cordis.yml \
   --no-open
 ```
 
-The second patch declares the configured AIHubMix endpoint through the supported `llm-pi-ai` OpenAI-compatible route. It reads the endpoint, credential, model id, context window, and output limit from the environment. OpenViking uses the same remote route for semantic extraction while retaining local Ollama models for embedding and query planning. The third patch keeps enterprise WeCom disabled unless `TRADER_OPS_WECOM_ENABLED=1`; use the remote deployment configurator rather than storing real bot credentials in the repository.
+The second patch declares the configured AIHubMix endpoint through the supported `llm-pi-ai` OpenAI-compatible route. It reads the endpoint, credential, model id, context window, and output limit from the environment. OpenViking uses the same remote route for semantic extraction while retaining local Ollama models for embedding and query planning. The third patch keeps enterprise WeCom disabled unless `TRADER_OPS_WECOM_ENABLED=1`; use the remote deployment configurator rather than storing real bot credentials in the repository. The final Schedule overlay adds session-local reminder tools and browser time context; a due reminder returns ordinary conversation content and does not execute a command by itself.
 
 The command prints a local access URL and token. The service must still start when there is no business knowledge and no `SKILL.md`: the Trader Ops skill count is zero and OpenViking provides an empty recall/memory baseline. This is the expected state. AIHubMix receives all model-visible prompts, recalled memory, tool descriptions, and user input, so do not send restricted business data until the relay and selected model have passed the required security review.
 
@@ -133,6 +134,7 @@ The command prints a local access URL and token. The service must still start wh
 - Add reviewed, non-empty Markdown to `knowledge/business`, `knowledge/systems`, or `knowledge/runbooks`, then submit it through an explicit OpenViking ingestion path. Exclude `README.md`, `README.zh.md`, and empty or whitespace-only files from ingestion; OpenViking can otherwise derive misleading semantic metadata from the filename alone.
 - Add a complete `SKILL.md` under a direct `skills/<name>/` child. The Loader recognizes direct children as skill bundles; do not add another business-category layer.
 - The bssh_ops MCP layer is already wired through `config/dsh/trader-ops-bssh-ops-mcp.patch.yml`; enable it with `sudo bash scripts/configure-bssh-ops-mcp.sh --enable`, which prompts for the key without putting it in shell history. Keep the patch loaded in every profile command so its `disabled` flag is controlled by the environment.
+- The WeCom patch maps only the durable `ps_check` action to bssh_ops `run_quick_command` with `colos: [target]` and `command: check`. Keep the target expression narrow and do not add `custom_shell` or start/stop actions to this unattended path.
 - Update `policies/tool-access.yaml` when tools are added. The Harness-side plugin enforces it with first-match rules and default deny; `risk-levels.yaml` and `approvals.yaml` remain design contracts until trusted identity and approval stores exist.
 
 ## 6. Stop the local service

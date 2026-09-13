@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Config } from '../src/config.ts'
 import { channelWeComDomainSpec } from '../src/domain.ts'
+import { weComScheduledActionDomainSpec } from '../src/scheduled-action-domain.ts'
 
 function requiredConfig(): Record<string, unknown> {
   return {
@@ -9,6 +10,8 @@ function requiredConfig(): Record<string, unknown> {
     messages: {
       processing: 'processing', timeout: 'timeout', failure: 'failure', emptyReply: 'empty',
       unauthorized: 'unauthorized', duplicate: 'duplicate',
+      scheduledActionSuccess: 'success', scheduledActionFailure: 'failure', scheduledActionUncertain: 'uncertain',
+      scheduledActionDefinitionUnavailable: 'definition changed',
     },
   }
 }
@@ -20,15 +23,22 @@ describe('WeCom configuration and domain', () => {
       maxInputBytes: 32_768, maxReplyBytes: 20_480, turnTimeoutMs: 300_000,
       deliveryRetentionMs: 604_800_000, maxDeliveryRecords: 10_000,
       outboxRetryIntervalMs: 30_000, maxOutboxAttempts: 10,
+      scheduledActions: [], maxScheduledActionsPerConversation: 32,
+      maxScheduledActionDelayMs: 31_536_000_000, scheduledActionTimeoutMs: 300_000,
+      scheduledActionUtcOffset: 'Z',
     })
     expect(channelWeComDomainSpec).toMatchObject({
       name: 'channel_wecom', version: 1,
       tables: { conversations: {}, deliveries: {}, outbox: {} },
+    })
+    expect(weComScheduledActionDomainSpec).toMatchObject({
+      name: 'channel_wecom_scheduled_action', version: 1, tables: { actions: {} },
     })
   })
 
   it('rejects absent required values and provider reply limits above the protocol maximum', () => {
     expect(() => Config({ ...requiredConfig(), botId: undefined } as never)).toThrow()
     expect(() => Config({ ...requiredConfig(), maxReplyBytes: 20_481 } as never)).toThrow()
+    expect(() => Config({ ...requiredConfig(), scheduledActionUtcOffset: '+24:00' } as never)).toThrow()
   })
 })

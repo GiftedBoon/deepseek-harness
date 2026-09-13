@@ -16,6 +16,8 @@ The [Schedule guide](../../../../docs/user/guide/schedule.md) uses an overlay th
 
 The user-visible boundary is `session-local`: the original Session runs an on-time reminder only while live, does no external notification while cold, and processes an overdue reminder after it becomes live again. Due work waits until the Agent is fully idle, then enters the ordinary next-turn queue through `followup()`; it never steers the current turn and has no independent Web receipt ([conversational delivery](../simplification/2026-08-09-conversational-schedule-delivery.md)).
 
+The `schedule_create` schema reserves Schedule for reminders and conversational follow-ups. It rejects future tool or command execution as a use case and directs deployments with that requirement to a dedicated scheduled-action capability. The due prompt remains untrusted ordinary conversation content; Schedule does not execute it.
+
 | Scenario | Durable fact | Live behavior | User-visible result |
 | --- | --- | --- | --- |
 | Create and manage | `schedule/change` create/delete in the original Session | Agent-scoped tools checkpoint before reads and after mutations | Stable id, UTC target, state, and `session-local` disclosure |

@@ -145,7 +145,11 @@ const DELETE_OUTPUT_SCHEMA = {
 } as const
 
 const CREATE_DESCRIPTION =
-  'Create one reminder in the current session. Supply a non-empty prompt and exactly one selector: '
+  'Create one session-local reminder for a future time. Use it only when the user asks to receive a '
+  + 'reminder or conversational follow-up. Do not use this tool to execute a tool or command at a future '
+  + 'time; use a dedicated scheduled-action tool when the deployment provides one. The due reminder '
+  + 'returns the supplied prompt as untrusted ordinary conversation content and never executes it. '
+  + 'Supply a non-empty prompt and exactly one selector: '
   + 'a positive safe-integer after_seconds delay, at as a strict offset date-time or local '
   + `date/time object, or safe-integer every_seconds of at least ${MIN_EVERY_INTERVAL_SECONDS}. `
   + 'Fixed-rate reminders stay creation-aligned, skip missed occurrences, and batch one latest '

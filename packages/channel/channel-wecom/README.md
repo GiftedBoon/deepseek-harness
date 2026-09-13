@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-channel-wecom` connects one enterprise WeCom intelligent bot to ordinary DSH Workspace Sessions through the official WebSocket long-connection SDK. It accepts outbound-only network deployment, validates and deduplicates text deliveries, serializes each conversation, streams correlated visible Agent output, and retains failed active sends in a durable outbox.
+`dsh-channel-wecom` connects one enterprise WeCom intelligent bot to ordinary DSH Workspace Sessions through the official WebSocket long-connection SDK. It accepts outbound-only network deployment, validates and deduplicates text deliveries, serializes each conversation, streams correlated visible Agent output, retains failed active sends in a durable outbox, and can execute deployment-allowlisted tools at durable future times.
 
 ## Table of Contents
 
@@ -35,9 +35,11 @@ The [Linux production deployment guide](../../../docs/user/guide/wecom-linux-dep
 <a id="configuration"></a>
 ## Configuration
 
-`botId`, `secretEnv`, `sessionKeyEnv`, `workspacePath`, `agentPreset`, `permissionPreset`, `allowedUsers`, `allowedChats`, and `messages` are required. `allowedUsers` and `allowedChats` accept exact provider ids or the explicit `"*"` wildcard. `groupConversationMode` is `shared` by default; `per-user` isolates each group member. `messages` supplies operator-localized processing, timeout, failure, empty-reply, unauthorized, and duplicate-delivery text.
+`botId`, `secretEnv`, `sessionKeyEnv`, `workspacePath`, `agentPreset`, `permissionPreset`, `allowedUsers`, `allowedChats`, and `messages` are required. `allowedUsers` and `allowedChats` accept exact provider ids or the explicit `"*"` wildcard. `groupConversationMode` is `shared` by default; `per-user` isolates each group member. `messages` supplies operator-localized delivery replies and scheduled-action notifications.
 
-Provider and resource controls are configurable: initial authentication timeout, stream flush interval, UTF-8 input/reply limits, Agent-turn timeout, delivery retention/count, outbox retry interval, and maximum retry attempts. `maxReplyBytes` cannot exceed WeCom's 20,480-byte stream limit. `workspacePath` must be an existing absolute directory.
+Provider and resource controls are configurable: initial authentication timeout, stream flush interval, UTF-8 input/reply limits, Agent-turn timeout, delivery retention/count, outbox retry interval, maximum retry attempts, scheduled-action count and horizon, background execution timeout, and the fixed UTC offset for time-only requests. `maxReplyBytes` cannot exceed WeCom's 20,480-byte stream limit. `workspacePath` must be an existing absolute directory.
+
+`scheduledActions` is empty by default. Each configured entry maps one stable action id to an exact registered tool, static lossless-JSON arguments, one top-level argument that receives the requested target, and an anchored target-validation expression. `targetArgumentFormat` defaults to `scalar`; use `singleton-array` when the downstream tool expects a one-element target array. The model can select only the declared action id, target, and future RFC 3339 time; it cannot replace the configured tool or static arguments.
 
 ```yaml
 - name: '@deepseek-ai/dsh-channel-wecom'
@@ -51,6 +53,15 @@ Provider and resource controls are configurable: initial authentication timeout,
     allowedUsers: ['zhangsan']
     allowedChats: []
     groupConversationMode: shared
+    scheduledActionUtcOffset: '+08:00'
+    scheduledActions:
+      - id: health_check
+        description: Run the read-only service health check.
+        toolName: example_health_check
+        targetArgument: host
+        targetPattern: '^[a-z0-9-]+$'
+        arguments:
+          mode: summary
     messages:
       processing: '正在处理…'
       timeout: '处理超时，请稍后重试。'
@@ -58,6 +69,10 @@ Provider and resource controls are configurable: initial authentication timeout,
       emptyReply: '任务已完成，但没有文本回复。'
       unauthorized: '当前用户或会话未获授权。'
       duplicate: '该消息正在处理中。'
+      scheduledActionSuccess: '定时动作执行成功'
+      scheduledActionFailure: '定时动作执行失败'
+      scheduledActionUncertain: '定时动作的执行结果不确定；系统未自动重放'
+      scheduledActionDefinitionUnavailable: '定时动作的配置已变更或被移除'
 ```
 
 <a id="conversation-and-delivery-lifecycle"></a>
@@ -65,16 +80,18 @@ Provider and resource controls are configurable: initial authentication timeout,
 
 Single chats map by user; groups map by chat or by chat plus user according to `groupConversationMode`. HMAC-SHA-256 derives stored conversation, Session, and delivery keys, so raw WeCom user, chat, and message ids do not become DSH identifiers. The Session key is an identity root: changing it starts new mappings and prevents old conversations from resolving.
 
-The channel persists conversation routing, delivery state, and outbox records in the `channel_wecom` storage domain. Repeated completed or failed deliveries replay their stored final text without invoking the model. Messages in one conversation queue behind each other; other conversations remain independent.
+The channel persists conversation routing, delivery state, and outbox records in the `channel_wecom` storage domain. The independent `channel_wecom_scheduled_action` domain retains pending and running background actions without changing the released channel-domain generation. Repeated completed or failed deliveries replay their stored final text without invoking the model. Messages in one conversation queue behind each other; other conversations remain independent.
 
 Each admitted message observes its mapped Session in persistence, then creates or resumes one Agent, mounts the configured agent preset before publication, applies the noninteractive permission preset, attaches a new Session to the configured Workspace, and sends one ordinary user message. If the mapped Session was deleted while the channel remained running, the next message creates a fresh Session under the same stable id instead of trying to resume the missing log. The channel correlates `agent/inbox/claimed`, `agent/assistant-stream`, and `turn/end` by exact Agent, Session, message, turn, and attempt. It flushes the Session and disposes the Agent after the interval reaches quiescence.
 
 The first passive reply is `messages.processing`; later cumulative updates contain only `text-delta` output, never reasoning. Passive-final failure falls back to an active Markdown send. If both transports fail, the bounded final text enters the durable outbox and retries after authentication and on the configured interval.
 
+When `scheduledActions` is non-empty, mapped Agents receive `scheduled_action_create`, `scheduled_action_list`, and `scheduled_action_delete`. An explicit RFC 3339 `at` value keeps its own offset; a time-only `HH:mm[:ss]` value resolves to its next occurrence under `scheduledActionUtcOffset`, so the model does not need a shell or clock tool. Creation durably records an allowlisted action before arming a timer, so disposing the per-delivery Agent does not cancel it. At the due time the channel resolves the current allowlist, requires its fingerprint to match the creation-time definition, and invokes the configured tool through the ordinary global policy and guard pipeline. The result enters the durable outbox before the task is removed. Startup rearms pending tasks; a task found in `running` is reported as uncertain and removed without executing again because the prior side effect may already have happened.
+
 <a id="security"></a>
 ## Security
 
-Use explicit user and group allowlists in production. Keep `sessionKeyEnv` distinct from the WeCom bot secret and back it up as deployment identity material. A rejected sender or group warning contains the exact `userid` or `chatid` as a JSON-quoted value so an operator can build the corresponding allowlist; journal access and retention must therefore protect identity data. The plugin never logs accepted raw provider ids or message text. Agent tools still have the authority of the selected preset, so a channel preset should grant only the workspace and commands the bot actually needs.
+Use explicit user and group allowlists in production. Keep `sessionKeyEnv` distinct from the WeCom bot secret and back it up as deployment identity material. A rejected sender or group warning contains the exact `userid` or `chatid` as a JSON-quoted value so an operator can build the corresponding allowlist; journal access and retention must therefore protect identity data. The plugin never logs accepted raw provider ids or message text. Agent tools still have the authority of the selected preset, so a channel preset should grant only the workspace and commands the bot actually needs. Scheduled actions must use narrow deployment definitions and remain allowed by the dispatch-time tool policy; never configure an arbitrary-shell tool or place secrets in static arguments.
 
 <a id="model-experience"></a>
 ## Model Experience
@@ -102,6 +119,7 @@ Resuming the same mapped Session preserves its reusable conversation prefix. Cha
 - **Credential reload requires reconnection** — bot secret and Session identity key are resolved at plugin activation; rotate them by reloading the plugin.
 - **Bounded reply projection** — replies longer than `maxReplyBytes` are truncated with an ellipsis; tools and reasoning are not rendered into WeCom.
 - **No inbound durable queue before admission** — the official SDK owns reconnect behavior, while provider callbacks that never reach this process cannot be replayed by DSH.
+- **Scheduled results are channel notifications** — background results are sent to WeCom and audited by the invoked tool, but are not inserted into the Session as model-authored conversation history.
 
 <a id="dev-note"></a>
 ### Dev Note

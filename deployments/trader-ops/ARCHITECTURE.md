@@ -43,6 +43,8 @@ DeepSeek Harness (web profile)
 | Trader Ops skill root | Configured | An empty root is valid; adding `SKILL.md` enables discovery |
 | Automatic Git knowledge ingestion | Not implemented | Reviewable add, update, and delete semantics remain required |
 | bssh_ops MCP | Optional, disabled by default | Enable `trader-ops-bssh-ops-mcp.patch.yml` with a root-owned API key |
+| Schedule reminders | Enabled | The Web service applies the Schedule overlay and policy permits its session-local management tools; a due prompt never executes directly |
+| WeCom scheduled `ps_check` | Enabled with WeCom | A durable action maps only `cf-sh-1` or `cf-sh-2` to bssh_ops `run_quick_command` with `command: check`; dispatch still traverses tool policy |
 | Harness tool policy | Experimental, enforced | First-match allow/ask/deny plus default deny and an anti-bypass guard |
 | Identity, resource authorization, audit | Not implemented | The Trader Ops MCP server and approval store must enforce them |
 
@@ -65,6 +67,7 @@ Built-in DSH web profile
   + config/dsh/trader-ops.patch.yml
   + (optional) config/dsh/trader-ops-aihubmix.patch.yml
   + (optional) config/dsh/trader-ops-bssh-ops-mcp.patch.yml
+  + apps/cli/config/examples/schedule/cordis.yml
 ```
 
 A later patch replaces the complete `config` of a matching row; it does not deep-merge that object. Any change to `openviking-memory-runtime` must retain every field that still needs to apply, then use `--dump-config` to inspect the final composition.

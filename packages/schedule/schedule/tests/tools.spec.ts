@@ -104,6 +104,9 @@ describe('Schedule tool protocol', () => {
     const test = await harness()
     expect(['schedule_create', 'schedule_list', 'schedule_delete'].map(name => test.ctx.tools.get(name)?.name))
       .toEqual(['schedule_create', 'schedule_list', 'schedule_delete'])
+    expect(test.ctx.tools.get('schedule_create')?.description).toContain(
+      'Do not use this tool to execute a tool or command at a future time',
+    )
     const outputSchema = test.ctx.tools.get('schedule_create')?.output.schema as {
       oneOf?: Array<{ properties?: { code?: { const?: string }; operation?: { enum?: string[] } } }>
     }

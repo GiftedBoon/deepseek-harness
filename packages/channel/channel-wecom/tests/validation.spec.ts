@@ -9,7 +9,13 @@ const config: ResolvedConfig = {
   connectTimeoutMs: 1, streamFlushIntervalMs: 1, maxInputBytes: 16, maxReplyBytes: 100,
   turnTimeoutMs: 1, deliveryRetentionMs: 1, maxDeliveryRecords: 1,
   outboxRetryIntervalMs: 1, maxOutboxAttempts: 1,
-  messages: { processing: 'p', timeout: 't', failure: 'f', emptyReply: 'e', unauthorized: 'u', duplicate: 'd' },
+  scheduledActions: [], maxScheduledActionsPerConversation: 1, maxScheduledActionDelayMs: 1,
+  scheduledActionTimeoutMs: 1, scheduledActionUtcOffset: 'Z',
+  messages: {
+    processing: 'p', timeout: 't', failure: 'f', emptyReply: 'e', unauthorized: 'u', duplicate: 'd',
+    scheduledActionSuccess: 'ss', scheduledActionFailure: 'sf', scheduledActionUncertain: 'su',
+    scheduledActionDefinitionUnavailable: 'sd',
+  },
 }
 
 function frame(content = 'hello'): unknown {

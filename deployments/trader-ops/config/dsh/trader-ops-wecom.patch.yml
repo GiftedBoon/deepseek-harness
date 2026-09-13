@@ -48,6 +48,16 @@
         allowedUsers: !!js (process.env.WECOM_ALLOWED_USERS ?? '').split(',').map(value => value.trim()).filter(Boolean)
         allowedChats: !!js (process.env.WECOM_ALLOWED_CHATS ?? '').split(',').map(value => value.trim()).filter(Boolean)
         groupConversationMode: !!js process.env.WECOM_GROUP_CONVERSATION_MODE ?? 'shared'
+        scheduledActionUtcOffset: '+08:00'
+        scheduledActions:
+          - id: ps_check
+            description: Run the bssh_ops allowlisted read-only "ps check" quick command on one colo.
+            toolName: mcp__bssh-ops-remote__run_quick_command
+            targetArgument: colos
+            targetArgumentFormat: singleton-array
+            targetPattern: '^cf-sh-(?:1|2)$'
+            arguments:
+              command: check
         messages:
           processing: '正在处理…'
           timeout: '处理超时，请稍后重试。'
@@ -55,3 +65,7 @@
           emptyReply: '任务已完成，但没有文本回复。'
           unauthorized: '当前用户或会话未获授权。'
           duplicate: '该消息正在处理中。'
+          scheduledActionSuccess: '✅ 定时动作已触发'
+          scheduledActionFailure: '❌ 定时动作执行失败'
+          scheduledActionUncertain: '⚠️ 定时动作的执行结果不确定；为避免重复副作用，系统没有自动重放'
+          scheduledActionDefinitionUnavailable: '定时动作的配置已变更或被移除'

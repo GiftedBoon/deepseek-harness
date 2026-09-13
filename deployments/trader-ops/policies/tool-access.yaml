@@ -12,6 +12,18 @@ rules:
     environments: [development, staging, production]
     decision: allow
 
+  - id: harness-schedule
+    tools:
+      - schedule_create
+      - schedule_list
+      - schedule_delete
+      - scheduled_action_create
+      - scheduled_action_list
+      - scheduled_action_delete
+    risk: session_write
+    environments: [development, staging, production]
+    decision: allow
+
   - id: openviking-read
     tools:
       - mcp__openviking__read

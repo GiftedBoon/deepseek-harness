@@ -34,15 +34,25 @@ function config(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     streamFlushIntervalMs: 1, maxInputBytes: 100, maxReplyBytes: 100, turnTimeoutMs: 100,
     deliveryRetentionMs: 100, maxDeliveryRecords: 10, outboxRetryIntervalMs: 100,
     maxOutboxAttempts: 2,
+    scheduledActions: [], maxScheduledActionsPerConversation: 32,
+    maxScheduledActionDelayMs: 1_000_000, scheduledActionTimeoutMs: 1_000,
+    scheduledActionUtcOffset: '+08:00',
     messages: {
       processing: 'p', timeout: 't', failure: 'f', emptyReply: 'e', unauthorized: 'u', duplicate: 'd',
+      scheduledActionSuccess: 'ss', scheduledActionFailure: 'sf', scheduledActionUncertain: 'su',
+      scheduledActionDefinitionUnavailable: 'sd',
     },
     ...overrides,
   }
 }
 
-function context(options: { permission?: { approval: string; sandbox: string }; missing?: string } = {}) {
+function context(options: {
+  permission?: { approval: string; sandbox: string }
+  missing?: string
+  storageFailureAt?: number
+} = {}) {
   const calls: string[] = []
+  let opened = 0
   const ctx = {
     permissionPresets: {
       resolve: () => options.permission ?? { approval: 'never', sandbox: 'workspace-write' },
@@ -59,7 +69,14 @@ function context(options: { permission?: { approval: string; sandbox: string }; 
     },
     workspaceRegistry: { create: async (path: string) => ({ path }) },
     sessionPersistence: {},
-    storageDomain: { open: async () => ({ close: async () => {} }) },
+    storageDomain: {
+      open: async () => {
+        opened += 1
+        if (opened === options.storageFailureAt) throw new Error('storage open failed')
+        const index = opened
+        return { close: async () => { calls.push(`close-domain-${String(index)}`) } }
+      },
+    },
     agentDefaultModel: { currentSelection: () => ({ provider: 'provider', model: 'model' }) },
     effect: (factory: () => () => Promise<void>) => {
       const cleanup = factory()
@@ -97,5 +114,11 @@ describe('channel-wecom plugin', () => {
     mocks.Runtime.startError = new Error('startup failed')
     await expect(apply(context().ctx as never, config())).rejects.toThrow('startup failed')
     expect(mocks.state.runtimes[0]?.close).toHaveBeenCalledOnce()
+  })
+
+  it('closes the channel domain when the scheduled-action domain cannot open', async () => {
+    const test = context({ storageFailureAt: 2 })
+    await expect(apply(test.ctx as never, config())).rejects.toThrow('storage open failed')
+    expect(test.calls).toContain('close-domain-1')
   })
 })

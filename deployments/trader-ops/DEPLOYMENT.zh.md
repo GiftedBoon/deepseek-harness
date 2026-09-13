@@ -156,6 +156,8 @@ sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure
 
 启用后，工具会以 `mcp__bssh-ops-remote__` 为前缀出现。`policies/tool-access.yaml` 允许三个精确的写工具直接通过 Harness policy；`bssh-ops` Skill 仍要求预览和用户明确确认，MCP 服务负责下游授权与审计。不要把 API key 写入 patch、Skill、命令参数或工单。
 
+企业微信 patch 暴露一个持久定时动作 `ps_check`。它只接受 `cf-sh-1` 或 `cf-sh-2`，把目标作为单元素 `colos` 数组传入，并把 bssh_ops 快捷命令 key 固定为 `check`；它不能选择 `custom_shell` 或任何启停命令。`15:01` 这样的仅时间请求按 `+08:00` 解析为下一次发生时点。到期通知会说明动作已触发，并附上 bssh_ops 结果，通常是 `run_id`；由于 `run_quick_command` 会在远程执行完成前返回，需要最终进程快照时应再通过 `get_run_status` 查询该 id。通用 Schedule 仍只提供提醒，不会执行该操作。
+
 ### 企业微信日常运维
 
 使用专用日志脚本列出过去 24 小时内最近 20 个被拒绝的用户 id；该脚本不会打印消息内容或无关启动日志。添加 `--follow` 可等待下一个被拒绝的发送者，也可以用 `--since '10 minutes ago'` 指定其他 journal 时间范围：
@@ -199,13 +201,13 @@ sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure
 1. 使用新的、已评审的完整 commit SHA 运行 `install-debian-release.sh`。
 2. 加载 `/etc/deepseek-harness/trader-ops.env`，再以 `dsh` 身份针对新发布运行 `bootstrap-profile.sh` 和 `verify-deployment.sh`，然后才重启服务；这些命令会保留可选企业微信依赖与无人值守 preset。
 3. 执行任何数据迁移前，备份 `/var/lib/openviking` 与 `/var/lib/deepseek-harness`。
-4. 重启 `dsh-trader-ops`，重复监听地址、健康、空 skill 和空 knowledge 检查，并保留上一发布。
+4. 通过 `restart-runtime.sh` 重启 `dsh-trader-ops`；该脚本会先安装当前 release 的 systemd unit。重复监听地址、健康、空 skill 和空 knowledge 检查，并保留上一发布。
 5. 失败时，把 `current` 原子指回上一个已验证发布，再重启 Harness。只有失败发布执行过明确的不兼容迁移时，才恢复持久化数据。
 
 ## 上线前门禁
 
 - OpenViking `/health` 与 `/ready` 成功，`ov doctor` 通过，且容器重启后数据仍然存在。
-- `dsh --dump-config` 中只有一个预期的 `openviking-memory-runtime`，并包含 `trader-ops-tool-policy`、`trader-ops-skills` 与 AIHubMix 提供方。
+- `dsh --dump-config` 中只有一个预期的 `openviking-memory-runtime`，并包含 `trader-ops-tool-policy`、`trader-ops-skills`、AIHubMix 提供方以及 `@deepseek-ai/dsh-schedule`。
 - 实际环境不存在模板或已暴露凭据，密钥不会出现在 Git、日志、进程参数或 shell history 中。
 - AIHubMix 的端点归属、模型路由、保留策略与数据处理条款必须覆盖每一类模型可见数据并通过评审。
 - 在缺少业务知识、生产 skill、可信用户身份、持久审批与 Trader Ops MCP 授权层时，Harness 保持只读，并只允许可信开发内网或 SSH 隧道访问。

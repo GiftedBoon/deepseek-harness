@@ -3,6 +3,10 @@ set -euo pipefail
 
 service="dsh-trader-ops"
 endpoint="http://127.0.0.1:3180/"
+script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+deployment_root="$(CDPATH= cd -- "$script_dir/.." && pwd)"
+service_source="$deployment_root/config/systemd/$service.service"
+service_target="/etc/systemd/system/$service.service"
 
 if (( $# != 0 )); then
   printf 'Usage: restart-runtime.sh\n' >&2
@@ -16,6 +20,10 @@ if ! systemctl cat "$service" >/dev/null 2>&1; then
   printf 'The %s systemd unit is not installed; configure the runtime first.\n' "$service" >&2
   exit 1
 fi
+if [[ ! -f "$service_source" ]]; then
+  printf 'The current release does not contain %s.\n' "$service_source" >&2
+  exit 1
+fi
 
 harness_ready() {
   local status
@@ -24,6 +32,8 @@ harness_ready() {
   [[ "$status" == 200 || "$status" == 401 ]]
 }
 
+install -o root -g root -m 0644 "$service_source" "$service_target"
+systemctl daemon-reload
 systemctl reset-failed "$service"
 systemctl restart "$service"
 for _ in {1..60}; do

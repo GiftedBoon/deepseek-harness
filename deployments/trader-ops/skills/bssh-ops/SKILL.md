@@ -20,6 +20,10 @@ description: Operate the bssh_ops quantitative-trading remote operations MCP ser
 
 会在真实 colo 上产生副作用的工具是 `run_quick_command`、`run_scp` 和 `execute_product_action`。它们的 stdout/stderr 会按 `run_id` 写入 bssh_ops 审计记录；不要执行会打印密码、令牌或其他敏感信息的命令，也不要自行传 `operator`，服务端会固定记录为 `ai-agent`。
 
+## 未来时刻执行
+
+当用户要求在未来时刻执行操作，且 `scheduled_action_create` 的 `action` 枚举包含对应的部署白名单动作时，必须调用 `scheduled_action_create`，并把用户给出的目标与时间原样映射到 `target` 和 `at`。不得立即调用 bssh_ops 写工具，不得用 bash 查询时间或等待，也不得改用只发送会话消息的 `schedule_create`。只有 `scheduled_action_create` 返回成功后，才能说明动作已经安排；如果所需动作不在枚举中，应明确说明该动作没有获准定时执行。
+
 ## 产品级操作流程
 
 产品级动作必须严格执行以下流程，不得因为用户措辞肯定而跳过确认：
