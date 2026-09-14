@@ -33,7 +33,7 @@ function config(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     allowedUsers: ['user'], allowedChats: [], sessionTitlePrefix: 'WeCom', connectTimeoutMs: 10,
     streamFlushIntervalMs: 1, maxInputBytes: 100, maxReplyBytes: 100, turnTimeoutMs: 100,
     deliveryRetentionMs: 100, maxDeliveryRecords: 10, outboxRetryIntervalMs: 100,
-    maxOutboxAttempts: 2,
+    maxOutboxAttempts: 2, outboxRetentionMs: 604_800_000,
     scheduledActions: [], maxScheduledActionsPerConversation: 32,
     maxScheduledActionDelayMs: 1_000_000, scheduledActionTimeoutMs: 1_000,
     scheduledActionUtcOffset: '+08:00',

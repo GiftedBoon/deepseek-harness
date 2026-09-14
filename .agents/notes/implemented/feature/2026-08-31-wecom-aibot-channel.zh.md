@@ -16,7 +16,7 @@ HMAC-SHA-256 把提供方会话和交付 id 映射为稳定的不透明键。单
 
 每个会话拥有一条进程内 Promise 队列。一次交付通过 `SessionPersistence.stat()` 观察其确定性 Session id，根据该实时结果创建或恢复一个 Agent，在发布前挂载 preset，应用受限的非交互权限 preset，并排入一条普通用户消息。如果 Session 在渠道持续运行期间被删除，下一次交付会使用同一个 id 重新创建它。准确的 Agent、Session、消息、已分配 turn 和 attempt 关联只允许该 turn 的 `agent/assistant-stream` 文本增量通过。runtime 等待对应 `turn/end`，达到静止后 flush Session，并在处理该会话下一条消息前释放 handle。
 
-`channel_wecom` domain 存储会话路由、交付状态与主动发送 outbox。已完成和已失败的重复交付会重放存储文本，不再调用模型。被动流更新采用累计内容、合并刷新、顺序发送与 UTF-8 长度限制。最终被动回复失败时退回到主动 Markdown；再次失败会把结果提交到 outbox 进行有界重试。
+`channel_wecom` domain 存储会话路由、交付状态与主动发送 outbox。已完成和已失败的重复交付会重放存储文本，不再调用模型。被动流更新采用累计内容、合并刷新、顺序发送与 UTF-8 长度限制。最终被动回复失败时退回到主动 Markdown；再次失败会把结果提交到 outbox，由它按配置间隔重试，并在该会话再次写来消息时投递。
 
 可选的部署动作白名单无需保留空闲 Agent，即可增加持久化的未来执行。每个条目固定动作 id、已注册工具名、静态无损 JSON 参数、目标参数、标量或单元素数组目标编码，以及带锚点的目标表达式。条目还可以允许一个有长度上限的模型提供字符串参数；其准确值存入独立的 `channel_wecom_scheduled_action_input` domain。Agent 作用域内的管理工具接受动作 id、目标、可选的已配置输入，以及显式带偏移的时刻或在部署固定 UTC 偏移下下一次发生的 `HH:mm[:ss]`。独立的动作与输入 domain 保存 pending 与 running 工作，而不改变已发布的 `channel_wecom` generation 或已发布定时动作记录格式。[参数化企业微信定时动作](2026-09-14-parameterized-wecom-scheduled-actions.zh.md)负责动态输入决策及其安全取舍。
 

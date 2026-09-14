@@ -41,6 +41,13 @@ interface RuntimeOptions {
   readonly modelSelection: ModelSelection
 }
 
+interface OutboxDrainOptions {
+  /** Deliver only items addressed to this conversation target. */
+  readonly target?: string
+  /** Retry items whose periodic attempts are exhausted. Defaults to true. */
+  readonly retryExhausted?: boolean
+}
+
 /** Apply the creation-time model selection until the first request header exists. */
 function installInitialModelSelection(agentCtx: Context, selection: ModelSelection): void {
   agentCtx.on('agent/request', async (_payload, next): Promise<LlmCallConfig> => {
@@ -111,7 +118,7 @@ export class WeComChannelRuntime {
     this.disposers.push(this.options.client.onAuthenticated(() => { this.queueOutboxDrain() }))
     await this.options.client.connect(this.controller.signal)
     await this.scheduledActions.start()
-    this.retryTimer = setInterval(() => { this.queueOutboxDrain() }, this.options.config.outboxRetryIntervalMs)
+    this.retryTimer = setInterval(() => { this.queueOutboxDrain({ retryExhausted: false }) }, this.options.config.outboxRetryIntervalMs)
     this.queueOutboxDrain()
     await this.outboxTail
   }
@@ -191,6 +198,9 @@ export class WeComChannelRuntime {
       updatedAt: now,
     })
     await deliveries.put(deliveryKey, { conversationKey, state: 'processing', reply: '', updatedAt: now })
+    // A conversation that just wrote in is the reliable moment to deliver what the
+    // provider refused while it was idle.
+    this.queueOutboxDrain({ target: delivery.target })
 
     const stream = new WeComReplyStream({
       client: this.options.client,
@@ -343,30 +353,36 @@ export class WeComChannelRuntime {
 
   private async enqueueScheduledNotification(target: string, content: string): Promise<void> {
     await this.enqueueOutbox(target, boundUtf8(content, this.options.config.maxReplyBytes))
-    this.queueOutboxDrain()
+    this.queueOutboxDrain({ target })
   }
 
-  private queueOutboxDrain(): void {
-    this.outboxTail = this.outboxTail.then(() => this.drainOutbox()).catch((error: unknown) => {
+  private queueOutboxDrain(options: OutboxDrainOptions = {}): void {
+    this.outboxTail = this.outboxTail.then(() => this.drainOutbox(options)).catch((error: unknown) => {
       this.ctx.logger.warn(`channel-wecom: outbox drain failed: ${errorChain(error)}`)
     })
   }
 
-  private async drainOutbox(): Promise<void> {
+  private async drainOutbox(options: OutboxDrainOptions): Promise<void> {
     if (this.controller.signal.aborted) return
     const table = this.options.domain.table('outbox')
-    for (const [key, item] of table.entries()) {
+    const expiredBefore = Date.now() - this.options.config.outboxRetentionMs
+    for (const [key, item] of [...table.entries()]) {
+      if (item.createdAt < expiredBefore) {
+        await table.delete(key)
+        this.ctx.logger.warn('channel-wecom: outbox item expired before delivery')
+        continue
+      }
+      if (options.target !== undefined && item.target !== options.target) continue
+      if (options.retryExhausted === false && item.attempts >= this.options.config.maxOutboxAttempts) continue
       try {
         await this.options.client.sendMarkdown(item.target, item.content)
         await table.delete(key)
       } catch (error: unknown) {
         const attempts = item.attempts + 1
-        if (attempts >= this.options.config.maxOutboxAttempts) {
-          this.ctx.logger.warn(`channel-wecom: dropping exhausted outbox item: ${errorChain(error)}`)
-          await table.delete(key)
-        } else {
-          await table.put(key, { ...item, attempts, updatedAt: Date.now() })
-        }
+        await table.put(key, { ...item, attempts, updatedAt: Date.now() })
+        // The target and the content carry provider identity and message text, so
+        // only the attempt count and the provider diagnostic reach the log.
+        this.ctx.logger.warn(`channel-wecom: outbox send failed on attempt ${attempts}: ${errorChain(error)}`)
       }
     }
   }

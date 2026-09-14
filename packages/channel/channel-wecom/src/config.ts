@@ -97,8 +97,10 @@ export interface Config {
   maxDeliveryRecords?: number
   /** Interval between active-send outbox retry passes. */
   outboxRetryIntervalMs?: number
-  /** Failed active sends allowed before an outbox item is dropped. */
+  /** Failed periodic active sends before an outbox item waits for the next active conversation. */
   maxOutboxAttempts?: number
+  /** Age after which an undelivered outbox item is removed. */
+  outboxRetentionMs?: number
   /** Deployment allowlist for durable, future tool execution. */
   scheduledActions?: ScheduledActionConfig[]
   /** Maximum pending or running actions retained for one conversation. */
@@ -134,6 +136,7 @@ export const Config: z<Config> = z.object({
   maxDeliveryRecords: z.number().min(1).default(10_000),
   outboxRetryIntervalMs: z.number().min(1).default(30_000),
   maxOutboxAttempts: z.number().min(1).default(10),
+  outboxRetentionMs: z.number().min(1).default(604_800_000),
   scheduledActions: z.array(z.object({
     id: z.string().required(),
     description: z.string().required(),

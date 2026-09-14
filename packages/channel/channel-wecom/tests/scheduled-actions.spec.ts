@@ -44,7 +44,7 @@ function config(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     allowedUsers: ['user'], allowedChats: [], sessionTitlePrefix: 'WeCom', connectTimeoutMs: 1_000,
     streamFlushIntervalMs: 1, maxInputBytes: 1_000, maxReplyBytes: 20_480, turnTimeoutMs: 10_000,
     deliveryRetentionMs: 10_000, maxDeliveryRecords: 100, outboxRetryIntervalMs: 10_000,
-    maxOutboxAttempts: 3, maxScheduledActionsPerConversation: 2,
+    maxOutboxAttempts: 3, outboxRetentionMs: 604_800_000, maxScheduledActionsPerConversation: 2,
     maxScheduledActionDelayMs: 86_400_000, scheduledActionTimeoutMs: 10_000,
     scheduledActionUtcOffset: '+08:00',
     scheduledActions: [{
@@ -637,6 +637,25 @@ describe('WeCom scheduled actions', () => {
     await vi.waitFor(() => { expect(test.notifications).toHaveLength(1) })
     expect(test.notifications[0]?.content).toBe('success\n\n`ps_check` @ `cf-sh-2`\n\n')
     await test.scheduled.close()
+  })
+
+  it('dispatches without notifying when the conversation route is gone', async () => {
+    const test = await harness()
+    test.ctx.tools.register(defineTool({
+      name: 'quick', description: 'quick', parameters: {
+        command: { type: 'string' }, colos: { type: 'array', items: { type: 'string' } },
+      },
+      output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+      async execute() { return 'process snapshot' },
+    }))
+    const created = await call(test, 'scheduled_action_create', {
+      action: 'ps_check', target: 'cf-sh-2', at: '2026-09-12T12:01:00+08:00',
+    })
+    const id = (created.value as { id: string }).id
+    test.stores.conversations.records.delete('conversation')
+    await internals(test.scheduled).dispatch(id)
+    expect(test.notifications).toEqual([])
+    expect(test.stores.actions.records.has(id)).toBe(false)
   })
 
   it('keeps missing conversations quiet and segments timers beyond the platform delay', async () => {

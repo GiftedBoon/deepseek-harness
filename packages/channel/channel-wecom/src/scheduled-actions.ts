@@ -464,7 +464,9 @@ export class WeComScheduledActions {
     }
     if (this.isClosed()) return
     const conversation = this.options.conversations.table('conversations').get(record.conversationKey)
-    if (conversation !== undefined) {
+    if (conversation === undefined) {
+      this.ctx.logger.warn('channel-wecom: scheduled action has no conversation route; notification skipped')
+    } else {
       const prefix = result !== undefined && !result.isError
         ? this.options.config.messages.scheduledActionSuccess
         : this.options.config.messages.scheduledActionFailure

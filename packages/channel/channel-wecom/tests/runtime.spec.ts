@@ -3,6 +3,7 @@ import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ResolvedConfig } from '../src/config.ts'
 import { conversationIdentity, deliveryIdentity } from '../src/identity.ts'
 import { WeComChannelRuntime } from '../src/runtime.ts'
+import { resolveScheduledActions } from '../src/scheduled-actions.ts'
 import type { WeComChannelClient } from '../src/types.ts'
 
 interface DeliveryRecord {
@@ -142,7 +143,7 @@ function baseConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     allowedUsers: ['allowed'], allowedChats: ['chat'], sessionTitlePrefix: 'WeCom',
     connectTimeoutMs: 20, streamFlushIntervalMs: 1, maxInputBytes: 100, maxReplyBytes: 100,
     turnTimeoutMs: 50, deliveryRetentionMs: 100_000, maxDeliveryRecords: 100,
-    outboxRetryIntervalMs: 100_000, maxOutboxAttempts: 2,
+    outboxRetryIntervalMs: 100_000, maxOutboxAttempts: 2, outboxRetentionMs: 100_000,
     scheduledActions: [], maxScheduledActionsPerConversation: 32,
     maxScheduledActionDelayMs: 1_000_000, scheduledActionTimeoutMs: 1_000,
     scheduledActionUtcOffset: '+08:00',
@@ -276,6 +277,7 @@ function harness(options: {
     },
     sessionTitle: { rename: () => { calls.push('title') } },
     sessions: { flush: async (session: { id: string }) => { calls.push('flush'); persistedSessions.add(session.id) } },
+    tools: { execute: async () => ({ content: [{ type: 'text', text: 'run-1' }] }) },
   }
   const workspace = {
     path: '/workspace',
@@ -490,17 +492,85 @@ describe('WeComChannelRuntime', () => {
     await vi.waitFor(() => { expect(queued.domain.outbox.records.size).toBe(0) })
   })
 
-  it('drops exhausted outbox items and contains drain failures', async () => {
+  it('delivers a due scheduled action result through the outbox', async () => {
+    const scheduledActions = [{
+      id: 'ps_check', description: 'Run the read-only process check.', toolName: 'quick',
+      targetArgument: 'colos', targetArgumentFormat: 'singleton-array' as const,
+      targetPattern: '^[a-z0-9-]+$', arguments: { command: 'check' },
+    }]
+    const test = harness({ config: { scheduledActions } })
+    await test.runtime.start()
+    const conversationKey = conversationIdentity('bot', 'identity', 'shared', {
+      messageId: 'message', requestId: 'request', botId: 'bot', chatType: 'single',
+      userId: 'allowed', target: 'allowed', text: 'hello', frame: {},
+    }).key
+    await test.domain.conversations.put(conversationKey, {
+      sessionId: 'session', target: 'allowed', chatType: 'single', updatedAt: Date.now(),
+    })
+    const definition = resolveScheduledActions(scheduledActions).get('ps_check')
+    if (definition === undefined) throw new Error('the scheduled action was not resolved')
+    await test.scheduledActionDomain.actions.put('action', {
+      sessionId: 'session', conversationKey, actionId: 'ps_check',
+      definitionFingerprint: definition.fingerprint, target: 'csc-sz-12',
+      runAt: Date.now(), state: 'pending', createdAt: Date.now(), updatedAt: Date.now(),
+    })
+    const internals = test.runtime as unknown as { scheduledActions: { dispatch(id: string): Promise<void> } }
+    await internals.scheduledActions.dispatch('action')
+    expect(test.client.sends).toHaveLength(1)
+    expect(test.client.sends[0]?.target).toBe('allowed')
+    expect(test.client.sends[0]?.content).toContain('scheduled success')
+    expect(test.client.sends[0]?.content).toContain('csc-sz-12')
+    expect(test.scheduledActionDomain.actions.records.size).toBe(0)
+    expect(test.domain.outbox.records.size).toBe(0)
+  })
+
+  it('keeps an exhausted outbox item, prunes expired items, and reports each failed attempt', async () => {
+    vi.useFakeTimers()
+    const now = Date.now()
     const domain = new Domain()
     domain.outbox.records.set('exhausted', {
-      target: 'target', content: 'content', attempts: 1, createdAt: 1, updatedAt: 1,
+      target: 'allowed', content: 'content', attempts: 1, createdAt: now, updatedAt: now,
+    })
+    domain.outbox.records.set('expired', {
+      target: 'allowed', content: 'old', attempts: 0, createdAt: now - 200_000, updatedAt: now - 200_000,
     })
     const client = new Client()
     client.failSend = true
-    const test = harness({ domain, client, config: { maxOutboxAttempts: 2 } })
+    const test = harness({
+      domain,
+      client,
+      config: { maxOutboxAttempts: 2, outboxRetentionMs: 100_000, outboxRetryIntervalMs: 1_000 },
+    })
     await test.runtime.start()
-    expect(domain.outbox.records.size).toBe(0)
-    expect(test.warnings).toHaveBeenCalledWith(expect.stringContaining('dropping exhausted outbox item'))
+    expect(domain.outbox.records.has('expired')).toBe(false)
+    expect(test.warnings).toHaveBeenCalledWith(expect.stringContaining('outbox item expired before delivery'))
+    expect(domain.outbox.records.get('exhausted')?.attempts).toBe(2)
+    expect(test.warnings).toHaveBeenCalledWith(expect.stringContaining('outbox send failed on attempt 2'))
+    const deliveries = client.sends.length
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(client.sends).toHaveLength(deliveries)
+    expect(domain.outbox.records.get('exhausted')?.attempts).toBe(2)
+  })
+
+  it('delivers pending items for a conversation once that conversation writes in', async () => {
+    const now = Date.now()
+    const domain = new Domain()
+    domain.outbox.records.set('pending', {
+      target: 'allowed', content: 'notification', attempts: 0, createdAt: now, updatedAt: now,
+    })
+    domain.outbox.records.set('other', {
+      target: 'someone-else', content: 'other', attempts: 0, createdAt: now, updatedAt: now,
+    })
+    const client = new Client()
+    client.failSend = true
+    const test = harness({ domain, client, behavior: { output: 'answer' } })
+    await test.runtime.start()
+    expect(domain.outbox.records.size).toBe(2)
+    client.failSend = false
+    test.client.emitText(frame())
+    await waitForDelivery(test.domain, 'completed')
+    await vi.waitFor(() => { expect(domain.outbox.records.has('pending')).toBe(false) })
+    expect(domain.outbox.records.has('other')).toBe(true)
   })
 
   it('disposes an active interval and reports startup connection failure', async () => {

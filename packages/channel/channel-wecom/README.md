@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-channel-wecom` connects one enterprise WeCom intelligent bot to ordinary DSH Workspace Sessions through the official WebSocket long-connection SDK. It accepts outbound-only network deployment, validates and deduplicates text deliveries, serializes each conversation, streams correlated visible Agent output, retains failed active sends in a durable outbox, and can execute deployment-allowlisted tools at durable future times.
+`dsh-channel-wecom` connects one enterprise WeCom intelligent bot to ordinary DSH Workspace Sessions through the official WebSocket long-connection SDK. It accepts outbound-only network deployment, validates and deduplicates text deliveries, serializes each conversation, streams correlated visible Agent output, retries failed active sends from a durable outbox until the conversation writes in again, and can execute deployment-allowlisted tools at durable future times.
 
 ## Table of Contents
 
@@ -37,7 +37,7 @@ The [Linux production deployment guide](../../../docs/user/guide/wecom-linux-dep
 
 `botId`, `secretEnv`, `sessionKeyEnv`, `workspacePath`, `agentPreset`, `permissionPreset`, `allowedUsers`, `allowedChats`, and `messages` are required. `allowedUsers` and `allowedChats` accept exact provider ids or the explicit `"*"` wildcard. `groupConversationMode` is `shared` by default; `per-user` isolates each group member. `messages` supplies operator-localized delivery replies and scheduled-action notifications.
 
-Provider and resource controls are configurable: initial authentication timeout, stream flush interval, UTF-8 input/reply limits, Agent-turn timeout, delivery retention/count, outbox retry interval, maximum retry attempts, scheduled-action count and horizon, background execution timeout, and the fixed UTC offset for time-only requests. `maxReplyBytes` cannot exceed WeCom's 20,480-byte stream limit. `workspacePath` must be an existing absolute directory.
+Provider and resource controls are configurable: initial authentication timeout, stream flush interval, UTF-8 input/reply limits, Agent-turn timeout, delivery retention/count, outbox retry interval, maximum periodic retry attempts, undelivered-outbox retention, scheduled-action count and horizon, background execution timeout, and the fixed UTC offset for time-only requests. `maxReplyBytes` cannot exceed WeCom's 20,480-byte stream limit. `workspacePath` must be an existing absolute directory.
 
 `scheduledActions` is empty by default. Each configured entry maps one stable action id to an exact registered tool, static lossless-JSON arguments, one top-level argument that receives the requested target, and an anchored target-validation expression. `targetArgumentFormat` defaults to `scalar`; use `singleton-array` when the downstream tool expects a one-element target array. An optional `input` maps the model-facing `scheduled_action_create.input` string to one additional top-level tool argument, applies a required UTF-8 byte limit and optional anchored pattern, and persists the exact value until dispatch. The model cannot replace the configured tool or static arguments.
 
@@ -88,7 +88,7 @@ The channel persists conversation routing, delivery state, and outbox records in
 
 Each admitted message observes its mapped Session in persistence, then creates or resumes one Agent, mounts the configured agent preset before publication, applies the noninteractive permission preset, attaches a new Session to the configured Workspace, and sends one ordinary user message. If the mapped Session was deleted while the channel remained running, the next message creates a fresh Session under the same stable id instead of trying to resume the missing log. The channel correlates `agent/inbox/claimed`, `agent/assistant-stream`, and `turn/end` by exact Agent, Session, message, turn, and attempt. It flushes the Session and disposes the Agent after the interval reaches quiescence.
 
-The first passive reply is `messages.processing`; later cumulative updates contain only `text-delta` output, never reasoning. Passive-final failure falls back to an active Markdown send. If both transports fail, the bounded final text enters the durable outbox and retries after authentication and on the configured interval.
+The first passive reply is `messages.processing`; later cumulative updates contain only `text-delta` output, never reasoning. Passive-final failure falls back to an active Markdown send. If both transports fail, the bounded final text enters the durable outbox, which retries after authentication and on each configured interval. Once an item reaches `maxOutboxAttempts` periodic retries stop and it waits for its conversation to write in, which drains it immediately; an item that stays undeliverable is removed after `outboxRetentionMs`. Every failed attempt logs its attempt count and the provider diagnostic, never the target or the content.
 
 When `scheduledActions` is non-empty, mapped Agents receive `scheduled_action_create`, `scheduled_action_list`, and `scheduled_action_delete`. An explicit RFC 3339 `at` value keeps its own offset; a time-only `HH:mm[:ss]` value resolves to its next occurrence under `scheduledActionUtcOffset`, so the model does not need a shell or clock tool. Creation durably records any validated dynamic input and then commits the allowlisted action before arming a timer, so disposing the per-delivery Agent does not cancel it. At the due time the channel resolves the current allowlist, requires its fingerprint to match the creation-time definition, and invokes the configured tool through the ordinary global policy and guard pipeline. The result enters the durable outbox before the task and input are removed. Startup rearms pending tasks, removes orphan inputs, and reports a recovered `running` task as uncertain without executing it again because the prior side effect may already have happened.
 
@@ -124,6 +124,7 @@ Resuming the same mapped Session preserves its reusable conversation prefix. Cha
 - **Bounded reply projection** — replies longer than `maxReplyBytes` are truncated with an ellipsis; tools and reasoning are not rendered into WeCom.
 - **No inbound durable queue before admission** — the official SDK owns reconnect behavior, while provider callbacks that never reach this process cannot be replayed by DSH.
 - **Scheduled results are channel notifications** — background results are sent to WeCom and audited by the invoked tool, but are not inserted into the Session as model-authored conversation history.
+- **An undelivered notification waits for its conversation** — a notification the provider refuses while the conversation is idle is delivered when that conversation next writes in, and is removed once `outboxRetentionMs` passes without a delivery.
 
 <a id="dev-note"></a>
 ### Dev Note

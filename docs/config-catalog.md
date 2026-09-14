@@ -356,8 +356,10 @@ export interface Config {
   maxDeliveryRecords?: number
   /** Interval between active-send outbox retry passes. */
   outboxRetryIntervalMs?: number
-  /** Failed active sends allowed before an outbox item is dropped. */
+  /** Failed periodic active sends before an outbox item waits for the next active conversation. */
   maxOutboxAttempts?: number
+  /** Age after which an undelivered outbox item is removed. */
+  outboxRetentionMs?: number
   /** Deployment allowlist for durable, future tool execution. */
   scheduledActions?: ScheduledActionConfig[]
   /** Maximum pending or running actions retained for one conversation. */
