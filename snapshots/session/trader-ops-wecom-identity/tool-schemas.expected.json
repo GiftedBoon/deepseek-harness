@@ -322,19 +322,25 @@
     },
     {
       "name": "scheduled_action_create",
-      "description": "Schedule one actual allowlisted action for future background execution. Use this instead of executing the action now, reading the clock with another tool, waiting in a shell, or creating a reminder. A time-only at value means its next occurrence in +08:00. The action is persisted, survives service restart, is rechecked by tool policy at dispatch, and its result is actively sent to this WeCom conversation. Available actions: ps_check: Run the bssh_ops allowlisted read-only \"ps check\" quick command on one colo.",
+      "description": "Schedule one actual allowlisted action for future background execution. Use this instead of executing the action now, reading the clock with another tool, waiting in a shell, or creating a reminder. A time-only at value means its next occurrence in +08:00. The action is persisted, survives service restart, is rechecked by tool policy at dispatch, and its result is actively sent to this WeCom conversation. Available actions: ps_check: Run the bssh_ops allowlisted read-only \"ps check\" quick command on one colo.; quick_command: Run any quick-command key currently configured by bssh_ops on one colo; list the keys before scheduling.; custom_shell: Run an exact user-confirmed custom shell command through bssh_ops on one colo after checking its syntax.",
       "parameters": {
         "type": "object",
         "properties": {
           "action": {
             "type": "string",
             "enum": [
-              "ps_check"
+              "ps_check",
+              "quick_command",
+              "custom_shell"
             ]
           },
           "target": {
             "type": "string",
             "description": "Exact target identifier for the selected action."
+          },
+          "input": {
+            "type": "string",
+            "description": "Exact operation input. Required for a parameterized action and omitted for a static action. Parameterized actions: quick_command: Exact key returned by list_quick_commands.; custom_shell: Exact user-confirmed shell command that passed check_shell_syntax."
           },
           "at": {
             "type": "string",

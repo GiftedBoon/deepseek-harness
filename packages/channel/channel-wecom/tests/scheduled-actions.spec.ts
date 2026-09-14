@@ -10,6 +10,7 @@ import { WeComScheduledActions, resolveScheduledActions } from '../src/scheduled
 class Table<T> {
   readonly records = new Map<string, T>()
   putFailure: unknown
+  deleteFailure: unknown
   beforePut: (() => Promise<void>) | undefined
   get(key: string): T | undefined { return this.records.get(key) }
   entries(): IterableIterator<[string, T]> { return new Map(this.records).entries() }
@@ -18,7 +19,10 @@ class Table<T> {
     if (this.putFailure !== undefined) throw this.putFailure
     this.records.set(key, value)
   }
-  async delete(key: string): Promise<boolean> { return this.records.delete(key) }
+  async delete(key: string): Promise<boolean> {
+    if (this.deleteFailure !== undefined) throw this.deleteFailure
+    return this.records.delete(key)
+  }
 }
 
 interface ActionRecord {
@@ -61,14 +65,22 @@ function config(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
 const contexts: Context[] = []
 
 async function harness(options: {
-  shared?: { actions: Table<ActionRecord>; conversations: Table<Record<string, unknown>> }
+  shared?: {
+    actions: Table<ActionRecord>
+    inputs: Table<{ value: string }>
+    conversations: Table<Record<string, unknown>>
+  }
   configured?: ResolvedConfig
 } = {}) {
   const ctx = new Context()
   contexts.push(ctx)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
-  const stores = options.shared ?? { actions: new Table<ActionRecord>(), conversations: new Table<Record<string, unknown>>() }
+  const stores = options.shared ?? {
+    actions: new Table<ActionRecord>(),
+    inputs: new Table<{ value: string }>(),
+    conversations: new Table<Record<string, unknown>>(),
+  }
   stores.conversations.records.set('conversation', {
     sessionId: 'session', target: 'wecom-user', chatType: 'single', updatedAt: Date.now(),
   })
@@ -77,6 +89,7 @@ async function harness(options: {
     config: options.configured ?? config(),
     conversations: { table: () => stores.conversations } as never,
     actions: { table: () => stores.actions } as never,
+    inputs: { table: () => stores.inputs } as never,
     enqueueNotification: async (target, content) => { notifications.push({ target, content }) },
   })
   const agent = { session: { id: 'session' } } as Agent
@@ -119,10 +132,16 @@ describe('WeCom scheduled actions', () => {
       { ...valid, toolName: ' ' },
       { ...valid, targetArgument: 'bad-key' },
       { ...valid, targetArgumentFormat: 'many-arrays' },
-      { ...valid, targetPattern: '[' },
+      { ...valid, targetPattern: '^[$' },
       { ...valid, arguments: null },
       { ...valid, arguments: [] },
       { ...valid, arguments: () => undefined },
+      { ...valid, input: { toolArgument: 'bad-key', description: 'value', maxBytes: 10 } },
+      { ...valid, input: { toolArgument: 'input', description: ' ', maxBytes: 10 } },
+      { ...valid, input: { toolArgument: 'input', description: 'value', maxBytes: 0 } },
+      { ...valid, input: { toolArgument: 'input', description: 'value', maxBytes: 1.5 } },
+      { ...valid, input: { toolArgument: 'input', description: 'value', maxBytes: 10, pattern: '[' } },
+      { ...valid, input: { toolArgument: 'input', description: 'value', maxBytes: 10, pattern: 'value' } },
     ]) expect(() => resolveScheduledActions([invalid as never])).toThrow()
     const { arguments: _arguments, ...withoutArguments } = valid
     expect(resolveScheduledActions([withoutArguments]).size).toBe(1)
@@ -135,6 +154,14 @@ describe('WeCom scheduled actions', () => {
     expect(() => resolveScheduledActions([
       { ...valid, arguments: { colos: ['forged'] } },
     ])).toThrow(/must not define targetArgument/)
+    expect(() => resolveScheduledActions([{
+      ...valid, input: { toolArgument: 'colos', description: 'value', maxBytes: 10 },
+    }])).toThrow(/must differ/)
+    expect(() => resolveScheduledActions([{
+      ...valid,
+      arguments: { command: 'fixed' },
+      input: { toolArgument: 'command', description: 'value', maxBytes: 10 },
+    }])).toThrow(/must not define input.toolArgument/)
   })
 
   it('does not expose management tools when the action allowlist is empty', async () => {
@@ -228,6 +255,91 @@ describe('WeCom scheduled actions', () => {
     await test.scheduled.close()
   })
 
+  it('persists exact parameterized quick-command and custom-shell inputs until due dispatch', async () => {
+    const base = config().scheduledActions[0]!
+    const test = await harness({ configured: config({ scheduledActions: [
+      {
+        ...base,
+        id: 'quick_command',
+        arguments: {},
+        input: {
+          toolArgument: 'command', description: 'Quick-command key.', maxBytes: 64,
+          pattern: '^[A-Za-z0-9_.-]+$',
+        },
+      },
+      {
+        ...base,
+        id: 'custom_shell',
+        arguments: {},
+        input: { toolArgument: 'custom_shell', description: 'Exact shell command.', maxBytes: 1_024 },
+      },
+    ] }) })
+    const bodies: unknown[] = []
+    test.ctx.tools.register(defineTool({
+      name: 'quick', description: 'quick', parameters: {
+        command: { type: 'string' }, custom_shell: { type: 'string' },
+        colos: { type: 'array', items: { type: 'string' } },
+      },
+      output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+      async execute(args) { bodies.push(args); return 'started' },
+    }))
+    await test.scheduled.start()
+    const quick = await call(test, 'scheduled_action_create', {
+      action: 'quick_command', target: 'cf-sh-2', input: 'start_signal', at: '12:01',
+    })
+    const shellText = 'printf "精确命令\\n"\ntrue'
+    const shell = await call(test, 'scheduled_action_create', {
+      action: 'custom_shell', target: 'cf-sh-1', input: shellText, at: '12:02',
+    })
+    expect(quick.value).toMatchObject({ action: 'quick_command', input: 'start_signal' })
+    expect(shell.value).toMatchObject({ action: 'custom_shell', input: shellText })
+    expect(test.stores.inputs.records.size).toBe(2)
+    expect((await call(test, 'scheduled_action_list', {})).value).toEqual([
+      expect.objectContaining({ input: 'start_signal' }),
+      expect.objectContaining({ input: shellText }),
+    ])
+    expect(bodies).toEqual([])
+
+    await vi.advanceTimersByTimeAsync(60_000)
+    await vi.waitFor(() => { expect(bodies).toHaveLength(1) })
+    expect(bodies[0]).toEqual({ command: 'start_signal', colos: ['cf-sh-2'] })
+    await vi.advanceTimersByTimeAsync(60_000)
+    await vi.waitFor(() => { expect(bodies).toHaveLength(2) })
+    expect(bodies[1]).toEqual({ custom_shell: shellText, colos: ['cf-sh-1'] })
+    expect(test.stores.inputs.records.size).toBe(0)
+    await test.scheduled.close()
+  })
+
+  it('validates parameterized inputs before persistence', async () => {
+    const base = config().scheduledActions[0]!
+    const test = await harness({ configured: config({ scheduledActions: [
+      base,
+      {
+        ...base,
+        id: 'parameterized',
+        arguments: {},
+        input: {
+          toolArgument: 'command', description: 'Command key.', maxBytes: 4,
+          pattern: '^[a-z]+$',
+        },
+      },
+    ] }) })
+    await test.scheduled.start()
+    for (const [argumentsValue, code] of [
+      [{ action: 'parameterized', target: 'cf-sh-2', at: '12:01' }, 'input_required'],
+      [{ action: 'parameterized', target: 'cf-sh-2', input: '   ', at: '12:01' }, 'input_required'],
+      [{ action: 'parameterized', target: 'cf-sh-2', input: 'abcde', at: '12:01' }, 'input_too_large'],
+      [{ action: 'parameterized', target: 'cf-sh-2', input: 'ab1', at: '12:01' }, 'invalid_input'],
+      [{ action: 'parameterized', target: 'cf-sh-2', input: 'a\0b', at: '12:01' }, 'invalid_input'],
+      [{ action: 'ps_check', target: 'cf-sh-2', input: 'check', at: '12:01' }, 'unexpected_input'],
+    ] as const) {
+      expect((await call(test, 'scheduled_action_create', argumentsValue)).value).toHaveProperty('code', code)
+    }
+    expect(test.stores.actions.records.size).toBe(0)
+    expect(test.stores.inputs.records.size).toBe(0)
+    await test.scheduled.close()
+  })
+
   it('defaults to a scalar target argument for tools that do not require an array', async () => {
     const configuredAction = config().scheduledActions[0]!
     const { targetArgumentFormat: _arrayFormat, ...scalarAction } = configuredAction
@@ -252,22 +364,33 @@ describe('WeCom scheduled actions', () => {
   })
 
   it('recovers pending work after restart and never repeats an in-flight side effect', async () => {
-    const first = await harness()
+    const base = config().scheduledActions[0]!
+    const dynamicConfig = config({ scheduledActions: [{
+      ...base,
+      id: 'quick_command',
+      arguments: {},
+      input: { toolArgument: 'command', description: 'Command key.', maxBytes: 64 },
+    }] })
+    const first = await harness({ configured: dynamicConfig })
     await first.scheduled.start()
     await call(first, 'scheduled_action_create', {
-      action: 'ps_check', target: 'cf-sh-1', at: '2026-09-12T12:01:00+08:00',
+      action: 'quick_command', target: 'cf-sh-1', input: 'start_signal',
+      at: '2026-09-12T12:01:00+08:00',
     })
     await first.scheduled.close()
-    const second = await harness({ shared: first.stores })
+    const second = await harness({ shared: first.stores, configured: dynamicConfig })
     let executions = 0
     second.ctx.tools.register(defineTool({
-      name: 'quick', description: 'quick', parameters: { command: { type: 'string' }, colo: { type: 'string' } },
+      name: 'quick', description: 'quick', parameters: {
+        command: { type: 'string' }, colos: { type: 'array', items: { type: 'string' } },
+      },
       output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
       async execute() { executions += 1; return 'ok' },
     }))
     await second.scheduled.start()
     await vi.advanceTimersByTimeAsync(60_000)
     await vi.waitFor(() => { expect(executions).toBe(1) })
+    expect(second.stores.inputs.records.size).toBe(0)
     await second.scheduled.close()
 
     const uncertain = await harness()
@@ -276,9 +399,12 @@ describe('WeCom scheduled actions', () => {
       definitionFingerprint: 'unknown-after-crash', target: 'cf-sh-1', runAt: Date.now(),
       state: 'running', createdAt: Date.now(), updatedAt: Date.now(),
     })
+    uncertain.stores.inputs.records.set('running', { value: 'start' })
+    uncertain.stores.inputs.records.set('orphan', { value: 'printf orphan' })
     await uncertain.scheduled.start()
     expect(uncertain.notifications[0]?.content).toContain('uncertain')
     expect(uncertain.stores.actions.records.size).toBe(0)
+    expect(uncertain.stores.inputs.records.size).toBe(0)
     await uncertain.scheduled.close()
   })
 
@@ -287,6 +413,7 @@ describe('WeCom scheduled actions', () => {
     await test.scheduled.start()
     for (const input of [
       { action: 'ps_check', target: 'cf sh 2', at: '2026-09-12T12:01:00+08:00' },
+      { action: 'ps_check', target: 'cf-sh-2\n', at: '2026-09-12T12:01:00+08:00' },
       { action: 'ps_check', target: 'cf-sh-2', at: '2026-02-30T12:01:00+08:00' },
       { action: 'ps_check', target: 'cf-sh-2', at: '2026-09-12T03:59:00Z' },
     ]) {
@@ -373,6 +500,33 @@ describe('WeCom scheduled actions', () => {
     await vi.waitFor(() => { expect(restarted.notifications).toHaveLength(1) })
     expect(restarted.notifications[0]?.content).toContain('definition changed')
     await restarted.scheduled.close()
+
+    const base = config().scheduledActions[0]!
+    const missingInput = await harness({ configured: config({ scheduledActions: [{
+      ...base,
+      id: 'quick_command',
+      arguments: {},
+      input: { toolArgument: 'command', description: 'Command key.', maxBytes: 64 },
+    }] }) })
+    let executions = 0
+    missingInput.ctx.tools.register(defineTool({
+      name: 'quick', description: 'quick', parameters: {
+        command: { type: 'string' }, colos: { type: 'array', items: { type: 'string' } },
+      },
+      output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+      async execute() { executions += 1; return 'must not run' },
+    }))
+    await missingInput.scheduled.start()
+    const created = await call(missingInput, 'scheduled_action_create', {
+      action: 'quick_command', target: 'cf-sh-2', input: 'start',
+      at: new Date(Date.now() + 60_000).toISOString(),
+    })
+    missingInput.stores.inputs.records.delete((created.value as { id: string }).id)
+    await vi.advanceTimersByTimeAsync(60_000)
+    await vi.waitFor(() => { expect(missingInput.notifications).toHaveLength(1) })
+    expect(executions).toBe(0)
+    expect(missingInput.notifications[0]?.content).toContain('definition changed')
+    await missingInput.scheduled.close()
   })
 
   it('contains persistence failures and logs background dispatch failures', async () => {
@@ -384,6 +538,31 @@ describe('WeCom scheduled actions', () => {
     })
     expect(rejected.isError).toBe(true)
     test.stores.actions.putFailure = undefined
+
+    const base = config().scheduledActions[0]!
+    const parameterized = await harness({ configured: config({ scheduledActions: [{
+      ...base,
+      id: 'quick_command',
+      arguments: {},
+      input: { toolArgument: 'command', description: 'Command key.', maxBytes: 64 },
+    }] }) })
+    await parameterized.scheduled.start()
+    parameterized.stores.actions.putFailure = new Error('action write failed')
+    const rolledBack = await call(parameterized, 'scheduled_action_create', {
+      action: 'quick_command', target: 'cf-sh-2', input: 'start', at: '12:01',
+    })
+    expect(rolledBack.isError).toBe(true)
+    expect(parameterized.stores.inputs.records.size).toBe(0)
+    parameterized.stores.inputs.deleteFailure = new Error('input cleanup failed')
+    const cleanupFailed = await call(parameterized, 'scheduled_action_create', {
+      action: 'quick_command', target: 'cf-sh-2', input: 'stop', at: '12:02',
+    })
+    expect(cleanupFailed.isError).toBe(true)
+    expect(parameterized.stores.inputs.records.size).toBe(1)
+    parameterized.stores.inputs.deleteFailure = undefined
+    parameterized.stores.actions.putFailure = undefined
+    await parameterized.scheduled.close()
+
     for (const at of ['2026-09-12T12:01:00+08:00', '2026-09-12T12:02:00+08:00']) {
       await call(test, 'scheduled_action_create', { action: 'ps_check', target: 'cf-sh-2', at })
     }

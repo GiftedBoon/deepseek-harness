@@ -32,6 +32,10 @@ describe('channel-wecom invariant', () => {
       domain: 'channel_wecom_scheduled_action', table: 'actions', operation: 'put', key: 'action',
       value: { conversationKey: 'conversation' },
     })).not.toThrow()
+    expect(() => changed?.({
+      domain: 'channel_wecom_scheduled_action_input', table: 'inputs', operation: 'put', key: 'action',
+      value: { value: 'check' },
+    })).not.toThrow()
   })
 
   it('fails when the domain or referenced conversation is missing', async () => {

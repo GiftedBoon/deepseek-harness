@@ -63,6 +63,13 @@ class ScheduledActionDomain {
   close(): Promise<void> { this.closed++; return Promise.resolve() }
 }
 
+class ScheduledActionInputDomain {
+  readonly inputs = new Table<{ value: string }>()
+  closed = 0
+  table(): Table<{ value: string }> { return this.inputs }
+  close(): Promise<void> { this.closed++; return Promise.resolve() }
+}
+
 class Client implements WeComChannelClient {
   readonly replies: Array<{ frame: unknown; streamId: string; content: string; finish: boolean }> = []
   readonly sends: Array<{ target: string; content: string }> = []
@@ -111,6 +118,7 @@ interface RuntimeHarness {
   readonly client: Client
   readonly domain: Domain
   readonly scheduledActionDomain: ScheduledActionDomain
+  readonly scheduledActionInputDomain: ScheduledActionInputDomain
   readonly config: ResolvedConfig
   readonly calls: string[]
   readonly modelResults: unknown[]
@@ -171,6 +179,7 @@ function harness(options: {
   const client = options.client ?? new Client()
   const domain = options.domain ?? new Domain()
   const scheduledActionDomain = new ScheduledActionDomain()
+  const scheduledActionInputDomain = new ScheduledActionInputDomain()
   const calls: string[] = []
   const modelResults: unknown[] = []
   const persistedSessions = new Set<string>()
@@ -281,13 +290,14 @@ function harness(options: {
     client,
     domain: domain as never,
     scheduledActionDomain: scheduledActionDomain as never,
+    scheduledActionInputDomain: scheduledActionInputDomain as never,
     identitySecret: 'identity',
     workspace: workspace as never,
     modelSelection: { provider: 'provider', model: 'model', reasoningEffort: ReasoningEffortId('high') },
   })
   runtimes.push(runtime)
   return {
-    runtime, client, domain, scheduledActionDomain, config, calls, modelResults, persistedSessions,
+    runtime, client, domain, scheduledActionDomain, scheduledActionInputDomain, config, calls, modelResults, persistedSessions,
     warnings, registeredTools, emit,
   }
 }
@@ -326,6 +336,7 @@ describe('WeComChannelRuntime', () => {
     expect(test.client.disconnected).toBe(1)
     expect(test.domain.closed).toBe(1)
     expect(test.scheduledActionDomain.closed).toBe(1)
+    expect(test.scheduledActionInputDomain.closed).toBe(1)
   })
 
   it('presents only deployment-allowlisted scheduled actions to a mapped Agent', async () => {

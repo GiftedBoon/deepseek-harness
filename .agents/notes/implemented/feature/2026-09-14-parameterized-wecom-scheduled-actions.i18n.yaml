@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-14-parameterized-wecom-scheduled-actions.md
+2026-09-14-parameterized-wecom-scheduled-actions.md: 6560c80e5d8c0e475ef0b6645b71b4b94720a71d
+2026-09-14-parameterized-wecom-scheduled-actions.zh.md: 5143a8843d5b282cb60d7cd359d38fe1b60e55ea

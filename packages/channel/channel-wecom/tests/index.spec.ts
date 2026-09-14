@@ -121,4 +121,10 @@ describe('channel-wecom plugin', () => {
     await expect(apply(test.ctx as never, config())).rejects.toThrow('storage open failed')
     expect(test.calls).toContain('close-domain-1')
   })
+
+  it('closes both earlier domains when the scheduled-action input domain cannot open', async () => {
+    const test = context({ storageFailureAt: 3 })
+    await expect(apply(test.ctx as never, config())).rejects.toThrow('storage open failed')
+    expect(test.calls).toEqual(expect.arrayContaining(['close-domain-2', 'close-domain-1']))
+  })
 })

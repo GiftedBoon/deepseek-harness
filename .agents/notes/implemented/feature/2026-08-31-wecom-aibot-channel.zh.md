@@ -18,7 +18,7 @@ HMAC-SHA-256 把提供方会话和交付 id 映射为稳定的不透明键。单
 
 `channel_wecom` domain 存储会话路由、交付状态与主动发送 outbox。已完成和已失败的重复交付会重放存储文本，不再调用模型。被动流更新采用累计内容、合并刷新、顺序发送与 UTF-8 长度限制。最终被动回复失败时退回到主动 Markdown；再次失败会把结果提交到 outbox 进行有界重试。
 
-可选的部署动作白名单无需保留空闲 Agent，即可增加持久化的未来执行。每个条目固定动作 id、已注册工具名、静态无损 JSON 参数、目标参数、标量或单元素数组目标编码，以及带锚点的目标表达式。Agent 作用域内的管理工具只接受动作 id、目标，以及显式带偏移的时刻或在部署固定 UTC 偏移下下一次发生的 `HH:mm[:ss]`。独立的 `channel_wecom_scheduled_action` domain 保存 pending 与 running 记录，而不改变已发布的 `channel_wecom` generation。
+可选的部署动作白名单无需保留空闲 Agent，即可增加持久化的未来执行。每个条目固定动作 id、已注册工具名、静态无损 JSON 参数、目标参数、标量或单元素数组目标编码，以及带锚点的目标表达式。条目还可以允许一个有长度上限的模型提供字符串参数；其准确值存入独立的 `channel_wecom_scheduled_action_input` domain。Agent 作用域内的管理工具接受动作 id、目标、可选的已配置输入，以及显式带偏移的时刻或在部署固定 UTC 偏移下下一次发生的 `HH:mm[:ss]`。独立的动作与输入 domain 保存 pending 与 running 工作，而不改变已发布的 `channel_wecom` generation 或已发布定时动作记录格式。[参数化企业微信定时动作](2026-09-14-parameterized-wecom-scheduled-actions.zh.md)负责动态输入决策及其安全取舍。
 
 到点时，进程全局调度器会先把 pending 记录改为 running，再在无 Agent 作用域下调用已配置工具。调用仍会经过全局工具 policy 与单调 guard。当前动作指纹必须与创建时的指纹一致；删除或修改定义都会封闭失败。结果会先进入已有持久 outbox，然后删除任务。启动时会重新启用 pending 记录。进程丢失后恢复出的 running 记录会产生结果不确定通知，并且不重放执行，因为远端副作用可能已经完成。
 
@@ -52,7 +52,7 @@ Trader Ops 运维脚本只从 journal 投影被拒绝用户或群聊的时间戳
 
 ## 验证
 
-测试覆盖不透明身份与群聊归属、删除后重新创建、敌对 wire 准入、SDK 日志抑制、UTF-8 限制、累计合并、顺序结束、假时钟到点调度、policy 经过性、pending 重启恢复、取消，以及不重放恢复出的 running 工作。一条无密钥的已记录 Session 会在已组装模型请求中固定三个定时动作 schema。类型检查覆盖 SDK 适配器与 Host service。仓库 gate 覆盖元数据、文档配对、生成目录、依赖策略与 invariant companion。
+测试覆盖不透明身份与群聊归属、删除后重新创建、敌对 wire 准入、SDK 日志抑制、UTF-8 限制、累计合并、顺序结束、假时钟到点调度、参数持久化与校验、policy 经过性、pending 重启恢复、取消，以及不重放恢复出的 running 工作。一条无密钥的已记录 Session 会在已组装模型请求中固定三个定时动作 schema。类型检查覆盖 SDK 适配器与 Host service。仓库 gate 覆盖元数据、文档配对、生成目录、依赖策略与 invariant companion。
 
 ## 结果
 
@@ -60,4 +60,4 @@ Trader Ops 运维脚本只从 journal 投影被拒绝用户或群聊的时间戳
 - Web Workspace 历史仍是权威对话记录。
 - 运维人员必须保留身份密钥并配置明确白名单。
 - 不支持媒体消息、卡片、横向扩展与入站重放。
-- 定时动作必须显式配置，受每会话数量与时间范围约束，并通过渠道 outbox 通知，而不是写入 Session 历史。
+- 定时动作必须显式配置，受每会话数量与时间范围约束，并通过渠道 outbox 通知，而不是写入 Session 历史；参数化条目还会按 UTF-8 字节长度限制持久化输入，并可应用锚定表达式。

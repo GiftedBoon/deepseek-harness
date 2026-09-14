@@ -44,7 +44,7 @@ DeepSeek Harness (web profile)
 | Automatic Git knowledge ingestion | Not implemented | Reviewable add, update, and delete semantics remain required |
 | bssh_ops MCP | Optional, disabled by default | Enable `trader-ops-bssh-ops-mcp.patch.yml` with a root-owned API key |
 | Schedule reminders | Enabled | The Web service applies the Schedule overlay and policy permits its session-local management tools; a due prompt never executes directly |
-| WeCom scheduled `ps_check` | Enabled with WeCom | A durable action maps only `cf-sh-1` or `cf-sh-2` to bssh_ops `run_quick_command` with `command: check`; dispatch still traverses tool policy |
+| WeCom scheduled bssh_ops execution | Enabled with WeCom | Durable actions accept `ps_check`, any current quick-command key, or an exact syntax-checked and user-confirmed custom shell for `cf-sh-1` or `cf-sh-2`; dispatch still traverses tool policy |
 | Harness tool policy | Experimental, enforced | First-match allow/ask/deny plus default deny and an anti-bypass guard |
 | Identity, resource authorization, audit | Not implemented | The Trader Ops MCP server and approval store must enforce them |
 

@@ -8,6 +8,7 @@ import { defineTool, type ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import { snapshotJsonValue, type JsonValue } from '@deepseek-ai/dsh-util-values'
 import type { ResolvedConfig, ScheduledActionConfig } from './config.ts'
 import type { ChannelWeComDomain } from './domain.ts'
+import type { WeComScheduledActionInputDomain } from './scheduled-action-input-domain.ts'
 import type { ScheduledActionRecord, WeComScheduledActionDomain } from './scheduled-action-domain.ts'
 
 const MAX_TIMER_DELAY_MS = 2_147_483_647
@@ -22,6 +23,12 @@ interface ResolvedAction {
   readonly targetArgumentFormat: 'scalar' | 'singleton-array'
   readonly targetPattern: RegExp
   readonly arguments: Readonly<Record<string, JsonValue>>
+  readonly input?: {
+    readonly toolArgument: string
+    readonly description: string
+    readonly maxBytes: number
+    readonly pattern?: RegExp
+  }
   readonly fingerprint: string
 }
 
@@ -29,6 +36,7 @@ interface ScheduledActionsOptions {
   readonly config: ResolvedConfig
   readonly conversations: ChannelWeComDomain
   readonly actions: WeComScheduledActionDomain
+  readonly inputs: WeComScheduledActionInputDomain
   readonly enqueueNotification: (target: string, content: string) => Promise<void>
 }
 
@@ -39,6 +47,7 @@ interface ScheduledActionView extends Record<string, JsonValue> {
   readonly target: string
   readonly runAt: string
   readonly state: 'scheduled' | 'running'
+  readonly input?: string
 }
 
 /** Stable model-facing management failure. */
@@ -68,15 +77,7 @@ export function resolveScheduledActions(configs: readonly ScheduledActionConfig[
     if (targetArgumentFormat !== 'scalar' && targetArgumentFormat !== 'singleton-array') {
       throw new Error(`${label}.targetArgumentFormat must be scalar or singleton-array`)
     }
-    let targetPattern: RegExp
-    try {
-      targetPattern = new RegExp(config.targetPattern)
-    } catch (error: unknown) {
-      throw new Error(`${label}.targetPattern is invalid`, { cause: error })
-    }
-    if (!config.targetPattern.startsWith('^') || !config.targetPattern.endsWith('$')) {
-      throw new Error(`${label}.targetPattern must be anchored with ^ and $`)
-    }
+    const targetPattern = resolvePattern(config.targetPattern, `${label}.targetPattern`)
     const detached = snapshotJsonValue(config.arguments === undefined ? {} : config.arguments)
     if (detached === undefined || detached === null || typeof detached !== 'object' || Array.isArray(detached)) {
       throw new Error(`${label}.arguments must be a lossless-JSON object`)
@@ -84,12 +85,20 @@ export function resolveScheduledActions(configs: readonly ScheduledActionConfig[
     if (Object.hasOwn(detached, config.targetArgument)) {
       throw new Error(`${label}.arguments must not define targetArgument "${config.targetArgument}"`)
     }
+    const input = config.input === undefined ? undefined : resolveInput(config.input, label)
+    if (input?.toolArgument === config.targetArgument) {
+      throw new Error(`${label}.input.toolArgument must differ from targetArgument`)
+    }
+    if (input !== undefined && Object.hasOwn(detached, input.toolArgument)) {
+      throw new Error(`${label}.arguments must not define input.toolArgument "${input.toolArgument}"`)
+    }
     const fingerprint = createHash('sha256').update(JSON.stringify({
       toolName: config.toolName,
       targetArgument: config.targetArgument,
       targetArgumentFormat,
       targetPattern: config.targetPattern,
       arguments: detached,
+      ...config.input === undefined ? {} : { input: config.input },
     })).digest('hex')
     result.set(config.id, Object.freeze({
       id: config.id,
@@ -99,10 +108,43 @@ export function resolveScheduledActions(configs: readonly ScheduledActionConfig[
       targetArgumentFormat,
       targetPattern,
       arguments: Object.freeze(detached as Record<string, JsonValue>),
+      ...input === undefined ? {} : { input: Object.freeze(input) },
       fingerprint,
     }))
   }
   return result
+}
+
+function resolveInput(config: NonNullable<ScheduledActionConfig['input']>, label: string): NonNullable<ResolvedAction['input']> {
+  if (!SAFE_ARGUMENT_NAME.test(config.toolArgument)) {
+    throw new Error(`${label}.input.toolArgument must be a top-level JavaScript identifier`)
+  }
+  if (config.description.trim() === '') throw new Error(`${label}.input.description must be non-empty`)
+  if (!Number.isInteger(config.maxBytes) || config.maxBytes < 1) {
+    throw new Error(`${label}.input.maxBytes must be a positive integer`)
+  }
+  return {
+    toolArgument: config.toolArgument,
+    description: config.description,
+    maxBytes: config.maxBytes,
+    ...config.pattern === undefined ? {} : { pattern: resolvePattern(config.pattern, `${label}.input.pattern`) },
+  }
+}
+
+function resolvePattern(source: string, label: string): RegExp {
+  if (!source.startsWith('^') || !source.endsWith('$')) {
+    throw new Error(`${label} must be anchored with ^ and $`)
+  }
+  try {
+    return new RegExp(source)
+  } catch (error: unknown) {
+    throw new Error(`${label} is invalid`, { cause: error })
+  }
+}
+
+function fullMatch(pattern: RegExp, value: string): boolean {
+  const match = pattern.exec(value)
+  return match !== null && match.index === 0 && match[0].length === value.length
 }
 
 /** Convert a validated fixed UTC offset to milliseconds. */
@@ -150,13 +192,14 @@ function parseRunAt(value: string, now: number, configuredOffset: string): numbe
   return local.getTime() - offsetSign * (offsetHour * 60 + offsetMinute) * 60_000
 }
 
-function view(id: string, record: ScheduledActionRecord): ScheduledActionView {
+function view(id: string, record: ScheduledActionRecord, input?: string): ScheduledActionView {
   return {
     id,
     action: record.actionId,
     target: record.target,
     runAt: new Date(record.runAt).toISOString(),
     state: record.state === 'pending' ? 'scheduled' : 'running',
+    ...input === undefined ? {} : { input },
   }
 }
 
@@ -207,6 +250,10 @@ export class WeComScheduledActions {
         )
       }
       await table.delete(id)
+      await this.options.inputs.table('inputs').delete(id)
+    }
+    for (const [id] of this.options.inputs.table('inputs').entries()) {
+      if (table.get(id) === undefined) await this.options.inputs.table('inputs').delete(id)
     }
   }
 
@@ -234,6 +281,9 @@ export class WeComScheduledActions {
     if (this.definitions.size === 0) return
     const choices = [...this.definitions.values()]
     const description = choices.map(item => `${item.id}: ${item.description}`).join('; ')
+    const inputDescription = choices.flatMap(item => item.input === undefined
+      ? []
+      : [`${item.id}: ${item.input.description}`]).join('; ')
     toolCtx.tools.register(defineTool({
       name: 'scheduled_action_create',
       description: 'Schedule one actual allowlisted action for future background execution. Use this instead of '
@@ -244,6 +294,11 @@ export class WeComScheduledActions {
       parameters: {
         action: { type: 'string', required: true, enum: choices.map(item => item.id) },
         target: { type: 'string', required: true, description: 'Exact target identifier for the selected action.' },
+        input: {
+          type: 'string',
+          description: 'Exact operation input. Required for a parameterized action and omitted for a static action. '
+            + `Parameterized actions: ${inputDescription}`,
+        },
         at: {
           type: 'string',
           required: true,
@@ -254,7 +309,24 @@ export class WeComScheduledActions {
       execute: async (args, _exec): Promise<JsonValue> => {
         // defineTool validates the deployment-derived enum before execution.
         const definition = this.definitions.get(args.action) as ResolvedAction
-        if (!definition.targetPattern.test(args.target)) return error('invalid_target', 'The target is not valid for this action.')
+        if (!fullMatch(definition.targetPattern, args.target)) {
+          return error('invalid_target', 'The target is not valid for this action.')
+        }
+        if (definition.input === undefined && args.input !== undefined) {
+          return error('unexpected_input', 'input must be omitted for this action.')
+        }
+        if (definition.input !== undefined) {
+          if (args.input === undefined || args.input.trim() === '') {
+            return error('input_required', 'input is required for this action.')
+          }
+          if (args.input.includes('\0')) return error('invalid_input', 'input must not contain NUL.')
+          if (Buffer.byteLength(args.input, 'utf8') > definition.input.maxBytes) {
+            return error('input_too_large', 'input exceeds the configured UTF-8 byte limit.')
+          }
+          if (definition.input.pattern !== undefined && !fullMatch(definition.input.pattern, args.input)) {
+            return error('invalid_input', 'input is not valid for this action.')
+          }
+        }
         const now = Date.now()
         const runAt = parseRunAt(args.at, now, this.options.config.scheduledActionUtcOffset)
         if (runAt === undefined) {
@@ -283,9 +355,19 @@ export class WeComScheduledActions {
             createdAt: now,
             updatedAt: now,
           }
-          await table.put(id, record)
+          if (args.input !== undefined) await this.options.inputs.table('inputs').put(id, { value: args.input })
+          try {
+            await table.put(id, record)
+          } catch (failure: unknown) {
+            if (args.input !== undefined) {
+              await this.options.inputs.table('inputs').delete(id).catch((cleanupFailure: unknown) => {
+                throw new AggregateError([failure, cleanupFailure], 'scheduled action creation and input cleanup failed')
+              })
+            }
+            throw failure
+          }
           this.arm(id, runAt)
-          return view(id, record)
+          return view(id, record, args.input)
         })
       },
     }))
@@ -299,7 +381,7 @@ export class WeComScheduledActions {
         return this.serialize(() => Promise.resolve([...this.options.actions.table('actions').entries()]
           .filter(([, record]) => record.sessionId === agent.session.id)
           .sort((left, right) => left[1].createdAt - right[1].createdAt)
-          .map(([id, record]) => view(id, record))))
+          .map(([id, record]) => view(id, record, this.options.inputs.table('inputs').get(id)?.value))))
       },
     }))
 
@@ -315,6 +397,7 @@ export class WeComScheduledActions {
           if (record === undefined || record.sessionId !== agent.session.id) return { id: args.id, deleted: false }
           if (record.state === 'running') return error('already_running', 'The scheduled action is already running.')
           await table.delete(args.id)
+          await this.options.inputs.table('inputs').delete(args.id)
           const timer = this.timers.get(args.id)
           if (timer !== undefined) clearTimeout(timer)
           this.timers.delete(args.id)
@@ -359,8 +442,11 @@ export class WeComScheduledActions {
     })
     if (record === undefined || this.isClosed()) return
     const definition = this.definitions.get(record.actionId)
+    const input = this.options.inputs.table('inputs').get(id)?.value
     let result: ToolExecutionResult | undefined
-    if (definition !== undefined && definition.fingerprint === record.definitionFingerprint) {
+    if (definition !== undefined
+      && definition.fingerprint === record.definitionFingerprint
+      && (definition.input === undefined || input !== undefined)) {
       const timeout = AbortSignal.timeout(this.options.config.scheduledActionTimeoutMs)
       const signal = AbortSignal.any([this.controller.signal, timeout])
       result = await this.ctx.tools.execute({
@@ -368,6 +454,7 @@ export class WeComScheduledActions {
         name: definition.toolName,
         arguments: {
           ...definition.arguments,
+          ...definition.input === undefined ? {} : { [definition.input.toolArgument]: input as string },
           [definition.targetArgument]: definition.targetArgumentFormat === 'scalar'
             ? record.target
             : [record.target],
@@ -386,7 +473,10 @@ export class WeComScheduledActions {
         : result.content.flatMap(block => block.type === 'text' ? [block.text] : []).join('\n')
       await this.options.enqueueNotification(conversation.target, `${this.notification(prefix, record)}\n\n${detail}`)
     }
-    await this.serialize(() => this.options.actions.table('actions').delete(id).then(() => {}))
+    await this.serialize(async () => {
+      await this.options.actions.table('actions').delete(id)
+      await this.options.inputs.table('inputs').delete(id)
+    })
   }
 
   private notification(prefix: string, record: ScheduledActionRecord): string {

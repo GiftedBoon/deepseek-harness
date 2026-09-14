@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-31-wecom-aibot-channel.md
-2026-08-31-wecom-aibot-channel.md: 50835a81d3dd1586eb80b1f6fc4947b1d74f9e68
-2026-08-31-wecom-aibot-channel.zh.md: 673e9334fa89a661a33d734ed2188651448efa44
+2026-08-31-wecom-aibot-channel.md: cc07ed8937295ed9358a47751edf8453e75c5472
+2026-08-31-wecom-aibot-channel.zh.md: 39d3bb4077a32004b577e7f4f40791a570d71a21

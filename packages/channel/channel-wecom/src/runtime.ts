@@ -11,6 +11,7 @@ import type {} from '@deepseek-ai/dsh-session-title'
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type { ResolvedConfig } from './config.ts'
 import type { ChannelWeComDomain } from './domain.ts'
+import type { WeComScheduledActionInputDomain } from './scheduled-action-input-domain.ts'
 import type { WeComScheduledActionDomain } from './scheduled-action-domain.ts'
 import { WeComScheduledActions } from './scheduled-actions.ts'
 import { conversationIdentity, deliveryIdentity } from './identity.ts'
@@ -34,6 +35,7 @@ interface RuntimeOptions {
   readonly client: WeComChannelClient
   readonly domain: ChannelWeComDomain
   readonly scheduledActionDomain: WeComScheduledActionDomain
+  readonly scheduledActionInputDomain: WeComScheduledActionInputDomain
   readonly identitySecret: string
   readonly workspace: Workspace
   readonly modelSelection: ModelSelection
@@ -85,6 +87,7 @@ export class WeComChannelRuntime {
       config: options.config,
       conversations: options.domain,
       actions: options.scheduledActionDomain,
+      inputs: options.scheduledActionInputDomain,
       enqueueNotification: (target, content) => this.enqueueScheduledNotification(target, content),
     })
     this.disposers.push(ctx.on('agent/inbox/claimed', ({ agent, message, turn }) => {
@@ -125,6 +128,7 @@ export class WeComChannelRuntime {
       await Promise.allSettled([...this.conversations.values()])
       await Promise.allSettled([...this.handles].map(handle => handle.dispose()))
       await this.outboxTail
+      await this.options.scheduledActionInputDomain.close()
       await this.options.scheduledActionDomain.close()
       await this.options.domain.close()
     })()

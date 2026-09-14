@@ -393,6 +393,8 @@ export interface ScheduledActionConfig {
   targetPattern: string
   /** Static lossless-JSON arguments merged with the target argument. */
   arguments?: unknown
+  /** Optional model-supplied string argument persisted for due-time dispatch. */
+  input?: ScheduledActionInputConfig
 }
 
 /** Operator-owned user-visible channel messages. */
@@ -415,12 +417,24 @@ export interface ChannelMessages {
   scheduledActionFailure: string
   /** Prefix for a scheduled action whose side-effect outcome is unknown after recovery. */
   scheduledActionUncertain: string
-  /** Detail for a scheduled action whose configured definition is absent or changed at dispatch. */
+  /** Detail for a scheduled action whose definition or required persisted input is unavailable at dispatch. */
   scheduledActionDefinitionUnavailable: string
+}
+
+/** One model-supplied string passed to the scheduled tool at dispatch. */
+export interface ScheduledActionInputConfig {
+  /** Top-level tool argument receiving the model-supplied value. */
+  toolArgument: string
+  /** Model-facing explanation of the required value. */
+  description: string
+  /** Maximum persisted UTF-8 byte length. */
+  maxBytes: number
+  /** Optional anchored regular expression admitting values. */
+  pattern?: string
 }
 ```
 
-来源：[`packages/channel/channel-wecom/src/config.ts:47`](../packages/channel/channel-wecom/src/config.ts)
+来源：[`packages/channel/channel-wecom/src/config.ts:63`](../packages/channel/channel-wecom/src/config.ts)
 
 <a id="deepseek-aidsh-client-connection"></a>
 

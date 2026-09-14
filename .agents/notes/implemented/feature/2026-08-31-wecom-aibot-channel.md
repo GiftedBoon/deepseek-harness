@@ -18,7 +18,7 @@ Each conversation has a process-local promise queue. One delivery observes its d
 
 The `channel_wecom` domain stores conversation routing, delivery state, and an active-send outbox. Completed and failed duplicates replay stored text without another model call. Passive stream updates are cumulative, coalesced, ordered, and UTF-8 bounded. Final passive failure falls back to active Markdown; another failure commits the result to the outbox for bounded retry.
 
-An optional deployment action allowlist adds durable future execution without retaining an idle Agent. Each entry fixes an action id, registered tool name, static lossless-JSON arguments, target argument, scalar or singleton-array target encoding, and anchored target expression. Agent-scoped management tools accept only the action id, target, and either an explicit offset time or the next occurrence of `HH:mm[:ss]` under the deployment's fixed UTC offset. The independent `channel_wecom_scheduled_action` domain preserves pending and running records without changing the released `channel_wecom` generation.
+An optional deployment action allowlist adds durable future execution without retaining an idle Agent. Each entry fixes an action id, registered tool name, static lossless-JSON arguments, target argument, scalar or singleton-array target encoding, and anchored target expression. An entry may also admit one bounded model-supplied string argument; its exact value is stored in the independent `channel_wecom_scheduled_action_input` domain. Agent-scoped management tools accept the action id, target, optional configured input, and either an explicit offset time or the next occurrence of `HH:mm[:ss]` under the deployment's fixed UTC offset. The independent action and input domains preserve pending and running work without changing the released `channel_wecom` generation or the released scheduled-action record format. [Parameterized WeCom scheduled actions](2026-09-14-parameterized-wecom-scheduled-actions.md) owns the dynamic-input decision and its security trade-offs.
 
 At the due time the process-global scheduler moves a pending record to running before invoking the configured tool without an Agent scope. The call still traverses the global tool policy and monotonic guards. The current action fingerprint must match the creation-time fingerprint; removal or change fails closed. The result enters the existing durable outbox before task deletion. Startup rearms pending records. A running record recovered after process loss produces an uncertain-outcome notification and is deleted without replay because the remote side effect may already have completed.
 
@@ -52,7 +52,7 @@ This decision does not supersede [Fire-and-forget webhook Sessions](2026-08-22-f
 
 ## Verification
 
-Tests cover opaque identity and group ownership, fresh creation after deletion, hostile wire admission, SDK log suppression, UTF-8 bounds, cumulative coalescing, ordered finalization, fake-clock due dispatch, policy traversal, pending restart recovery, cancellation, and non-replay of recovered running work. A keyless recorded Session pins the three scheduled-action schemas in the assembled model request. Type checking covers the SDK adapter and Host services. Repository gates cover metadata, documentation pairing, generated catalogs, dependency policy, and the invariant companion.
+Tests cover opaque identity and group ownership, fresh creation after deletion, hostile wire admission, SDK log suppression, UTF-8 bounds, cumulative coalescing, ordered finalization, fake-clock due dispatch, parameter persistence and validation, policy traversal, pending restart recovery, cancellation, and non-replay of recovered running work. A keyless recorded Session pins the three scheduled-action schemas in the assembled model request. Type checking covers the SDK adapter and Host services. Repository gates cover metadata, documentation pairing, generated catalogs, dependency policy, and the invariant companion.
 
 ## Consequences
 
@@ -60,4 +60,4 @@ Tests cover opaque identity and group ownership, fresh creation after deletion, 
 - Web Workspace history remains the authoritative conversation record.
 - Operators must preserve the identity key and configure explicit allowlists.
 - Media messages, cards, horizontal scaling, and inbound replay are unsupported.
-- Scheduled actions are explicitly configured, bounded per conversation and by time horizon, and notify through the channel outbox rather than Session history.
+- Scheduled actions are explicitly configured, bounded per conversation and by time horizon, and notify through the channel outbox rather than Session history; parameterized entries also bound the persisted input by UTF-8 byte length and may apply an anchored expression.

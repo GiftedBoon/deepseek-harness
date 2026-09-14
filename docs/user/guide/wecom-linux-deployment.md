@@ -295,12 +295,12 @@ Create `/var/lib/deepseek-harness/profiles/wecom/cordis.patch.yml`. Replace ever
           scheduledActionSuccess: '定时动作执行成功'
           scheduledActionFailure: '定时动作执行失败'
           scheduledActionUncertain: '定时动作的执行结果不确定；系统未自动重放'
-          scheduledActionDefinitionUnavailable: '定时动作的配置已变更或被移除'
+          scheduledActionDefinitionUnavailable: '定时动作的配置已变更、被移除或缺少已保存输入'
 ```
 
 Use `allowedChats: []` until group access is separately approved. Add exact group ids instead of `"*"` when group access is enabled.
 
-`scheduledActions` defaults to an empty list. Configure it only when this unattended channel must execute a narrow deployment-allowlisted tool at a future time; each entry fixes the tool name and static arguments, validates the model-supplied target with an anchored expression, and still passes through dispatch-time tool policy. `targetArgumentFormat` defaults to `scalar`; set it to `singleton-array` only for a downstream argument that requires a one-element target array. Never expose an arbitrary-shell action or store a secret in static arguments.
+`scheduledActions` defaults to an empty list. Configure it only when this unattended channel must execute a deployment-approved tool at a future time; each entry fixes the tool name and static arguments, validates the model-supplied target with an anchored expression, and still passes through dispatch-time tool policy. `targetArgumentFormat` defaults to `scalar`; set it to `singleton-array` only for a downstream argument that requires a one-element target array. An optional `input` declaration can persist one model-supplied string for a configured tool argument; set a narrow UTF-8 byte limit and an anchored pattern when the value has a closed syntax. Arbitrary-shell actions require exact user confirmation and syntax validation before scheduling. Never persist credentials or other sensitive values in either static arguments or dynamic input.
 
 Protect the profile files:
 

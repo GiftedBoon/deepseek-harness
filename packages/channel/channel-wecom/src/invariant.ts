@@ -14,7 +14,9 @@ export const inject = ['invariants']
 /** Ensure every durable delivery and scheduled action references a durable channel conversation. */
 const install: InvariantInstaller = Object.assign((ctx: Context, fail: InvariantFailure) => {
   ctx.on('domain/changed', (change: DomainChanged) => {
-    if (change.domain !== 'channel_wecom' && change.domain !== 'channel_wecom_scheduled_action') return
+    if (change.domain !== 'channel_wecom'
+      && change.domain !== 'channel_wecom_scheduled_action'
+      && change.domain !== 'channel_wecom_scheduled_action_input') return
     const domain = ctx.storage.form('domain').get(change.domain)
     if (domain === undefined) {
       return fail(`${change.domain} domain change has no open authoritative domain`)

@@ -26,7 +26,11 @@ description: Operate the bssh_ops quantitative-trading remote operations MCP ser
 
 ## 未来时刻执行
 
-当用户要求在未来时刻执行操作，且 `scheduled_action_create` 的 `action` 枚举包含对应的部署白名单动作时，必须调用 `scheduled_action_create`，并把用户给出的目标与时间原样映射到 `target` 和 `at`。不得立即调用 bssh_ops 写工具，不得用 bash 查询时间或等待，也不得改用只发送会话消息的 `schedule_create`。只有 `scheduled_action_create` 返回成功后，才能说明动作已经安排；如果所需动作不在枚举中，应明确说明该动作没有获准定时执行。
+用户要求在未来时刻执行快捷命令时，先调用 `list_quick_commands` 获取当前清单，再调用 `scheduled_action_create`：`action` 使用 `quick_command`，`target` 和 `at` 原样使用用户给出的目标与时间，`input` 使用清单返回的准确 key。不得猜测、改写或使用未返回的 key；清单在到点前变更时，bssh_ops 会在执行时拒绝失效的 key。`ps_check` 是兼容入口；普通流程仍使用 `quick_command` 和 `input: check`。
+
+用户要求在未来时刻执行自定义 shell 时，先调用 `check_shell_syntax`，向用户展示准确目标、完整命令、预期影响和回滚方式并取得明确确认，再调用 `scheduled_action_create`：`action` 使用 `custom_shell`，`target` 和 `at` 使用已确认的目标与时间，`input` 使用已确认且通过语法检查的原始命令。不得在定时记录中放入密码、令牌或其他敏感值。
+
+未来执行请求不得立即调用 bssh_ops 写工具，不得用 bash 查询时间或等待，也不得改用只发送会话消息的 `schedule_create`。只有 `scheduled_action_create` 返回成功后，才能说明动作已经安排；如果所需动作不在枚举中，应明确说明该动作没有获准定时执行。
 
 ## 产品级操作流程
 
@@ -66,7 +70,7 @@ description: Operate the bssh_ops quantitative-trading remote operations MCP ser
 
 ## 自定义命令与安全边界
 
-- 自己拼接 `custom_shell` 时，先调用 `check_shell_syntax`，再请求用户确认，最后才调用写操作工具。
+- 自己拼接 `custom_shell` 时，先调用 `check_shell_syntax`，再请求用户确认，最后才立即执行或创建定时动作。
 - `run_quick_command` 的自定义命令必须说明目标 colo、命令全文、预期影响和回滚方式。
 - 任何涉及生产策略进程、配置、文件覆盖或复制的写操作都需要用户明确确认；没有收到确认时停止，不调用写工具。
 - 不要把实时状态、产品归属或动作定义写入知识库；它们必须来自本次 MCP 查询。

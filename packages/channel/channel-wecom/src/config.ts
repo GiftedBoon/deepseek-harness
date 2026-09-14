@@ -23,8 +23,20 @@ export interface ChannelMessages {
   scheduledActionFailure: string
   /** Prefix for a scheduled action whose side-effect outcome is unknown after recovery. */
   scheduledActionUncertain: string
-  /** Detail for a scheduled action whose configured definition is absent or changed at dispatch. */
+  /** Detail for a scheduled action whose definition or required persisted input is unavailable at dispatch. */
   scheduledActionDefinitionUnavailable: string
+}
+
+/** One model-supplied string passed to the scheduled tool at dispatch. */
+export interface ScheduledActionInputConfig {
+  /** Top-level tool argument receiving the model-supplied value. */
+  toolArgument: string
+  /** Model-facing explanation of the required value. */
+  description: string
+  /** Maximum persisted UTF-8 byte length. */
+  maxBytes: number
+  /** Optional anchored regular expression admitting values. */
+  pattern?: string
 }
 
 /** Deployment-owned allowlisted action available to the WeCom scheduling tools. */
@@ -43,6 +55,8 @@ export interface ScheduledActionConfig {
   targetPattern: string
   /** Static lossless-JSON arguments merged with the target argument. */
   arguments?: unknown
+  /** Optional model-supplied string argument persisted for due-time dispatch. */
+  input?: ScheduledActionInputConfig
 }
 
 /** Enterprise WeCom channel configuration. */
@@ -128,6 +142,12 @@ export const Config: z<Config> = z.object({
     targetArgumentFormat: z.union(['scalar', 'singleton-array']).default('scalar'),
     targetPattern: z.string().required(),
     arguments: z.any().default({}),
+    input: z.object({
+      toolArgument: z.string().required(),
+      description: z.string().required(),
+      maxBytes: z.number().min(1).required(),
+      pattern: z.string(),
+    }),
   })).default([]),
   maxScheduledActionsPerConversation: z.number().min(1).default(32),
   maxScheduledActionDelayMs: z.number().min(1).default(31_536_000_000),

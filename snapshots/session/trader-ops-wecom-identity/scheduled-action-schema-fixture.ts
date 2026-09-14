@@ -28,20 +28,50 @@ export const inject = ['tools']
 export function apply(ctx: Context): () => Promise<void> {
   const config = {
     scheduledActionUtcOffset: '+08:00',
-    scheduledActions: [{
-      id: 'ps_check',
-      description: 'Run the bssh_ops allowlisted read-only "ps check" quick command on one colo.',
-      toolName: 'mcp__bssh-ops-remote__run_quick_command',
-      targetArgument: 'colos',
-      targetArgumentFormat: 'singleton-array',
-      targetPattern: '^cf-sh-(?:1|2)$',
-      arguments: { command: 'check' },
-    }],
+    scheduledActions: [
+      {
+        id: 'ps_check',
+        description: 'Run the bssh_ops allowlisted read-only "ps check" quick command on one colo.',
+        toolName: 'mcp__bssh-ops-remote__run_quick_command',
+        targetArgument: 'colos',
+        targetArgumentFormat: 'singleton-array',
+        targetPattern: '^cf-sh-(?:1|2)$',
+        arguments: { command: 'check' },
+      },
+      {
+        id: 'quick_command',
+        description: 'Run any quick-command key currently configured by bssh_ops on one colo; list the keys before scheduling.',
+        toolName: 'mcp__bssh-ops-remote__run_quick_command',
+        targetArgument: 'colos',
+        targetArgumentFormat: 'singleton-array',
+        targetPattern: '^cf-sh-(?:1|2)$',
+        arguments: {},
+        input: {
+          toolArgument: 'command', description: 'Exact key returned by list_quick_commands.', maxBytes: 128,
+          pattern: '^[A-Za-z0-9_.-]+$',
+        },
+      },
+      {
+        id: 'custom_shell',
+        description: 'Run an exact user-confirmed custom shell command through bssh_ops on one colo after checking its syntax.',
+        toolName: 'mcp__bssh-ops-remote__run_quick_command',
+        targetArgument: 'colos',
+        targetArgumentFormat: 'singleton-array',
+        targetPattern: '^cf-sh-(?:1|2)$',
+        arguments: {},
+        input: {
+          toolArgument: 'custom_shell',
+          description: 'Exact user-confirmed shell command that passed check_shell_syntax.',
+          maxBytes: 16_384,
+        },
+      },
+    ],
   } as ResolvedConfig
   const scheduler = new WeComScheduledActions(ctx, {
     config,
     conversations: { table: () => new MemoryTable() } as never,
     actions: { table: () => new MemoryTable() } as never,
+    inputs: { table: () => new MemoryTable() } as never,
     enqueueNotification: () => Promise.resolve(),
   })
   scheduler.register(ctx, { session: { id: 'snapshot-wecom' } } as Agent, 'snapshot-conversation')

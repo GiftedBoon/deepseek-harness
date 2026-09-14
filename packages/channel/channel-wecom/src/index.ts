@@ -9,6 +9,7 @@ import { isAbsolute } from 'node:path'
 import { OfficialWeComClient } from './client.ts'
 import { Config, type ResolvedConfig } from './config.ts'
 import { channelWeComDomainSpec } from './domain.ts'
+import { weComScheduledActionInputDomainSpec } from './scheduled-action-input-domain.ts'
 import { weComScheduledActionDomainSpec } from './scheduled-action-domain.ts'
 import { WeComChannelRuntime } from './runtime.ts'
 import { resolveScheduledActions } from './scheduled-actions.ts'
@@ -50,6 +51,14 @@ export function apply(ctx: Context, config: Config): Promise<void> {
       await domain.close()
       throw error
     }
+    let scheduledActionInputDomain
+    try {
+      scheduledActionInputDomain = await ctx.storageDomain.open(weComScheduledActionInputDomainSpec)
+    } catch (error: unknown) {
+      await scheduledActionDomain.close()
+      await domain.close()
+      throw error
+    }
     const runtime = new WeComChannelRuntime(ctx, {
       config: resolved,
       client: new OfficialWeComClient({
@@ -59,6 +68,7 @@ export function apply(ctx: Context, config: Config): Promise<void> {
       }),
       domain,
       scheduledActionDomain,
+      scheduledActionInputDomain,
       identitySecret: identity.value,
       workspace,
       modelSelection: ctx.agentDefaultModel.currentSelection(),
