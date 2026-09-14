@@ -392,7 +392,7 @@ export interface ScheduledActionConfig {
   /** Static lossless-JSON arguments merged with the target argument. */
   arguments?: unknown
   /** Optional model-supplied string argument persisted for due-time dispatch. */
-  input?: ScheduledActionInputConfig
+  input?: ScheduledActionInputConfig | undefined
 }
 
 /** Operator-owned user-visible channel messages. */
