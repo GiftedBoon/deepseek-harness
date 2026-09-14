@@ -16,6 +16,7 @@ description: Operate the bssh_ops quantitative-trading remote operations MCP ser
 - `list_runs`、`get_run_status`：查询执行记录和状态。
 - `list_product_actions`：列出产品级动作定义。
 - `preview_product_action`：解析产品归属、渲染命令并做语法检查，不连接远端执行。
+- `list_colos_for_index`：按 Index 或产品分类批量解析产品及其全部 colo，不连接远端执行。
 - `list_change_cfg_paras_runs`：查询改参 preview/deploy 审计记录。
 - `check_shell_syntax`：对自定义 shell 命令做语法检查。
 
@@ -40,6 +41,12 @@ description: Operate the bssh_ops quantitative-trading remote operations MCP ser
 5. 返回 `run_id`、每台 colo 的结果和失败信息；不要声称未返回的操作成功。
 
 不要把 `stop_signal`、`start_signal`、`stop_trader` 或 `start_trader` 当作产品级动作。这些命令影响整台机器，可能连带其他产品。产品操作只能使用经过评审、明确只影响该产品的 `product_ops_actions.json` 动作。
+
+## Index 与分类批量操作
+
+按 Index 或产品分类批量选择机器时，先调用 `list_colos_for_index`，再向用户完整展示返回的 `products`、`colos` 及其数量。若产品或 colo 为空，说明未匹配到目标并停止，不能自行补充机器。
+
+将解析结果的数量级与用户预期核对；出现明显差异时停止并核实 Index、分类及当天产品归属。即使后续只执行 `ps check` 等只读快捷命令，也必须先取得用户对完整范围的明确确认，再把确认后的 `colos` 原样传给 `run_quick_command`。
 
 ## 盘中改参与策略启停
 
