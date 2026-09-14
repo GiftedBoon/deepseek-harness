@@ -64,7 +64,7 @@ ssh -t dsh-server \
   'sudo env TRADER_OPS_LAN_HOST=192.168.4.103 bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-debian-runtime.sh'
 ```
 
-在隐藏提示处输入已轮换的 AIHubMix key。脚本默认使用 `https://api.inferera.com/v1` 和 `deepseek-v4-flash-0731`，生成独立的 OpenViking root key，写入权限为 `0600` 的环境文件，启动 OpenViking，创建 `trader-ops/remote-admin` 租户身份，保存权限更窄的 user key，安装固定版本的 DSH 插件，并在加载 Trader Ops 插件的情况下验证一次真实远程模型回合。脚本会持久化显式传入的 `TRADER_OPS_LAN_HOST`，通过 `--trusted-host` 向 Harness 声明该 authority，并配置 systemd socket proxy，而不会改变 Harness 的回环监听。然后它会要求两条访问路径都成功响应或返回预期的 `401` 身份验证挑战，并确认 systemd 重启次数在十秒内保持稳定。Harness 单元在两分钟内启动失败五次后会停止重试。
+在隐藏提示处输入已轮换的 AIHubMix key。脚本默认使用 `https://api.inferera.com/v1` 和 `deepseek-v4.1-flash`，生成独立的 OpenViking root key，写入权限为 `0600` 的环境文件，启动 OpenViking，创建 `trader-ops/remote-admin` 租户身份，保存权限更窄的 user key，安装固定版本的 DSH 插件，并在加载 Trader Ops 插件的情况下验证一次真实远程模型回合。脚本会持久化显式传入的 `TRADER_OPS_LAN_HOST`，通过 `--trusted-host` 向 Harness 声明该 authority，并配置 systemd socket proxy，而不会改变 Harness 的回环监听。然后它会要求两条访问路径都成功响应或返回预期的 `401` 身份验证挑战，并确认 systemd 重启次数在十秒内保持稳定。Harness 单元在两分钟内启动失败五次后会停止重试。
 
 配置器可继续执行：环境文件存在后会复用它，不会再次询问或覆盖凭据。如果 OpenViking account 已存在但租户 key 仍为空，它会只重新生成该 admin key 并保存新值。Harness 永远不会取得 root key。
 
