@@ -30,7 +30,7 @@ description: Operate the bssh_ops quantitative-trading remote operations MCP ser
 
 用户要求在未来时刻执行自定义 shell 时，先调用 `check_shell_syntax`，向用户展示准确目标、完整命令、预期影响和回滚方式并取得明确确认，再调用 `scheduled_action_create`：`action` 使用 `custom_shell`，`target` 和 `at` 使用已确认的目标与时间，`input` 使用已确认且通过语法检查的原始命令。不得在定时记录中放入密码、令牌或其他敏感值。
 
-未来执行请求不得立即调用 bssh_ops 写工具，不得用 bash 查询时间或等待，也不得改用只发送会话消息的 `schedule_create`。只有 `scheduled_action_create` 返回成功后，才能说明动作已经安排；如果所需动作不在枚举中，应明确说明该动作没有获准定时执行。
+未来执行请求不得立即调用 bssh_ops 写工具，不得用 bash 查询时间或等待，也不得改用只发送会话消息的 `schedule_create`。只有 `scheduled_action_create` 返回成功后，才能说明动作已经安排；如果所需动作不在枚举中，应说明该动作没有列入本部署的可定时动作清单——这是部署配置的选择，不代表该工具或 bssh_ops 缺少定时执行能力——并列出当前枚举中可用的动作。
 
 ## 产品级操作流程
 
