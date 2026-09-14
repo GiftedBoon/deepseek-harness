@@ -56,7 +56,7 @@ export interface ScheduledActionConfig {
   /** Static lossless-JSON arguments merged with the target argument. */
   arguments?: unknown
   /** Optional model-supplied string argument persisted for due-time dispatch. */
-  input?: ScheduledActionInputConfig
+  input?: ScheduledActionInputConfig | undefined
 }
 
 /** Enterprise WeCom channel configuration. */
@@ -142,12 +142,15 @@ export const Config: z<Config> = z.object({
     targetArgumentFormat: z.union(['scalar', 'singleton-array']).default('scalar'),
     targetPattern: z.string().required(),
     arguments: z.any().default({}),
-    input: z.object({
-      toolArgument: z.string().required(),
-      description: z.string().required(),
-      maxBytes: z.number().min(1).required(),
-      pattern: z.string(),
-    }),
+    input: z.union([
+      z.object({
+        toolArgument: z.string().required(),
+        description: z.string().required(),
+        maxBytes: z.number().min(1).required(),
+        pattern: z.string(),
+      }),
+      z.const(undefined),
+    ]).default(undefined),
   })).default([]),
   maxScheduledActionsPerConversation: z.number().min(1).default(32),
   maxScheduledActionDelayMs: z.number().min(1).default(31_536_000_000),

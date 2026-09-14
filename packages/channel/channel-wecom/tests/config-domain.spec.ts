@@ -19,7 +19,8 @@ function requiredConfig(): Record<string, unknown> {
 
 describe('WeCom configuration and domain', () => {
   it('materializes deployment defaults and declares durable tables', () => {
-    expect(Config(requiredConfig() as never)).toMatchObject({
+    const parsed = Config(requiredConfig() as never)
+    expect(parsed).toMatchObject({
       groupConversationMode: 'shared', connectTimeoutMs: 15_000, streamFlushIntervalMs: 250,
       maxInputBytes: 32_768, maxReplyBytes: 20_480, turnTimeoutMs: 300_000,
       deliveryRetentionMs: 604_800_000, maxDeliveryRecords: 10_000,
@@ -28,6 +29,7 @@ describe('WeCom configuration and domain', () => {
       maxScheduledActionDelayMs: 31_536_000_000, scheduledActionTimeoutMs: 300_000,
       scheduledActionUtcOffset: 'Z',
     })
+    expect(parsed.scheduledActions).toEqual([])
     expect(channelWeComDomainSpec).toMatchObject({
       name: 'channel_wecom', version: 1,
       tables: { conversations: {}, deliveries: {}, outbox: {} },
@@ -71,5 +73,16 @@ describe('WeCom configuration and domain', () => {
         input: { toolArgument: 'command', description: 'Exact configured key.', maxBytes: 0 },
       }],
     } as never)).toThrow()
+  })
+
+  it('keeps static scheduled actions valid without a model-supplied input', () => {
+    const parsed = Config({
+      ...requiredConfig(),
+      scheduledActions: [{
+        id: 'ps_check', description: 'Run ps check.', toolName: 'quick',
+        targetArgument: 'colos', targetPattern: '^cf-sh-[12]$', arguments: { command: 'check' },
+      }],
+    } as never)
+    expect(parsed.scheduledActions?.[0]?.input).toBeUndefined()
   })
 })
