@@ -14,13 +14,13 @@ Status: implemented
 
 动态值存入版本化的 `channel_wecom_scheduled_action_input` storage domain，并以定时动作 id 为 key。创建流程先写输入，再提交动作；动作提交失败时删除输入。启动时删除没有对应动作的输入记录。参数化记录缺少输入时，调度器拒绝执行；否则只把该值注入已配置的顶层参数，并在通知后删除两条记录。恢复出的 running 动作不会重放，同时删除两条记录。已发布的 `channel_wecom_scheduled_action` 记录及静态定义指纹保持不变。
 
-Trader Ops 配置 `quick_command`，将安全 key 写入 bssh_ops `run_quick_command.command`；配置 `custom_shell`，将准确命令写入 `run_quick_command.custom_shell`。两者仍将目标限制为 `cf-sh-1` 或 `cf-sh-2`。bssh_ops Skill 会在定时 key 前获取当前快捷命令清单。对于自定义 shell，它会检查语法，展示准确目标、完整命令、预期影响和回滚方式，并在定时前要求用户明确确认。持久化输入禁止包含密钥。到点执行仍经过 Harness 工具策略，bssh_ops 继续负责自身的命令校验、授权与审计。
+Trader Ops 配置 `quick_command`，将安全 key 写入 bssh_ops `run_quick_command.command`；配置 `custom_shell`，将准确命令写入 `run_quick_command.custom_shell`。两者接受任意非空单行目标，实际目标由 bssh_ops 在派发时授权。bssh_ops Skill 会在定时 key 前获取当前快捷命令清单。对于自定义 shell，它会检查语法，展示准确目标、完整命令、预期影响和回滚方式，并在定时前要求用户明确确认。持久化输入禁止包含密钥。到点执行仍经过 Harness 工具策略，bssh_ops 继续负责自身的命令校验、授权与审计。
 
 静态 `ps_check` 兼容动作继续保留。它已有的指纹和 pending 记录可跨本次发布继续工作。
 
 ## 安全与恢复
 
-参数化输入提高了定时记录的权限，任意 shell 尤其如此。用户确认要求属于 Agent 工作流规则，并非加密审批令牌；需要独立强制审批的部署必须先增加持久审批能力，再暴露 `custom_shell`。当前部署依赖企业微信准入白名单、受限非交互 Agent preset、准确目标表达式、Harness 工具策略、MCP 身份验证、bssh_ops 授权与审计，以及持久化输入禁止凭据的规则。
+参数化输入提高了定时记录的权限，任意 shell 尤其如此。用户确认要求属于 Agent 工作流规则，并非加密审批令牌；需要独立强制审批的部署必须先增加持久审批能力，再暴露 `custom_shell`。当前部署依赖企业微信准入白名单、受限非交互 Agent preset、Harness 工具策略、MCP 身份验证、bssh_ops 授权与审计，以及持久化输入禁止凭据的规则。
 
 调度器在派发前提交 running，并且绝不重复执行恢复出的 running 操作。这在进程丢失时保持至多一次派发，但可能报告结果不确定。bssh_ops 调用通常会在远端命令结束前返回 `run_id`，所以到期通知报告已接受触发；最终命令输出仍可通过 `get_run_status` 和提供方审计记录获取。
 

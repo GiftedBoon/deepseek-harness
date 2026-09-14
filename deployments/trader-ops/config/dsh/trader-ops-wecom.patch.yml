@@ -49,13 +49,15 @@
         allowedChats: !!js (process.env.WECOM_ALLOWED_CHATS ?? '').split(',').map(value => value.trim()).filter(Boolean)
         groupConversationMode: !!js process.env.WECOM_GROUP_CONVERSATION_MODE ?? 'shared'
         scheduledActionUtcOffset: '+08:00'
+        # Targets are not restricted to a colo list. The pattern rejects only
+        # empty and multi-line targets; bssh_ops authorizes the exact target.
         scheduledActions:
           - id: ps_check
             description: Run the bssh_ops allowlisted read-only "ps check" quick command on one colo.
             toolName: mcp__bssh-ops-remote__run_quick_command
             targetArgument: colos
             targetArgumentFormat: singleton-array
-            targetPattern: '^cf-sh-(?:1|2)$'
+            targetPattern: '^.+$'
             arguments:
               command: check
           - id: quick_command
@@ -63,7 +65,7 @@
             toolName: mcp__bssh-ops-remote__run_quick_command
             targetArgument: colos
             targetArgumentFormat: singleton-array
-            targetPattern: '^cf-sh-(?:1|2)$'
+            targetPattern: '^.+$'
             input:
               toolArgument: command
               description: Exact key returned by list_quick_commands.
@@ -74,7 +76,7 @@
             toolName: mcp__bssh-ops-remote__run_quick_command
             targetArgument: colos
             targetArgumentFormat: singleton-array
-            targetPattern: '^cf-sh-(?:1|2)$'
+            targetPattern: '^.+$'
             input:
               toolArgument: custom_shell
               description: Exact user-confirmed shell command that passed check_shell_syntax.

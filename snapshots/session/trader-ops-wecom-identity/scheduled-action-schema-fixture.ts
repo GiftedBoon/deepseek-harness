@@ -35,7 +35,7 @@ export function apply(ctx: Context): () => Promise<void> {
         toolName: 'mcp__bssh-ops-remote__run_quick_command',
         targetArgument: 'colos',
         targetArgumentFormat: 'singleton-array',
-        targetPattern: '^cf-sh-(?:1|2)$',
+        targetPattern: '^.+$',
         arguments: { command: 'check' },
       },
       {
@@ -44,7 +44,7 @@ export function apply(ctx: Context): () => Promise<void> {
         toolName: 'mcp__bssh-ops-remote__run_quick_command',
         targetArgument: 'colos',
         targetArgumentFormat: 'singleton-array',
-        targetPattern: '^cf-sh-(?:1|2)$',
+        targetPattern: '^.+$',
         arguments: {},
         input: {
           toolArgument: 'command', description: 'Exact key returned by list_quick_commands.', maxBytes: 128,
@@ -57,7 +57,7 @@ export function apply(ctx: Context): () => Promise<void> {
         toolName: 'mcp__bssh-ops-remote__run_quick_command',
         targetArgument: 'colos',
         targetArgumentFormat: 'singleton-array',
-        targetPattern: '^cf-sh-(?:1|2)$',
+        targetPattern: '^.+$',
         arguments: {},
         input: {
           toolArgument: 'custom_shell',

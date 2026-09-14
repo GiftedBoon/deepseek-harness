@@ -44,7 +44,7 @@ DeepSeek Harness (web profile)
 | Git 知识自动入库 | 未实现 | 必须单独实现评审、提交、更新和删除语义 |
 | bssh_ops MCP | 可选、默认关闭 | 使用 root 所有的 API key 启用 `trader-ops-bssh-ops-mcp.patch.yml` |
 | Schedule 提醒 | 已启用 | Web 服务应用 Schedule overlay，策略允许其 Session 内管理工具；到期 prompt 绝不直接执行 |
-| 企业微信定时执行 bssh_ops | 随企业微信启用 | 持久动作允许对 `cf-sh-1` 或 `cf-sh-2` 执行 `ps_check`、任意当前快捷命令 key，或经过语法检查并由用户准确确认的自定义 shell；执行时仍经过工具策略 |
+| 企业微信定时执行 bssh_ops | 随企业微信启用 | 持久动作允许对任意非空目标执行 `ps_check`、任意当前快捷命令 key，或经过语法检查并由用户准确确认的自定义 shell；执行时仍经过工具策略，具体目标由 bssh_ops 授权 |
 | Harness 工具策略 | 实验性、已强制执行 | 首条匹配 allow/ask/deny、默认拒绝，并带防绕过 guard |
 | 身份、资源授权、审计 | 未实现 | 必须由 Trader Ops MCP 服务和审批存储强制执行 |
 
