@@ -161,7 +161,7 @@ function harness(options: {
   const createHandle = async (agentOptions: {
     sessionId?: string
     resumeSessionId?: string
-    setup?: (ctx: unknown) => Promise<void>
+    setup?: (ctx: unknown, agent: unknown) => Promise<void>
     agentOptions?: unknown
   }, operation: 'create' | 'resume') => {
     calls.push(operation)
@@ -196,12 +196,11 @@ function harness(options: {
     }
     const requestListeners: Array<(_payload: unknown, next: () => Promise<unknown>) => Promise<unknown>> = []
     await agentOptions.setup?.({
-      agent,
       on: (name: string, listener: (_payload: unknown, next: () => Promise<unknown>) => Promise<unknown>) => {
         if (name === 'agent/request') requestListeners.push(listener)
         return () => {}
       },
-    })
+    }, agent)
     for (const listener of requestListeners) {
       modelResults.push(await listener({}, async () => ({ provider: 'provider', model: 'model', reasoningEffort: 'low', temperature: 1 })))
       modelResults.push(await listener({}, async () => ({ provider: 'other', model: 'model' })))

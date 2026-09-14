@@ -37,12 +37,9 @@ interface RuntimeOptions {
 }
 
 /** Apply the creation-time model selection until the first request header exists. */
-function installInitialModelSelection(agentCtx: Context, selection: ModelSelection): void {
+function installInitialModelSelection(agentCtx: Context, agent: Agent, selection: ModelSelection): void {
   agentCtx.on('agent/request', async (_payload, next): Promise<LlmCallConfig> => {
     const resolved = await next()
-    const agent = agentCtx.agent
-    /* v8 ignore next -- AgentRegistry setup always provides its unpublished Agent. */
-    if (agent === undefined) throw new Error('channel-wecom: Agent setup has no scoped Agent')
     if (agent.session.requestHeader() !== undefined
       || resolved.provider !== selection.provider
       || resolved.model !== selection.model) return resolved
@@ -206,9 +203,9 @@ export class WeComChannelRuntime {
   private async runAgent(sessionId: SessionId, delivery: WeComTextDelivery, stream: WeComReplyStream): Promise<string> {
     if (this.ctx.agents.get(sessionId) !== undefined) throw new Error(`channel-wecom: Session is already active: ${sessionId}`)
     const existing = await this.ctx.sessionPersistence.stat(sessionId, { signal: this.controller.signal }) !== undefined
-    const setup = async (agentCtx: Context): Promise<void> => {
+    const setup = async (agentCtx: Context, agent: Agent): Promise<void> => {
       await this.ctx.agentPresets.mount(agentCtx, this.options.config.agentPreset)
-      installInitialModelSelection(agentCtx, this.options.modelSelection)
+      installInitialModelSelection(agentCtx, agent, this.options.modelSelection)
     }
     const agentOptions = { provider: this.options.modelSelection.provider, model: this.options.modelSelection.model }
     const handle = existing
