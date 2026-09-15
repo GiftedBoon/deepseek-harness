@@ -123,6 +123,8 @@ case "$llm_provider" in
     ;;
 esac
 
+node "$deployment_root/scripts/verify-skill-tool-policy.mjs" "$repo_root" "$deployment_root"
+
 skill_count="$(find "$deployment_root/skills" -mindepth 2 -maxdepth 2 -name SKILL.md -type f | wc -l | tr -d ' ')"
 knowledge_count=0
 empty_knowledge_count=0

@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-11-bssh-ops-mcp.md
-2026-09-11-bssh-ops-mcp.md: faa600116fea179bc1e40299e54c9308ab101603
-2026-09-11-bssh-ops-mcp.zh.md: a37da07d0f000b240a16bbf75cc98fd701c99055
+2026-09-11-bssh-ops-mcp.md: b3e06f04fe38f3975efe03387d0b288e4a135dfa
+2026-09-11-bssh-ops-mcp.zh.md: 9cc7601a8fc9bdc12a83acd14f0ccc365a24478e

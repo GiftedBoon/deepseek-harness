@@ -154,7 +154,7 @@ sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure
 sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-bssh-ops-mcp.sh --disable
 ```
 
-启用后，工具会以 `mcp__bssh-ops-remote__` 为前缀出现。`policies/tool-access.yaml` 允许三个精确的写工具直接通过 Harness policy；`bssh-ops` Skill 仍要求预览和用户明确确认，MCP 服务负责下游授权与审计。不要把 API key 写入 patch、Skill、命令参数或工单。
+启用后，工具会以 `mcp__bssh-ops-remote__` 为前缀出现。`policies/tool-access.yaml` 对 `bssh-ops` Skill 和定时动作引用的每个工具做了分类并全部解析为 `allow`，不经过 Harness 审批；`scripts/verify-skill-tool-policy.mjs` 会拒绝策略判定为拒绝的引用工具。Skill 仍要求预览和用户明确确认，MCP 服务负责下游授权与审计。不要把 API key 写入 patch、Skill、命令参数或工单。
 
 企业微信 patch 暴露三个持久 bssh_ops 动作，接受任意非空目标：静态的 `ps_check` 兼容动作、使用 `list_quick_commands` 返回准确 key 的 `quick_command`，以及使用已通过 `check_shell_syntax` 并经用户准确确认命令的 `custom_shell`。动态输入具有 UTF-8 长度限制，独立于已发布的动作记录持久保存，并且只会在到点时传给 `run_quick_command`；其中仍禁止凭据及其他敏感值。`15:01` 这样的仅时间请求按 `+08:00` 解析为下一次发生时点。到期通知会说明动作已触发，并附上 bssh_ops 结果，通常是 `run_id`；由于 `run_quick_command` 会在远程执行完成前返回，需要最终输出时应再通过 `get_run_status` 查询该 id。通用 Schedule 仍只提供提醒，不会执行这些操作。
 

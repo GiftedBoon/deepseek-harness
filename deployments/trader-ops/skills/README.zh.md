@@ -8,6 +8,7 @@
 
 - Agent 完成一类任务时必须遵守的完整步骤、校验和停止条件。
 - 允许调用的 MCP tools、输入要求、输出格式和失败处理。
+- 工具清单中以完整 `mcp__<server>__<tool>` 名称书写的 MCP tool 引用，供 `../scripts/verify-skill-tool-policy.mjs` 解析到 `../policies/tool-access.yaml`。
 - Skill 专用的 `references/`、`scripts/` 或 `assets/` 配套资源。
 - 合法的 YAML frontmatter：`name`、`description`，以及需要时的 `whenToUse`、`disable-model-invocation`、`user-invocable`。
 

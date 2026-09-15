@@ -11,18 +11,17 @@ description: Operate the bssh_ops quantitative-trading remote operations MCP ser
 
 只读工具可以直接调用：
 
-- `list_live_colos`：列出当前在线 colo 及单中心/双中心分组。
-- `list_quick_commands`：查看机器级快捷命令清单。
-- `list_runs`、`get_run_status`：查询执行记录和状态。
-- `list_product_actions`：列出产品级动作定义。
-- `preview_product_action`：解析产品归属、渲染命令并做语法检查，不连接远端执行。
-- `list_colos_for_index`：按 Index 或产品分类批量解析产品及其全部 colo，不连接远端执行。
-- `list_change_cfg_paras_runs`：查询改参 preview/deploy 审计记录。
-- `check_shell_syntax`：对自定义 shell 命令做语法检查。
+- `mcp__bssh-ops-remote__list_live_colos`：列出当前在线 colo 及单中心/双中心分组。
+- `mcp__bssh-ops-remote__list_quick_commands`：查看机器级快捷命令清单。
+- `mcp__bssh-ops-remote__list_runs`、`mcp__bssh-ops-remote__get_run_status`：查询执行记录和状态。
+- `mcp__bssh-ops-remote__list_product_actions`：列出产品级动作定义。
+- `mcp__bssh-ops-remote__preview_product_action`：解析产品归属、渲染命令并做语法检查，不连接远端执行。
+- `mcp__bssh-ops-remote__list_colos_for_index`：按 Index 或产品分类批量解析产品及其全部 colo，不连接远端执行。
+- `mcp__bssh-ops-remote__list_change_cfg_paras_runs`：查询改参 preview/deploy 审计记录。
+- `mcp__bssh-ops-remote__check_shell_syntax`：对自定义 shell 命令做语法检查。
+- `mcp__bssh-ops-remote__preview_change_cfg_paras`：纯解析改参规则；不连接远端、不生成也不覆盖 cfg 文件、不落审计，可以反复调用。
 
-`preview_change_cfg_paras` 不连接远端，但会覆盖同一交易日已生成、尚未部署的本地改参 cfg；不能把它当作可随意重复的纯只读预览。
-
-会在真实 colo 上产生副作用的工具是 `run_quick_command`、`run_scp`、`execute_product_action`、`deploy_change_cfg_paras` 和 `exec_change_cfg_paras`。它们的 stdout/stderr 会按 `run_id` 写入 bssh_ops 审计记录；不要执行会打印密码、令牌或其他敏感信息的命令，也不要自行传 `operator`，服务端会固定记录为 `ai-agent`。
+会在真实 colo 上产生副作用的工具是 `mcp__bssh-ops-remote__run_quick_command`、`mcp__bssh-ops-remote__run_scp`、`mcp__bssh-ops-remote__execute_product_action`、`mcp__bssh-ops-remote__deploy_change_cfg_paras` 和 `mcp__bssh-ops-remote__exec_change_cfg_paras`。其中 `mcp__bssh-ops-remote__deploy_change_cfg_paras` 是改参链路上唯一的写入点：生成当天 cfg、上传跳板机、触发 colo 生效都在它一步里完成。它们的 stdout/stderr 会按 `run_id` 写入 bssh_ops 审计记录；不要执行会打印密码、令牌或其他敏感信息的命令，也不要自行传 `operator`，服务端会固定记录为 `ai-agent`。
 
 ## 未来时刻执行
 
@@ -54,17 +53,19 @@ description: Operate the bssh_ops quantitative-trading remote operations MCP ser
 
 ## 盘中改参与策略启停
 
-当用户要求对指定产品执行 `kill`、`start`、`open_t0`、`close_t0` 或其他 `preview_change_cfg_paras` 白名单内的改参命令时，优先使用 change-cfg-paras 官方通道，不要改用 `execute_product_action` 或现场拼 shell。工具自身的参数说明是 rule 结构和 `cmd` 白名单的权威来源。
+当用户要求对指定产品执行 `kill`、`start`、`open_t0`、`close_t0` 或其他 `preview_change_cfg_paras` 白名单内的改参命令时，优先使用 change-cfg-paras 官方通道，不要改用 `execute_product_action` 或现场拼 shell；`product_ops_actions.json` 只留给白名单覆盖不到的场景。工具自身的参数说明是 rule 结构和 `cmd` 白名单的权威来源。
 
-同一交易日多次 preview 是覆盖而非追加：收集当天要一起生效的全部规则，合并成一个 `rules` 数组，只调用一次 `preview_change_cfg_paras`。`curdate` 缺省为今天，不得填写过去的交易日。
+preview 只做解析，deploy 才是写入点：`preview_change_cfg_paras` 不写盘、不留痕，用户要改规则、换产品或取消都可以带新 `rules` 重新调用。生成 cfg 是覆盖语义，所以当天要一起生效的全部规则必须合并进同一次 `rules` 数组、只做一次 deploy；分几次 deploy 会互相覆盖，只有最后一次生效。`curdate` 缺省为今天，不得填写过去的交易日。
 
 严格执行以下流程：
 
 1. 确认产品、命令、参数和交易日；信息不全时提问，不能猜测。
-2. 用包含全部规则的单次 `preview_change_cfg_paras` 生成预览。
-3. 向用户完整展示返回的 `affected`，包括交易所、参数、产品清单与数量，并说明再次 preview 会覆盖当天尚未部署的 cfg。
-4. 取得明确确认后，调用 `deploy_change_cfg_paras`；`expected_time_flag` 必须原样使用该次 preview 返回的 `cfg_time_flag`。若服务端返回 409，重新 preview 并再次取得确认，不能自行绕过。
+2. 用包含当天全部规则的单次 `preview_change_cfg_paras` 生成预览。
+3. 向用户完整展示返回的 `affected`，包括交易所、参数、产品清单与数量。
+4. 取得明确确认后，调用 `deploy_change_cfg_paras`：`rules` 必须与该次 preview 逐字一致，`confirmed_plan_digest` 原样取自那次 preview 返回的 `plan_digest`。服务端会在写盘前重新核对摘要，对不上时工具直接报错、既不生成 cfg 也不上传；此时重新 preview 并再次取得确认，不能自行绕过。
 5. deploy 成功后记录返回的 `exec_run_id`，用 `get_run_status` 查询执行结果。只有部分 colo 失败时，才可考虑用 `exec_change_cfg_paras` 重试，无需重新 preview/deploy。
+
+人在前端页面（`/ops/bssh` 的改参下发 tab）自行生成的那份 cfg 不属于这条链路，不要代为下发。
 
 调用 `exec_change_cfg_paras` 前，先用 `list_change_cfg_paras_runs` 或 `get_run_status` 核实要重试的 deploy 和准确 colo 列表，把目标与影响展示给用户并取得明确确认。该工具会重新执行已经下发的真实改参内容，不是查询或预览。
 

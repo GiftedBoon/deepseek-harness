@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-本目录保存 Agent 执行层的治理规则。Policy 根据环境、工具和风险级别做出 `allow`、`require_approval` 或 `deny` 决策。实验包 `@deepseek-ai/dsh-experimental-quant-tool-policy` 通过 `tools/pre-execute` 和 `ctx.tools.guard()` 在工具执行前强制实施 `tool-access.yaml`。
+本目录保存 Agent 执行层的治理规则。Policy 根据环境、工具和风险级别做出 `allow`、`require_approval` 或 `deny` 决策。实验包 `@deepseek-ai/dsh-experimental-quant-tool-policy` 通过 `tools/pre-execute` 和 `ctx.tools.guard()` 在工具执行前强制实施 `tool-access.yaml`。部署的 `scripts/verify-deployment.sh` 会把 Skill 和定时动作点名的每个工具解析到该文件，避免被引用的工具落到默认拒绝。
 
 `tool-access.yaml` 是已经在 Harness 侧生效的策略，并显式设置 `enforced: true`。`risk-levels.yaml` 和 `approvals.yaml` 仍是 `design-only`：它们描述未来可信身份、角色、审批存储与审计约定，尚未由插件加载。Trader Ops MCP 服务还必须再次执行资源、主体与参数级授权；在该服务存在之前，本部署仍只用于可信开发环境。
 
