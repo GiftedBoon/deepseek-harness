@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-18-trader-ops-governed-database-query.md
+2026-09-18-trader-ops-governed-database-query.md: c9019c0c2fd5d814acd19cc5ada2ff18f810e3d7
+2026-09-18-trader-ops-governed-database-query.zh.md: 4b8cb9a59fb647c56f3bb60fe90a825d53b2cb7f

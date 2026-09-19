@@ -68,6 +68,7 @@ grep -q 'channel-wecom: 2' <<<"$dump_output"
 grep -q 'trader-ops-skills' <<<"$dump_output"
 grep -q 'trader-ops-wecom' <<<"$dump_output"
 grep -q 'trader-ops-bssh-ops-mcp' <<<"$dump_output"
+grep -q 'toolCallTimeoutMs: 75000' <<<"$dump_output"
 grep -q '@deepseek-ai/dsh-schedule' <<<"$dump_output"
 grep -q 'includeHarnessIdentity: false' <<<"$dump_output"
 grep -q 'id: ps_check' <<<"$dump_output"
@@ -124,6 +125,8 @@ case "$llm_provider" in
 esac
 
 node "$deployment_root/scripts/verify-skill-tool-policy.mjs" "$repo_root" "$deployment_root"
+node "$deployment_root/scripts/sync-knowledge.mjs" \
+  --state "$DSH_HOME/knowledge-sync/trader-ops.json"
 
 skill_count="$(find "$deployment_root/skills" -mindepth 2 -maxdepth 2 -name SKILL.md -type f | wc -l | tr -d ' ')"
 knowledge_count=0

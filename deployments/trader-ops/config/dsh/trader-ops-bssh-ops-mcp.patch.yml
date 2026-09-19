@@ -11,7 +11,7 @@
         url: !!js process.env.TRADER_OPS_BSSH_MCP_URL
         headers:
           X-API-Key: !!js process.env.TRADER_OPS_BSSH_MCP_API_KEY
-        toolCallTimeoutMs: 60000
+        toolCallTimeoutMs: 75000
         failOnStartupError: true
         reconnect:
           enabled: true

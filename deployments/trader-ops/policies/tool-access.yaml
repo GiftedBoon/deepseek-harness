@@ -69,6 +69,16 @@ rules:
   # record. The Harness approval path does not reach the WeCom channel, whose
   # preset is approval: never, so every bssh_ops tool resolves to allow and the
   # bssh-ops Skill requires preview plus explicit user confirmation.
+  - id: agent-database-read
+    tools:
+      - mcp__bssh-ops-remote__db_list_connections
+      - mcp__bssh-ops-remote__db_list_tables
+      - mcp__bssh-ops-remote__db_describe_table
+      - mcp__bssh-ops-remote__db_run_query
+    risk: read_only
+    environments: [development, staging, production]
+    decision: allow
+
   - id: bssh-ops-read
     tool_pattern: mcp__bssh-ops-remote__list_*
     risk: read_only

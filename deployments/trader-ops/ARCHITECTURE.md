@@ -27,7 +27,7 @@ DeepSeek Harness (web profile)
            disabled by default
 ```
 
-`knowledge/` is the version-controlled source of truth for future OpenViking ingestion. The OpenViking plugin provides session memory, recall, and a bridge for related MCP tools, but it does not scan this Git directory automatically. A reviewed ingestion pipeline, OpenViking Studio, or `mcp__openviking__add_resource` must submit content explicitly.
+`knowledge/` is the version-controlled source of truth for OpenViking resources. The OpenViking plugin provides session memory, recall, and a bridge for related MCP tools, but it does not scan this Git directory. The operator-run `scripts/sync-knowledge.mjs` publisher validates approved documents, plans content-hash changes, and submits each changed file to a stable `viking://resources/trader-ops/knowledge/...` URI. Publication is explicit and stale resources are reported without deletion.
 
 `skills/` is discovered by an additional `@deepseek-ai/dsh-skill-filesystem` provider. Each `README.md` is documentation only. Only `<skill-name>/SKILL.md` enters the catalog and is loaded in full by Harness Skill Loader when a task matches.
 
@@ -41,7 +41,7 @@ DeepSeek Harness (web profile)
 | OpenViking DSH plugin | Installable | Pinned to `@openviking/dsh-memory-plugin@0.3.0` |
 | AIHubMix model | Optional, validated | `llm-pi-ai` serves Harness and OpenViking semantic extraction through an environment-provided endpoint and key |
 | Trader Ops skill root | Configured | An empty root is valid; adding `SKILL.md` enables discovery |
-| Automatic Git knowledge ingestion | Not implemented | Reviewable add, update, and delete semantics remain required |
+| Git knowledge publishing | Operator-controlled | Dry-run planning plus approved-document add/update; stale resources are never deleted |
 | bssh_ops MCP | Optional, disabled by default | Enable `trader-ops-bssh-ops-mcp.patch.yml` with a root-owned API key |
 | Schedule reminders | Enabled | The Web service applies the Schedule overlay and policy permits its session-local management tools; a due prompt never executes directly |
 | WeCom scheduled bssh_ops execution | Enabled with WeCom | Durable actions accept `ps_check`, any current quick-command key, or an exact syntax-checked and user-confirmed custom shell for any non-empty target; dispatch still traverses tool policy, and bssh_ops authorizes the exact target |

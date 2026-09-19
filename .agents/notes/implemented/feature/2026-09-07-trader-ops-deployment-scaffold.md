@@ -30,7 +30,7 @@ Add a deployment-owned, empty-state scaffold under `deployments/trader-ops/`:
 - Trader Ops MCP configuration remains a disabled example until an actual server and reviewed tool schemas exist.
 - `tool-access.yaml` is enforced by the private experimental `quant-tool-policy` package through `tools/pre-execute` and a monotonic `ctx.tools.guard()` fallback. Unmatched tools are denied. The broader risk and approval documents remain design contracts until trusted identity and approval stores exist.
 
-The OpenViking memory plugin does not imply automatic Git knowledge ingestion. Later work must define reviewed add, update, and delete semantics for synchronizing `knowledge/` into OpenViking.
+The OpenViking memory plugin does not imply automatic Git knowledge ingestion. The [reviewed knowledge publisher](../process/2026-09-18-reviewed-openviking-knowledge-publishing.md) now plans and applies approved additions and updates from `knowledge/`; stale resources are reported without automatic deletion.
 
 ## Validation boundary
 
@@ -50,7 +50,7 @@ It also does not claim business authorization. DSH sandbox permissions, OpenViki
 
 ## Consequences
 
-Developers can bring up and validate the integration before business content exists, and operators have an explicit remote filesystem layout and startup sequence. Adding a skill later requires only a valid direct-child `SKILL.md`; adding knowledge still requires a separately reviewed ingestion path.
+Developers can bring up and validate the integration before business content exists, and operators have an explicit remote filesystem layout and startup sequence. Adding a skill requires a valid direct-child `SKILL.md`; adding knowledge uses the reviewed publisher after the document owner marks an entry approved.
 
 OpenViking may derive semantic metadata from a filename even when its file is empty. Deployment validation therefore does not count empty or whitespace-only Markdown, and ingestion must reject it rather than creating misleading searchable resources.
 
@@ -60,7 +60,7 @@ A remote relay moves every model-visible prompt, recalled memory item, tool desc
 
 The host bootstrap pins Node, pnpm, Ollama, its two model ids, and the OpenViking image digest. Docker Engine follows Docker's signed Debian apt repository; an upgrade therefore requires reviewing the resolved Docker package versions as well as the explicitly pinned artifacts.
 
-The Harness-side tool-name/environment boundary is active and explicitly denies OpenViking permanent-forget. The remaining unfinished area is the real Trader Ops MCP service and its trusted identity, resource/argument authorization, durable approval, and audit stores. The private-LAN proxy carries a bearer URL token and session cookie over plaintext HTTP, so its network and users stay trusted until that final service boundary and a TLS terminator exist.
+The Harness-side tool-name/environment boundary is active and explicitly denies OpenViking permanent-forget. The Trader Ops MCP service now exposes governed database discovery and read-only query tools through a fixed Agent identity, AST validation, bounded execution, and audit records. Durable approval and broader subject/resource authorization remain unfinished. The private-LAN proxy carries a bearer URL token and session cookie over plaintext HTTP, so its network and users stay trusted until those controls and a TLS terminator exist.
 
 Enabling WeCom sends each admitted user message and its recalled context through the configured AIHubMix model route. Operators must keep one active process per BotID, preserve the separate Session identity key, and approve exact users and groups before enabling the channel.
 
