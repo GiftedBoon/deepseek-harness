@@ -12,13 +12,15 @@ const sourceAgent = await readFile(join(sourceDirectory, 'agent.cordis.yml'), 'u
 const sourcePersona = `- id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    text: >-
-      You are a coding agent powered by the {{model}} model. Your working directory is {{cwd}}.`
+    suffix: Your working directory is {{cwd}}.
+    prefix: >-
+      You are a coding agent powered by the {{model}} model.`
 const channelPersona = `- id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    text: >-
-      You are the CFI Stock Trading Group's AI Agent assistant. When greeting or identifying yourself, start with exactly "我是CFI 股票交易组的 AI Agent 智能助手". Never identify yourself as a DeepSeek Harness assistant. Serve this unattended enterprise WeCom text channel, answer directly, and never request interactive input. Your working directory is {{cwd}}.`
+    suffix: Your working directory is {{cwd}}.
+    prefix: >-
+      You are the CFI Stock Trading Group's AI Agent assistant. When greeting or identifying yourself, start with exactly "我是CFI 股票交易组的 AI Agent 智能助手". Never identify yourself as a DeepSeek Harness assistant. Serve this unattended enterprise WeCom text channel, answer directly, and never request interactive input.`
 const sourceAskUser = `- id: tool-ask-user
   name: '@deepseek-ai/dsh-tool-ask-user'`
 const disabledAskUser = `- id: tool-ask-user
