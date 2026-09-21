@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto'
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import {
   lstat,
   mkdir,
@@ -13,7 +13,7 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 import yaml from 'js-yaml'
 
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url))
@@ -382,8 +382,23 @@ Options:
 OPENVIKING_API_KEY is read only for --apply and is never written to state.`)
 }
 
-const invokedPath = process.argv[1] === undefined ? undefined : pathToFileURL(resolve(process.argv[1])).href
-if (invokedPath === import.meta.url) {
+/**
+ * Whether this file is the process entry point.
+ *
+ * Node resolves the entry module's realpath, while `argv[1]` keeps whatever
+ * path the caller used. Comparing unresolved paths makes an invocation through
+ * a symlink — such as the deployment's `current` release — skip `main()` and
+ * still exit 0, reporting success without publishing anything.
+ *
+ * @returns true when the running process was started on this file.
+ */
+function isEntryPoint() {
+  const entry = process.argv[1]
+  if (entry === undefined || !existsSync(entry)) return false
+  return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url))
+}
+
+if (isEntryPoint()) {
   main().catch((error) => {
     console.error(`sync-knowledge: ${error instanceof Error ? error.message : String(error)}`)
     process.exitCode = 1

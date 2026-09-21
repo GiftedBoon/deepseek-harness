@@ -1,7 +1,9 @@
+import { execFile } from 'node:child_process'
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { promisify } from 'node:util'
 import { afterEach, describe, expect, it } from 'vitest'
 
 // @ts-expect-error The deployment entrypoint is intentionally executable plain ESM.
@@ -43,6 +45,7 @@ const {
 }
 
 const temporaryDirectories: string[] = []
+const execFileAsync = promisify(execFile)
 
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map(path => rm(path, { recursive: true, force: true })))
@@ -194,6 +197,22 @@ tags: [product]
 
   it('requires persistent state before apply mode', () => {
     expect(() => parseArguments(['--apply'], {})).toThrow('--apply requires --state')
+  })
+
+  it('runs the entry point when invoked through a symlinked directory', async () => {
+    const root = await temporaryRoot()
+    await writeKnowledge(root, 'knowledge/business/product-definition.md', approvedKnowledge('Product definition'))
+    await symlink(join(import.meta.dirname, '..', 'deployments', 'trader-ops', 'scripts'), join(root, 'scripts'), 'dir')
+    await symlink(root, join(root, 'linked'), 'dir')
+
+    const { stdout } = await execFileAsync(process.execPath, [
+      join(root, 'linked', 'scripts', 'sync-knowledge.mjs'),
+      '--knowledge-root', join(root, 'knowledge'),
+      '--state', join(root, 'state', 'knowledge.json'),
+    ])
+
+    expect(stdout).toContain('Knowledge plan: 1 change(s)')
+    expect(stdout).toContain('business/product-definition.md')
   })
 })
 

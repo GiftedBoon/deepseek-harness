@@ -53,6 +53,8 @@ ssh dsh-server \
 
 如果主机访问 GitHub 过慢，应在可信机器上创建带顶层目录的 `git archive`，其中 `.trader-ops-source-commit` 保存同一个完整 commit SHA。把归档复制到主机并计算 SHA-256，再通过 `TRADER_OPS_RELEASE_ARCHIVE` 传入绝对路径，通过 `TRADER_OPS_RELEASE_ARCHIVE_SHA256` 传入 digest。安装器会先校验两者，再解压和构建；由于源码归档没有 `.git` 目录，安装器会把已校验的 revision 作为 `DSH_CLIENT_COMMIT_HASH` 传给构建过程。
 
+应仅用 `git archive` 创建该归档：`git archive --format=tar.gz --prefix="$name/" --add-virtual-file="$name/.trader-ops-source-commit:$commit" -o "/tmp/$name.tar.gz" "$commit"`。经由 macOS `tar` 打包则会为每个文件写入一条扩展属性记录，Debian 主机上的 GNU tar 会把每条记录实体化成 `._*` AppleDouble 文件，随后 `sync-knowledge.mjs` 会以「知识路径不是小写 ASCII slug」拒绝这些文件。
+
 安装器只获取该 commit，运行 `pnpm install --frozen-lockfile` 与 `pnpm run build`，记录构建标记，再原子移动 `/opt/deepseek-harness/current`。部署脚本根据自身安装路径定位仓库，并直接调用已构建的 `apps/cli/lib/bin.js` 入口；部署 overlay 也从当前 release 加载私有工具策略插件，不要求外部 Profile 安装它。因此运行时配置既不要求发布目录保留 Git 元数据，也不会让 pnpm 调整不可变发布。安装器不会重启任何服务。已有目录缺少构建标记时会被视为未完成发布，需要人工检查而不是自动删除。
 
 ## 3. 安装密钥并启动运行时
