@@ -53,34 +53,16 @@
         # empty and multi-line targets; bssh_ops authorizes the exact target.
         scheduledActions:
           - id: ps_check
-            description: Run the bssh_ops allowlisted read-only "ps check" quick command on one colo.
-            toolName: mcp__bssh-ops-remote__run_quick_command
+            description: Run the fixed read-only bssh_ops process check on one colo.
+            toolName: mcp__bssh-ops-remote__check_process_status
             targetArgument: colos
             targetArgumentFormat: singleton-array
             targetPattern: '^.+$'
-            arguments:
-              command: check
-          - id: quick_command
-            description: Run any quick-command key currently configured by bssh_ops on one colo; list the keys before scheduling.
-            toolName: mcp__bssh-ops-remote__run_quick_command
-            targetArgument: colos
-            targetArgumentFormat: singleton-array
+          - id: quick_command_plan
+            description: Execute an exact persistent bssh_ops quick-command plan prepared for this future run.
+            toolName: mcp__bssh-ops-remote__execute_quick_command_plan
+            targetArgument: plan_id
             targetPattern: '^.+$'
-            input:
-              toolArgument: command
-              description: Exact key returned by list_quick_commands.
-              maxBytes: 128
-              pattern: '^[A-Za-z0-9_.-]+$'
-          - id: custom_shell
-            description: Run an exact user-confirmed custom shell command through bssh_ops on one colo after checking its syntax.
-            toolName: mcp__bssh-ops-remote__run_quick_command
-            targetArgument: colos
-            targetArgumentFormat: singleton-array
-            targetPattern: '^.+$'
-            input:
-              toolArgument: custom_shell
-              description: Exact user-confirmed shell command that passed check_shell_syntax.
-              maxBytes: 16384
         messages:
           processing: '正在处理…'
           timeout: '处理超时，请稍后重试。'

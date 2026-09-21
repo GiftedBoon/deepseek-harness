@@ -1,83 +1,73 @@
 ---
 name: bssh-ops
-description: Operate the bssh_ops quantitative-trading remote operations MCP server with product-aware previews, explicit production confirmation, change-cfg-paras deployment, and audit-safe execution.
+description: Use the bssh_ops MCP server for audited quantitative-trading colo operations, including persistent quick-command plans, product-scoped preview and execution, file transfer, process checks, and change-cfg-paras deployment. Apply when a request targets live colo machines or product strategy state; use database-query for read-only business database analysis.
 ---
 
 # bssh_ops 远程运维
 
-该 Skill 配合 `mcp__bssh-ops-remote__*` 工具使用。MCP 服务通过 HTTP 访问 bssh_ops 后端；连接地址和 `X-API-Key` 由部署环境注入，绝不要在回复、日志、Skill 或代码仓库中展示或保存密钥。
+该 Skill 配合 `mcp__bssh-ops-remote__*` 工具使用。连接地址和 `X-API-Key` 由部署环境注入；绝不要在回复、日志、Skill 或代码仓库中展示或保存密钥。实时状态、产品归属和动作定义必须来自本次 MCP 查询，不能写入知识库后复用。
 
 ## 工具选择
 
-只读工具可以直接调用：
+以下工具不改变远端 colo 状态，可以直接调用：
 
-- `mcp__bssh-ops-remote__list_live_colos`：列出当前在线 colo 及单中心/双中心分组。
-- `mcp__bssh-ops-remote__list_quick_commands`：查看机器级快捷命令清单。
-- `mcp__bssh-ops-remote__list_runs`、`mcp__bssh-ops-remote__get_run_status`：查询执行记录和状态。
-- `mcp__bssh-ops-remote__list_product_actions`：列出产品级动作定义。
-- `mcp__bssh-ops-remote__preview_product_action`：解析产品归属、渲染命令并做语法检查，不连接远端执行。
-- `mcp__bssh-ops-remote__list_colos_for_index`：按 Index 或产品分类批量解析产品及其全部 colo，不连接远端执行。
-- `mcp__bssh-ops-remote__list_change_cfg_paras_runs`：查询改参 preview/deploy 审计记录。
-- `mcp__bssh-ops-remote__check_shell_syntax`：对自定义 shell 命令做语法检查。
-- `mcp__bssh-ops-remote__preview_change_cfg_paras`：纯解析改参规则；不连接远端、不生成也不覆盖 cfg 文件、不落审计，可以反复调用。
+- `mcp__bssh-ops-remote__list_live_colos`、`mcp__bssh-ops-remote__list_quick_commands`、`mcp__bssh-ops-remote__list_runs`、`mcp__bssh-ops-remote__get_run_status`。
+- `mcp__bssh-ops-remote__get_operation_plan`：查询本地快捷命令计划。
+- `mcp__bssh-ops-remote__list_product_actions`、`mcp__bssh-ops-remote__preview_product_action`：查询产品级动作，解析产品归属，渲染命令并检查语法。
+- `mcp__bssh-ops-remote__list_colos_for_index`：按 Index 或产品分类解析全部产品和 colo。
+- `mcp__bssh-ops-remote__list_change_cfg_paras_runs`、`mcp__bssh-ops-remote__preview_change_cfg_paras`：查询改参审计记录或纯解析规则；preview 不连接远端、不生成或覆盖 cfg、不落审计。
+- `mcp__bssh-ops-remote__check_shell_syntax`：静态检查动作模板中的 shell 语法，不执行命令。
 
-会在真实 colo 上产生副作用的工具是 `mcp__bssh-ops-remote__run_quick_command`、`mcp__bssh-ops-remote__run_scp`、`mcp__bssh-ops-remote__execute_product_action`、`mcp__bssh-ops-remote__deploy_change_cfg_paras` 和 `mcp__bssh-ops-remote__exec_change_cfg_paras`。其中 `mcp__bssh-ops-remote__deploy_change_cfg_paras` 是改参链路上唯一的写入点：生成当天 cfg、上传跳板机、触发 colo 生效都在它一步里完成。它们的 stdout/stderr 会按 `run_id` 写入 bssh_ops 审计记录；不要执行会打印密码、令牌或其他敏感信息的命令，也不要自行传 `operator`，服务端会固定记录为 `ai-agent`。
+`mcp__bssh-ops-remote__prepare_quick_command` 只把快捷命令、目标和执行窗口写入 MCP 本地 SQLite，不连接远端。`mcp__bssh-ops-remote__check_process_status` 只执行固定的 `ps check`；它会连接远端并生成 `run_id`，但不改变远端状态。
 
-## 未来时刻执行
+以下工具会在真实生产 colo 上执行操作：`mcp__bssh-ops-remote__execute_quick_command_plan`、`mcp__bssh-ops-remote__run_scp`、`mcp__bssh-ops-remote__execute_product_action`、`mcp__bssh-ops-remote__deploy_change_cfg_paras` 和 `mcp__bssh-ops-remote__exec_change_cfg_paras`。其 stdout/stderr 会按 `run_id` 长期写入 bssh_ops 审计记录；不要执行会输出密码、令牌或其他敏感信息的操作，也不要传 `operator`，服务端会按调用凭据记录为 `ai-agent`。
 
-用户要求在未来时刻执行快捷命令时，先调用 `list_quick_commands` 获取当前清单，再调用 `scheduled_action_create`：`action` 使用 `quick_command`，`target` 和 `at` 原样使用用户给出的目标与时间，`input` 使用清单返回的准确 key。不得猜测、改写或使用未返回的 key；清单在到点前变更时，bssh_ops 会在执行时拒绝失效的 key。`ps_check` 是兼容入口；普通流程仍使用 `quick_command` 和 `input: check`。
+## 快捷命令
 
-用户要求在未来时刻执行自定义 shell 时，先调用 `check_shell_syntax`，向用户展示准确目标、完整命令、预期影响和回滚方式并取得明确确认，再调用 `scheduled_action_create`：`action` 使用 `custom_shell`，`target` 和 `at` 使用已确认的目标与时间，`input` 使用已确认且通过语法检查的原始命令。不得在定时记录中放入密码、令牌或其他敏感值。
+先调用 `list_quick_commands` 取得当前白名单 key，再调用 `prepare_quick_command`；只把返回的 `plan_id` 传给 `execute_quick_command_plan`。计划冻结完整 `colos`、`shell` 和执行窗口并防止重复派发，不是审批单；用户已经明确要求执行时可以连续完成 prepare 和 execute，无需追加确认。需要稍后执行时保存 `plan_id`，不能只保存 command key。
 
-未来执行请求不得立即调用 bssh_ops 写工具，不得用 bash 查询时间或等待，也不得改用只发送会话消息的 `schedule_create`。只有 `scheduled_action_create` 返回成功后，才能说明动作已经安排；如果所需动作不在枚举中，应说明该动作没有列入本部署的可定时动作清单——这是部署配置的选择，不代表该工具或 bssh_ops 缺少定时执行能力——并列出当前枚举中可用的动作。
+`execute_quick_command_plan` 会在派发前锁定计划，并重新核对快捷命令定义；同名 key 的实际命令发生变化时拒绝执行。后端调用结果不确定时，计划进入 `uncertain`，不得自动重试。固定进程检查直接使用 `check_process_status`。
 
-## 产品级操作流程
+未来执行快捷命令时，先按用户指定的目标和时间调用 `prepare_quick_command`，再用 `scheduled_action_create` 创建 `quick_command_plan` 动作：`target` 原样使用返回的 `plan_id`，`at` 使用用户指定的时间。未来固定进程检查使用 `ps_check` 动作和准确 colo。只有 `scheduled_action_create` 成功后才能说明已安排执行；不得为未来执行保存裸 command key 或 shell。
 
-产品分为单中心和双中心。单中心产品的 Colo-SZ 与 Colo-SH 是同一台物理机器，预览去重后应返回 1 台 colo；双中心产品分别运行在两台机器上，应返回 2 台。不要自行查询或判断 `Dual` 字段；以本次 `preview_product_action` 的归属解析结果为准。
+不得提交任意 shell。自定义命令只能来自 `product_ops_actions.json` 中预先定义的动作模板，并走 `preview_product_action` → `execute_product_action`。白名单快捷命令和产品级动作都覆盖不到时，停止并说明缺少已评审的动作定义。
 
-产品级动作必须严格执行以下流程，不得因为用户措辞肯定而跳过确认：
+## 产品级操作
 
-1. 解析并复述产品名；缺少产品名时提问，不能猜测。
-2. 调用 `preview_product_action`。
-3. 把返回的完整 `colos`、`shell_command`、动作说明和风险展示给用户。`colos` 数量是合理性检查：1 台表示单中心，2 台表示双中心；与用户预期不一致时停止并核实产品归属。
-4. 取得明确确认后，原样把 preview 返回的 `confirmed_colos` 与 `confirmed_shell` 传给 `execute_product_action`。
-5. 返回 `run_id`、每台 colo 的结果和失败信息；不要声称未返回的操作成功。
+单中心产品的 Colo-SZ 与 Colo-SH 是同一台物理机器，预览去重后返回 1 台 colo；双中心产品分别运行在两台机器上，返回 2 台。不要自行查询或判断 `Dual` 字段，以本次 `preview_product_action` 的归属解析结果为准。若返回数量与用户预期不一致，停止并核实产品名和当天归属。
 
-不要把 `stop_signal`、`start_signal`、`stop_trader` 或 `start_trader` 当作产品级动作。这些命令影响整台机器，可能连带其他产品。产品操作只能使用经过评审、明确只影响该产品的 `product_ops_actions.json` 动作。
+产品级动作必须执行以下流程，即使用户原话已经明确要求执行也不能跳过确认：
+
+1. 确认产品名；缺失时提问，不能猜测。
+2. 调用 `preview_product_action`；`syntax_ok` 为 false 时停止。
+3. 向用户展示完整 `colos`、`shell_command`、动作说明、风险以及 1 台或 2 台 colo 的含义。
+4. 取得明确确认后，把 preview 返回的 `confirmed_colos` 和 `confirmed_shell` 原样传给 `execute_product_action`。
+5. 返回 `run_id`、每台 colo 的结果和失败信息，不声称未返回的操作成功。
+
+`stop_signal`、`start_signal`、`stop_trader` 和 `start_trader` 影响整台机器，可能连带同机其他产品，不能当作产品级动作。`product_ops_actions.json` 中的动作每次调用都会重新读取；动作必须确实只影响单个产品，且 `label` 与 `shell_template` 的实际效果一致。`{product}` 只负责模板替换，不证明命令已按产品隔离。
 
 ## Index 与分类批量操作
 
-按 Index 或产品分类批量选择机器时，先调用 `list_colos_for_index`，再向用户完整展示返回的 `products`、`colos` 及其数量。若产品或 colo 为空，说明未匹配到目标并停止，不能自行补充机器。
+先调用 `list_colos_for_index`，再向用户完整展示返回的 `products`、`colos` 及数量。产品或 colo 为空时，说明未匹配到目标并停止；数量级与预期明显不符时，先核实 Index、分类和当天产品归属。
 
-将解析结果的数量级与用户预期核对；出现明显差异时停止并核实 Index、分类及当天产品归属。即使后续只执行 `ps check` 等只读快捷命令，也必须先取得用户对完整范围的明确确认，再把确认后的 `colos` 原样传给 `run_quick_command`。
+取得用户对完整范围的明确确认后，固定进程检查使用 `check_process_status`；其他快捷命令把完整 `colos` 传给 `prepare_quick_command`，再用返回的 `plan_id` 执行。
 
 ## 盘中改参与策略启停
 
-当用户要求对指定产品执行 `kill`、`start`、`open_t0`、`close_t0` 或其他 `preview_change_cfg_paras` 白名单内的改参命令时，优先使用 change-cfg-paras 官方通道，不要改用 `execute_product_action` 或现场拼 shell；`product_ops_actions.json` 只留给白名单覆盖不到的场景。工具自身的参数说明是 rule 结构和 `cmd` 白名单的权威来源。
+对指定产品执行 `kill`、`start`、`open_t0`、`close_t0` 或其他 `preview_change_cfg_paras` 白名单命令时，优先使用 change-cfg-paras 通道，不使用 `execute_product_action` 或临时 shell。工具参数说明是 rule 结构和 `cmd` 白名单的权威来源；`product_ops_actions.json` 只用于白名单覆盖不到的产品级动作。
 
-preview 只做解析，deploy 才是写入点：`preview_change_cfg_paras` 不写盘、不留痕，用户要改规则、换产品或取消都可以带新 `rules` 重新调用。生成 cfg 是覆盖语义，所以当天要一起生效的全部规则必须合并进同一次 `rules` 数组、只做一次 deploy；分几次 deploy 会互相覆盖，只有最后一次生效。`curdate` 缺省为今天，不得填写过去的交易日。
+`preview_change_cfg_paras` 只解析规则，`deploy_change_cfg_paras` 才会生成当天 cfg、上传跳板机并触发 colo 生效。cfg 是覆盖写入；当天需要一起生效的全部规则必须合并到同一次 `rules` 数组和一次 deploy 中。`curdate` 缺省为今天，不能填写过去的交易日。
 
 严格执行以下流程：
 
 1. 确认产品、命令、参数和交易日；信息不全时提问，不能猜测。
 2. 用包含当天全部规则的单次 `preview_change_cfg_paras` 生成预览。
 3. 向用户完整展示返回的 `affected`，包括交易所、参数、产品清单与数量。
-4. 取得明确确认后，调用 `deploy_change_cfg_paras`：`rules` 必须与该次 preview 逐字一致，`confirmed_plan_digest` 原样取自那次 preview 返回的 `plan_digest`。服务端会在写盘前重新核对摘要，对不上时工具直接报错、既不生成 cfg 也不上传；此时重新 preview 并再次取得确认，不能自行绕过。
-5. deploy 成功后记录返回的 `exec_run_id`，用 `get_run_status` 查询执行结果。只有部分 colo 失败时，才可考虑用 `exec_change_cfg_paras` 重试，无需重新 preview/deploy。
+4. 取得明确确认后调用 `deploy_change_cfg_paras`；`rules` 必须与该次 preview 逐字一致，`confirmed_plan_digest` 原样使用 preview 返回的 `plan_digest`。
+5. 摘要不一致时重新 preview 并再次确认，不能绕过。deploy 成功后，用返回的 `exec_run_id` 调用 `get_run_status` 查询结果。
 
-人在前端页面（`/ops/bssh` 的改参下发 tab）自行生成的那份 cfg 不属于这条链路，不要代为下发。
-
-调用 `exec_change_cfg_paras` 前，先用 `list_change_cfg_paras_runs` 或 `get_run_status` 核实要重试的 deploy 和准确 colo 列表，把目标与影响展示给用户并取得明确确认。该工具会重新执行已经下发的真实改参内容，不是查询或预览。
-
-## 自定义命令与安全边界
-
-- 自己拼接 `custom_shell` 时，先调用 `check_shell_syntax`，再请求用户确认，最后才立即执行或创建定时动作。
-- `run_quick_command` 的自定义命令必须说明目标 colo、命令全文、预期影响和回滚方式。
-- 任何涉及生产策略进程、配置、文件覆盖或复制的写操作都需要用户明确确认；没有收到确认时停止，不调用写工具。
-- 不要把实时状态、产品归属或动作定义写入知识库；它们必须来自本次 MCP 查询。
-- 对单中心产品只接受一台 colo，对双中心产品接受两台 colo；预览返回数量异常时先与人核实。
-- `product_ops_actions.json` 中的动作每次调用都会重新读取，无需重启 MCP 服务。新增或选择动作时，确认它确实只影响单个产品，且 `label` 与 `shell_template` 的实际效果一致；`{product}` 只负责模板替换，不证明命令已按产品隔离。
+只有部分 colo 失败时，才考虑用 `exec_change_cfg_paras` 重试，无需重新 preview 或 deploy。重试前先用 `list_change_cfg_paras_runs` 或 `get_run_status` 核实具体 deploy 和准确 colo 列表，向用户展示目标与影响并取得明确确认；不得自动扩大范围。人在 `/ops/bssh` 改参页面生成的 cfg 不属于 Agent 链路，不能代为下发。
 
 ## 失败与审计
 
-连接失败、工具错误、语法检查失败或用户确认未完成时，保留失败事实并停止后续写操作。执行结果通过 `run_id` 在 bssh_ops 的 `BsshOpsRun` 审计表中长期可查；向用户报告时只包含完成任务所需的最小输出，不把审计记录中可能出现的敏感值复制进回复。
+连接失败、工具错误、语法检查失败、计划进入 `uncertain` 或用户确认未完成时，保留失败事实并停止后续写操作。报告只包含完成任务所需的最小输出，不把审计记录中可能出现的敏感值复制进回复。

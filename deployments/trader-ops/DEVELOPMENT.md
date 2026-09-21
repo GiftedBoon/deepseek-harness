@@ -134,7 +134,7 @@ The command prints a local access URL and token. The service must still start wh
 - Add reviewed, non-empty Markdown to `knowledge/business`, `knowledge/systems`, or `knowledge/runbooks`, then submit it through an explicit OpenViking ingestion path. Exclude `README.md`, `README.zh.md`, and empty or whitespace-only files from ingestion; OpenViking can otherwise derive misleading semantic metadata from the filename alone.
 - Add a complete `SKILL.md` under a direct `skills/<name>/` child. The Loader recognizes direct children as skill bundles; do not add another business-category layer.
 - The bssh_ops MCP layer is already wired through `config/dsh/trader-ops-bssh-ops-mcp.patch.yml`; enable it with `sudo bash scripts/configure-bssh-ops-mcp.sh --enable`, which prompts for the key without putting it in shell history. Keep the patch loaded in every profile command so its `disabled` flag is controlled by the environment.
-- The WeCom patch exposes durable `ps_check`, `quick_command`, and `custom_shell` actions through bssh_ops `run_quick_command`. Keep the target expression narrow; list the current quick-command keys before scheduling one, and require syntax validation plus explicit user confirmation before persisting an exact custom shell command.
+- The WeCom patch exposes durable `ps_check` and `quick_command_plan` actions. Prepare a quick-command plan first and schedule its exact `plan_id`; arbitrary shell commands are not exposed.
 - Update `policies/tool-access.yaml` when tools are added. The Harness-side plugin enforces it with first-match rules and default deny; `risk-levels.yaml` and `approvals.yaml` remain design contracts until trusted identity and approval stores exist.
 
 ## 6. Stop the local service

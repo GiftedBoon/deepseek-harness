@@ -7,7 +7,7 @@ This bundle gives Harness the reviewed workflow for the `bssh_ops` remote operat
 ## What belongs here
 
 - The bssh_ops tool-selection rules and the mandatory product preview-confirm-execute flow.
-- Colo single-center/dual-center checks, custom-shell syntax checks, failure handling, and audit-safe output rules.
+- Colo single-center/dual-center checks, persistent quick-command plans, failure handling, and audit-safe output rules.
 - References to live tool results, never copied product state or credentials.
 
 ## What does not belong here

@@ -96,13 +96,15 @@ rules:
       - mcp__bssh-ops-remote__preview_product_action
       - mcp__bssh-ops-remote__check_shell_syntax
       - mcp__bssh-ops-remote__preview_change_cfg_paras
+      - mcp__bssh-ops-remote__check_process_status
     risk: read_only
     environments: [development, staging, production]
     decision: allow
 
   - id: bssh-ops-mutation
     tools:
-      - mcp__bssh-ops-remote__run_quick_command
+      - mcp__bssh-ops-remote__prepare_quick_command
+      - mcp__bssh-ops-remote__execute_quick_command_plan
       - mcp__bssh-ops-remote__run_scp
       - mcp__bssh-ops-remote__execute_product_action
       - mcp__bssh-ops-remote__deploy_change_cfg_paras
