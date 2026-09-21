@@ -18,6 +18,11 @@
 - 未验证的聊天记录、临时猜测和事故原始日志。
 - 密钥或可绕过 Tool Guard 的命令。
 
+## 模板
+
+- [故障处置手册](../../templates/knowledge/incident-runbook.md)覆盖故障现象、诊断、恢复、升级和验证。
+- [变更手册](../../templates/knowledge/change-runbook.md)覆盖审批、变更前检查、受控执行、回滚和变更后验证。
+
 ## 示例：`switch-strategy.md`
 
 ```markdown

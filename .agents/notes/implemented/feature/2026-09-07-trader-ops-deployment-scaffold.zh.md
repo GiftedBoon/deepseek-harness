@@ -30,7 +30,7 @@ Trader Ops 部署拥有相互分离的 `knowledge/`、`skills/` 和 `policies/` 
 - 在真实服务和经过评审的工具 schema 存在以前，Trader Ops MCP 配置保持为默认关闭的示例。
 - `tool-access.yaml` 已由私有实验包 `quant-tool-policy` 通过 `tools/pre-execute` 和单调 `ctx.tools.guard()` 兜底强制执行，未匹配工具默认拒绝。在可信身份和审批存储存在前，更广泛的风险与审批文档仍是设计约定。
 
-OpenViking 记忆插件并不意味着自动把 Git 知识入库。后续工作必须为 `knowledge/` 同步到 OpenViking 定义经过评审的新增、更新和删除语义。
+OpenViking 记忆插件并不意味着自动把 Git 知识入库。[经评审的知识发布器](../process/2026-09-18-reviewed-openviking-knowledge-publishing.zh.md)现在可以从 `knowledge/` 计划并应用已批准的新增和更新；stale resource 只会被报告，不会自动删除。
 
 ## 验证边界
 
@@ -50,7 +50,7 @@ OpenViking 记忆插件并不意味着自动把 Git 知识入库。后续工作�
 
 ## 后果
 
-开发者可以在业务内容存在以前启动并验证集成，运维人员也获得了显式的远程文件系统布局和启动顺序。以后添加 skill 只需要一个有效的直接子目录 `SKILL.md`；添加知识仍然需要单独评审的入库路径。
+开发者可以在业务内容存在以前启动并验证集成，运维人员也获得了显式的远程文件系统布局和启动顺序。添加 skill 需要一个有效的直接子目录 `SKILL.md`；添加知识则在文档负责人把条目标记为已批准后使用受评审的发布器。
 
 即使文件为空，OpenViking 也可能根据文件名派生语义元数据。因此部署验证不会统计空白或只含空白字符的 Markdown，入库流程也必须拒绝这类文件，避免生成误导性的可检索资源。
 
@@ -60,7 +60,7 @@ OpenViking 记忆插件并不意味着自动把 Git 知识入库。后续工作�
 
 主机引导固定 Node、pnpm、Ollama、它的两个模型 id 与 OpenViking 镜像 digest。Docker Engine 跟随 Docker 的签名 Debian apt 软件源；因此升级时既要评审解析出的 Docker 软件包版本，也要评审显式固定的产物。
 
-Harness 侧的工具名/环境边界已经生效，并显式拒绝 OpenViking 永久遗忘。剩余未完成区域是真实的 Trader Ops MCP 服务，以及它的可信身份、资源/参数授权、持久审批与审计存储。内网代理通过明文 HTTP 传输 bearer URL token 与 session cookie，因此在最终服务边界和 TLS 终止器存在前，其网络与用户都必须可信。
+Harness 侧的工具名/环境边界已经生效，并显式拒绝 OpenViking 永久遗忘。Trader Ops MCP 服务现在通过固定 Agent 身份、AST 校验、有界执行和审计记录暴露受治理的数据库发现与只读查询工具。持久审批和更广泛的主体/资源授权仍未完成。内网代理通过明文 HTTP 传输 bearer URL token 与 session cookie，因此在这些控制和 TLS 终止器存在前，其网络与用户都必须可信。
 
 启用企业微信后，每条准入用户消息及其召回上下文都会通过已配置的 AIHubMix 模型路由发送。运维人员必须确保每个 BotID 只有一个活跃进程，保留独立的 Session 身份密钥，并在启用渠道前批准准确的用户与群聊。
 

@@ -9,14 +9,18 @@ deployments/trader-ops/
 ├── config/       # DSH, OpenViking, and systemd configuration
 ├── knowledge/    # Facts, rules, and operational context indexed by OpenViking
 ├── policies/     # Enforced tool access plus future identity/approval contracts
+├── remote-deployment/ # Validated remote deployment record
 ├── scripts/      # Profile bootstrap and deployment verification scripts
 ├── skills/       # Task instructions loaded in full by Harness Skill Loader
+├── templates/    # Obsidian authoring templates excluded from knowledge ingestion
 ├── ARCHITECTURE.md
 ├── DEVELOPMENT.md
 └── DEPLOYMENT.md
 ```
 
 The scaffold supports zero knowledge documents and zero `SKILL.md` files. Read the [architecture](ARCHITECTURE.md), then follow either [local development](DEVELOPMENT.md) or [remote deployment](DEPLOYMENT.md).
+
+The current remote verification snapshot is in [remote-deployment/](remote-deployment/README.md). It records the deployed revision, service endpoints, health checks, and the WeCom Session recreation acceptance sequence without storing credentials or message content.
 
 ## What belongs here
 

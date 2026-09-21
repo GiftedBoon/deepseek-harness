@@ -11,6 +11,7 @@ logger_plugin="$repo_root/vendor/logger-console/lib/index.js"
 wecom_plugin="$repo_root/packages/channel/channel-wecom/lib/index.js"
 wecom_patch="$deployment_root/config/dsh/trader-ops-wecom.patch.yml"
 bssh_mcp_patch="$deployment_root/config/dsh/trader-ops-bssh-ops-mcp.patch.yml"
+schedule_patch="$repo_root/apps/cli/config/examples/schedule/cordis.yml"
 lan_proxy_service="$deployment_root/config/systemd/dsh-trader-ops-lan-proxy.service"
 lan_proxy_socket="$deployment_root/config/systemd/dsh-trader-ops-lan-proxy.socket.in"
 endpoint="${OPENVIKING_URL:-http://127.0.0.1:1933}"
@@ -25,8 +26,8 @@ if [[ ! -f "$policy_plugin" || ! -f "$logger_plugin" ]]; then
   printf 'Built Trader Ops policy or console logger plugin is missing; install a completed release.\n' >&2
   exit 1
 fi
-if [[ ! -f "$wecom_plugin" || ! -f "$wecom_patch" || ! -f "$bssh_mcp_patch" || ! -f "$wecom_preset" ]]; then
-  printf 'Trader Ops WeCom plugin, MCP patch, or generated preset is missing.\n' >&2
+if [[ ! -f "$wecom_plugin" || ! -f "$wecom_patch" || ! -f "$bssh_mcp_patch" || ! -f "$schedule_patch" || ! -f "$wecom_preset" ]]; then
+  printf 'Trader Ops WeCom plugin, MCP patch, Schedule overlay, or generated preset is missing.\n' >&2
   exit 1
 fi
 if [[ ! -f "$lan_proxy_service" || ! -f "$lan_proxy_socket" ]]; then
@@ -57,6 +58,7 @@ case "$llm_provider" in
 esac
 patch_args+=(--patch "$wecom_patch")
 patch_args+=(--patch "$bssh_mcp_patch")
+patch_args+=(--patch "$schedule_patch")
 dump_output="$(node "$dsh_cli" --profile "$profile" "${patch_args[@]}" --dump-config)"
 
 grep -q 'openviking-memory-runtime' <<<"$dump_output"
@@ -66,7 +68,18 @@ grep -q 'channel-wecom: 2' <<<"$dump_output"
 grep -q 'trader-ops-skills' <<<"$dump_output"
 grep -q 'trader-ops-wecom' <<<"$dump_output"
 grep -q 'trader-ops-bssh-ops-mcp' <<<"$dump_output"
+grep -q 'toolCallTimeoutMs: 75000' <<<"$dump_output"
+grep -q '@deepseek-ai/dsh-schedule' <<<"$dump_output"
 grep -q 'includeHarnessIdentity: false' <<<"$dump_output"
+grep -q 'id: ps_check' <<<"$dump_output"
+grep -q 'id: quick_command' <<<"$dump_output"
+grep -q 'id: custom_shell' <<<"$dump_output"
+grep -q 'toolName: mcp__bssh-ops-remote__run_quick_command' <<<"$dump_output"
+grep -q 'targetArgument: colos' <<<"$dump_output"
+grep -q 'targetArgumentFormat: singleton-array' <<<"$dump_output"
+grep -q 'command: check' <<<"$dump_output"
+grep -q 'toolArgument: command' <<<"$dump_output"
+grep -q 'toolArgument: custom_shell' <<<"$dump_output"
 grep -Fq '我是CFI 股票交易组的 AI Agent 智能助手' "$wecom_preset"
 awk '
   $0 == "- id: tool-ask-user" {
@@ -110,6 +123,10 @@ case "$llm_provider" in
     grep -q 'AIHUBMIX_MODEL' <<<"$dump_output"
     ;;
 esac
+
+node "$deployment_root/scripts/verify-skill-tool-policy.mjs" "$repo_root" "$deployment_root"
+node "$deployment_root/scripts/sync-knowledge.mjs" \
+  --state "$DSH_HOME/knowledge-sync/trader-ops.json"
 
 skill_count="$(find "$deployment_root/skills" -mindepth 2 -maxdepth 2 -name SKILL.md -type f | wc -l | tr -d ' ')"
 knowledge_count=0

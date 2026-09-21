@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-This directory contains governance rules for the agent execution layer. A Policy decides `allow`, `require_approval`, or `deny` from the environment, tool, and risk level. The experimental `@deepseek-ai/dsh-experimental-quant-tool-policy` package enforces `tool-access.yaml` before tool execution through `tools/pre-execute` and `ctx.tools.guard()`.
+This directory contains governance rules for the agent execution layer. A Policy decides `allow`, `require_approval`, or `deny` from the environment, tool, and risk level. The experimental `@deepseek-ai/dsh-experimental-quant-tool-policy` package enforces `tool-access.yaml` before tool execution through `tools/pre-execute` and `ctx.tools.guard()`. The deployment's `scripts/verify-deployment.sh` resolves every tool named by a skill or a scheduled action against this file, so a referenced tool cannot fall through to the default deny.
 
 `tool-access.yaml` is active Harness-side policy and explicitly sets `enforced: true`. `risk-levels.yaml` and `approvals.yaml` remain `design-only`: they describe the future trusted identity, role, approval-store, and audit contracts but are not loaded by the plugin. The Trader Ops MCP server must enforce resource-, actor-, and argument-level authorization again; until that server exists, this deployment remains for trusted development.
 

@@ -18,6 +18,11 @@
 - 业务概念定义；放在 `../business/`。
 - 具体事件的处置流程；放在 `../runbooks/`。
 
+## 模板
+
+- [系统概览](../../templates/knowledge/system-overview.md)用于记录职责、依赖、接口、可观测性和故障行为。
+- [数据源](../../templates/knowledge/data-source.md)用于记录权威事实、字段含义、新鲜度、访问方式和质量信号。
+
 ## 示例：`strategy-control.md`
 
 ```markdown

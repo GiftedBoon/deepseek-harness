@@ -17,6 +17,46 @@ export interface ChannelMessages {
   unauthorized: string
   /** Reply while the same delivery id is already processing. */
   duplicate: string
+  /** Prefix for a completed scheduled action notification. */
+  scheduledActionSuccess: string
+  /** Prefix for a failed scheduled action notification. */
+  scheduledActionFailure: string
+  /** Prefix for a scheduled action whose side-effect outcome is unknown after recovery. */
+  scheduledActionUncertain: string
+  /** Detail for a scheduled action whose definition or required persisted input is unavailable at dispatch. */
+  scheduledActionDefinitionUnavailable: string
+}
+
+/** One model-supplied string passed to the scheduled tool at dispatch. */
+export interface ScheduledActionInputConfig {
+  /** Top-level tool argument receiving the model-supplied value. */
+  toolArgument: string
+  /** Model-facing explanation of the required value. */
+  description: string
+  /** Maximum persisted UTF-8 byte length. */
+  maxBytes: number
+  /** Optional anchored regular expression admitting values. */
+  pattern?: string
+}
+
+/** Deployment-owned allowlisted action available to the WeCom scheduling tools. */
+export interface ScheduledActionConfig {
+  /** Stable model-facing action identifier. */
+  id: string
+  /** Short model-facing description of the allowlisted operation. */
+  description: string
+  /** Exact registered tool name dispatched when the action becomes due. */
+  toolName: string
+  /** Top-level tool argument receiving the model-supplied target. */
+  targetArgument: string
+  /** Encoding used when placing the target into the configured tool argument. */
+  targetArgumentFormat?: 'scalar' | 'singleton-array'
+  /** Anchored regular expression admitting target identifiers for this action. */
+  targetPattern: string
+  /** Static lossless-JSON arguments merged with the target argument. */
+  arguments?: unknown
+  /** Optional model-supplied string argument persisted for due-time dispatch. */
+  input?: ScheduledActionInputConfig | undefined
 }
 
 /** Enterprise WeCom channel configuration. */
@@ -57,8 +97,20 @@ export interface Config {
   maxDeliveryRecords?: number
   /** Interval between active-send outbox retry passes. */
   outboxRetryIntervalMs?: number
-  /** Failed active sends allowed before an outbox item is dropped. */
+  /** Failed periodic active sends before an outbox item waits for the next active conversation. */
   maxOutboxAttempts?: number
+  /** Age after which an undelivered outbox item is removed. */
+  outboxRetentionMs?: number
+  /** Deployment allowlist for durable, future tool execution. */
+  scheduledActions?: ScheduledActionConfig[]
+  /** Maximum pending or running actions retained for one conversation. */
+  maxScheduledActionsPerConversation?: number
+  /** Furthest permitted future execution time from creation. */
+  maxScheduledActionDelayMs?: number
+  /** Cooperative deadline supplied to one background tool execution. */
+  scheduledActionTimeoutMs?: number
+  /** Fixed numeric offset used to resolve time-only scheduled-action requests. */
+  scheduledActionUtcOffset?: string
   /** Operator-localized text sent by channel-owned states. */
   messages: ChannelMessages
 }
@@ -84,6 +136,29 @@ export const Config: z<Config> = z.object({
   maxDeliveryRecords: z.number().min(1).default(10_000),
   outboxRetryIntervalMs: z.number().min(1).default(30_000),
   maxOutboxAttempts: z.number().min(1).default(10),
+  outboxRetentionMs: z.number().min(1).default(604_800_000),
+  scheduledActions: z.array(z.object({
+    id: z.string().required(),
+    description: z.string().required(),
+    toolName: z.string().required(),
+    targetArgument: z.string().required(),
+    targetArgumentFormat: z.union(['scalar', 'singleton-array']).default('scalar'),
+    targetPattern: z.string().required(),
+    arguments: z.any().default({}),
+    input: z.union([
+      z.object({
+        toolArgument: z.string().required(),
+        description: z.string().required(),
+        maxBytes: z.number().min(1).required(),
+        pattern: z.string(),
+      }),
+      z.const(undefined),
+    ]).default(undefined),
+  })).default([]),
+  maxScheduledActionsPerConversation: z.number().min(1).default(32),
+  maxScheduledActionDelayMs: z.number().min(1).default(31_536_000_000),
+  scheduledActionTimeoutMs: z.number().min(1).default(300_000),
+  scheduledActionUtcOffset: z.string().pattern(/^(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/).default('Z'),
   messages: z.object({
     processing: z.string().required(),
     timeout: z.string().required(),
@@ -91,6 +166,10 @@ export const Config: z<Config> = z.object({
     emptyReply: z.string().required(),
     unauthorized: z.string().required(),
     duplicate: z.string().required(),
+    scheduledActionSuccess: z.string().required(),
+    scheduledActionFailure: z.string().required(),
+    scheduledActionUncertain: z.string().required(),
+    scheduledActionDefinitionUnavailable: z.string().required(),
   }).required(),
 })
 

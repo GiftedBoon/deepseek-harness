@@ -64,7 +64,7 @@ ssh -t dsh-server \
   'sudo env TRADER_OPS_LAN_HOST=192.168.4.103 bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-debian-runtime.sh'
 ```
 
-Enter the rotated AIHubMix key at the hidden prompt. The script uses `https://api.inferera.com/v1` and `deepseek-v4-flash-0731` by default, generates a separate OpenViking root key, writes the mode-`0600` environment file, starts OpenViking, creates the `trader-ops/remote-admin` tenant identity, stores its narrower user key, installs the pinned DSH plugin, and validates one real remote-model turn with the Trader Ops plugins loaded. It persists an explicitly supplied `TRADER_OPS_LAN_HOST`, declares that authority to Harness through `--trusted-host`, and configures the systemd socket proxy without changing Harness's loopback bind. It then requires either a successful Web response or the expected `401` authentication challenge on both routes and confirms that the systemd restart count remains stable for ten seconds. The Harness unit stops retrying after five startup failures in two minutes.
+Enter the rotated AIHubMix key at the hidden prompt. The script uses `https://api.inferera.com/v1` and `deepseek-v4.1-flash` by default, generates a separate OpenViking root key, writes the mode-`0600` environment file, starts OpenViking, creates the `trader-ops/remote-admin` tenant identity, stores its narrower user key, installs the pinned DSH plugin, and validates one real remote-model turn with the Trader Ops plugins loaded. It persists an explicitly supplied `TRADER_OPS_LAN_HOST`, declares that authority to Harness through `--trusted-host`, and configures the systemd socket proxy without changing Harness's loopback bind. It then requires either a successful Web response or the expected `401` authentication challenge on both routes and confirms that the systemd restart count remains stable for ten seconds. The Harness unit stops retrying after five startup failures in two minutes.
 
 The configurator is resumable: after the environment file exists it reuses it instead of prompting or overwriting credentials. If the OpenViking account already exists while the tenant key is still absent, it regenerates that one admin key and stores the new value. The root key is never given to Harness.
 
@@ -154,7 +154,9 @@ Disable the connection while retaining the stored key for a later rotation or re
 sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-bssh-ops-mcp.sh --disable
 ```
 
-After enablement, tools appear with the `mcp__bssh-ops-remote__` prefix. `policies/tool-access.yaml` allows the three exact mutation tools without a Harness approval prompt; the `bssh-ops` Skill still requires preview and explicit user confirmation, and the MCP server owns downstream authorization and audit. Do not put the API key in a patch, Skill, command argument, or ticket.
+After enablement, tools appear with the `mcp__bssh-ops-remote__` prefix. `policies/tool-access.yaml` classifies every tool that the `bssh-ops` Skill and the scheduled actions reference and resolves each to `allow` without a Harness approval prompt; `scripts/verify-skill-tool-policy.mjs` rejects a referenced tool that the policy would deny. The Skill still requires preview and explicit user confirmation, and the MCP server owns downstream authorization and audit. Do not put the API key in a patch, Skill, command argument, or ticket.
+
+The WeCom patch exposes three durable bssh_ops actions that accept any non-empty target: the static `ps_check` compatibility action, `quick_command` with an exact key returned by `list_quick_commands`, and `custom_shell` with the exact user-confirmed command that passed `check_shell_syntax`. The dynamic input is UTF-8 bounded, persisted independently from the released action record, and passed to `run_quick_command` only at the due time; credentials and other sensitive values remain forbidden. A time-only request such as `15:01` resolves to the next occurrence at `+08:00`. The due notification reports that the action was triggered and includes the bssh_ops result, normally its `run_id`; because `run_quick_command` returns before remote completion, query that id through `get_run_status` when the final output is needed. Generic Schedule remains reminder-only and does not execute these operations.
 
 ### Routine WeCom operations
 
@@ -199,13 +201,13 @@ Before production approval, complete the channel-owned [Linux acceptance procedu
 1. Run `install-debian-release.sh` with a new reviewed full commit SHA.
 2. Load `/etc/deepseek-harness/trader-ops.env`, then run `bootstrap-profile.sh` and `verify-deployment.sh` as `dsh` against the new release before restarting the service; these commands preserve the optional WeCom dependency and unattended preset.
 3. Back up `/var/lib/openviking` and `/var/lib/deepseek-harness` before any data migration.
-4. Restart `dsh-trader-ops`, repeat the listener, health, empty-skill, and empty-knowledge checks, and retain the previous release.
+4. Restart `dsh-trader-ops` through `restart-runtime.sh`; it installs the current release's systemd unit before restarting. Repeat the listener, health, empty-skill, and empty-knowledge checks, and retain the previous release.
 5. On failure, atomically point `current` to the previous validated release and restart Harness. Restore persistent data only when the failed release performed an explicit incompatible migration.
 
 ## Pre-production gates
 
 - OpenViking `/health` and `/ready` succeed, `ov doctor` passes, and data survives a container restart.
-- `dsh --dump-config` contains exactly one expected `openviking-memory-runtime` and includes `trader-ops-tool-policy`, `trader-ops-skills`, and the AIHubMix provider.
+- `dsh --dump-config` contains exactly one expected `openviking-memory-runtime` and includes `trader-ops-tool-policy`, `trader-ops-skills`, the AIHubMix provider, and `@deepseek-ai/dsh-schedule`.
 - The real environment contains no template or exposed credentials, and secrets do not appear in Git, logs, process arguments, or shell history.
 - AIHubMix endpoint ownership, model routing, retention, and data-processing terms are approved for every class of model-visible data.
 - Harness stays read-only and is limited to the trusted private developer network or an SSH tunnel while business knowledge, production skills, trusted user identity, durable approval, and the Trader Ops MCP authorization layer are absent.

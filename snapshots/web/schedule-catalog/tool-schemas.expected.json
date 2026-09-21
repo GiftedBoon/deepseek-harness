@@ -365,7 +365,7 @@
     },
     {
       "name": "schedule_create",
-      "description": "Create one reminder in the current session. Supply a non-empty prompt and exactly one selector: a positive safe-integer after_seconds delay, at as a strict offset date-time or local date/time object, or safe-integer every_seconds of at least 300. Fixed-rate reminders stay creation-aligned, skip missed occurrences, and batch one latest occurrence per overdue rule. Delivery is session-local: the reminder runs on time only while this session is live and otherwise becomes overdue until the session is resumed.",
+      "description": "Create one session-local reminder for a future time. Use it only when the user asks to receive a reminder or conversational follow-up. Do not use this tool to execute a tool or command at a future time; use a dedicated scheduled-action tool when the deployment provides one. The due reminder returns the supplied prompt as untrusted ordinary conversation content and never executes it. Supply a non-empty prompt and exactly one selector: a positive safe-integer after_seconds delay, at as a strict offset date-time or local date/time object, or safe-integer every_seconds of at least 300. Fixed-rate reminders stay creation-aligned, skip missed occurrences, and batch one latest occurrence per overdue rule. Delivery is session-local: the reminder runs on time only while this session is live and otherwise becomes overdue until the session is resumed.",
       "parameters": {
         "type": "object",
         "properties": {

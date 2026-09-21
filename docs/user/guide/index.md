@@ -27,5 +27,6 @@ The agent can read and edit workspace files, run commands, delegate work, and ma
 - [Configure models](./providers.md)
 - [Deploy the enterprise WeCom Agent on Linux](./wecom-linux-deployment.md)
 - [Use the Python SDK](./python-sdk.md)
+- [Build a controlled team Agent platform](./team-agent-platform.md)
 - [Use other CLI modes](../../../apps/cli/README.md)
 - [Develop a plugin](../develop/basic/index.md)

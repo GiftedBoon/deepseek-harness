@@ -11,6 +11,9 @@ import type {} from '@deepseek-ai/dsh-session-title'
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type { ResolvedConfig } from './config.ts'
 import type { ChannelWeComDomain } from './domain.ts'
+import type { WeComScheduledActionInputDomain } from './scheduled-action-input-domain.ts'
+import type { WeComScheduledActionDomain } from './scheduled-action-domain.ts'
+import { WeComScheduledActions } from './scheduled-actions.ts'
 import { conversationIdentity, deliveryIdentity } from './identity.ts'
 import { WeComReplyStream, boundUtf8 } from './stream.ts'
 import type { WeComChannelClient, WeComTextDelivery } from './types.ts'
@@ -31,9 +34,18 @@ interface RuntimeOptions {
   readonly config: ResolvedConfig
   readonly client: WeComChannelClient
   readonly domain: ChannelWeComDomain
+  readonly scheduledActionDomain: WeComScheduledActionDomain
+  readonly scheduledActionInputDomain: WeComScheduledActionInputDomain
   readonly identitySecret: string
   readonly workspace: Workspace
   readonly modelSelection: ModelSelection
+}
+
+interface OutboxDrainOptions {
+  /** Deliver only items addressed to this conversation target. */
+  readonly target?: string
+  /** Retry items whose periodic attempts are exhausted. Defaults to true. */
+  readonly retryExhausted?: boolean
 }
 
 /** Apply the creation-time model selection until the first request header exists. */
@@ -71,9 +83,17 @@ export class WeComChannelRuntime {
   private outboxTail = Promise.resolve()
   private retryTimer: ReturnType<typeof setInterval> | undefined
   private closing: Promise<void> | undefined
+  private readonly scheduledActions: WeComScheduledActions
 
   /** @param ctx - host services; @param options - validated and pre-resolved runtime inputs. */
   constructor(private readonly ctx: Context, private readonly options: RuntimeOptions) {
+    this.scheduledActions = new WeComScheduledActions(ctx, {
+      config: options.config,
+      conversations: options.domain,
+      actions: options.scheduledActionDomain,
+      inputs: options.scheduledActionInputDomain,
+      enqueueNotification: (target, content) => this.enqueueScheduledNotification(target, content),
+    })
     this.disposers.push(ctx.on('agent/inbox/claimed', ({ agent, message, turn }) => {
       this.onInboxClaimed(agent, message, turn)
     }))
@@ -94,7 +114,8 @@ export class WeComChannelRuntime {
     this.disposers.push(this.options.client.onText((frame) => { this.receive(frame) }))
     this.disposers.push(this.options.client.onAuthenticated(() => { this.queueOutboxDrain() }))
     await this.options.client.connect(this.controller.signal)
-    this.retryTimer = setInterval(() => { this.queueOutboxDrain() }, this.options.config.outboxRetryIntervalMs)
+    await this.scheduledActions.start()
+    this.retryTimer = setInterval(() => { this.queueOutboxDrain({ retryExhausted: false }) }, this.options.config.outboxRetryIntervalMs)
     this.queueOutboxDrain()
     await this.outboxTail
   }
@@ -106,10 +127,13 @@ export class WeComChannelRuntime {
       if (this.retryTimer !== undefined) clearInterval(this.retryTimer)
       this.controller.abort(new Error('channel-wecom disposed'))
       for (const handle of this.handles) handle.agent.cancel({ kind: 'disposed' })
+      await this.scheduledActions.close()
       await this.options.client.disconnect()
       await Promise.allSettled([...this.conversations.values()])
       await Promise.allSettled([...this.handles].map(handle => handle.dispose()))
       await this.outboxTail
+      await this.options.scheduledActionInputDomain.close()
+      await this.options.scheduledActionDomain.close()
       await this.options.domain.close()
     })()
     return this.closing
@@ -171,6 +195,9 @@ export class WeComChannelRuntime {
       updatedAt: now,
     })
     await deliveries.put(deliveryKey, { conversationKey, state: 'processing', reply: '', updatedAt: now })
+    // A conversation that just wrote in is the reliable moment to deliver what the
+    // provider refused while it was idle.
+    this.queueOutboxDrain({ target: delivery.target })
 
     const stream = new WeComReplyStream({
       client: this.options.client,
@@ -182,7 +209,7 @@ export class WeComChannelRuntime {
     let finalReply = this.options.config.messages.failure
     try {
       await stream.start(this.options.config.messages.processing)
-      const result = await this.runAgent(sessionId, delivery, stream)
+      const result = await this.runAgent(conversationKey, sessionId, delivery, stream)
       finalReply = result.trim() === '' ? this.options.config.messages.emptyReply : result
       await this.deliverFinal(stream, delivery.target, finalReply)
       await deliveries.put(deliveryKey, { conversationKey, state: 'completed', reply: finalReply, updatedAt: Date.now() })
@@ -200,12 +227,18 @@ export class WeComChannelRuntime {
     }
   }
 
-  private async runAgent(sessionId: SessionId, delivery: WeComTextDelivery, stream: WeComReplyStream): Promise<string> {
+  private async runAgent(
+    conversationKey: string,
+    sessionId: SessionId,
+    delivery: WeComTextDelivery,
+    stream: WeComReplyStream,
+  ): Promise<string> {
     if (this.ctx.agents.get(sessionId) !== undefined) throw new Error(`channel-wecom: Session is already active: ${sessionId}`)
     const existing = await this.ctx.sessionPersistence.stat(sessionId, { signal: this.controller.signal }) !== undefined
     const setup = async (agentCtx: Context, agent: Agent): Promise<void> => {
       await this.ctx.agentPresets.mount(agentCtx, this.options.config.agentPreset)
       installInitialModelSelection(agentCtx, agent, this.options.modelSelection)
+      this.scheduledActions.register(agentCtx, agent, conversationKey)
     }
     const agentOptions = { provider: this.options.modelSelection.provider, model: this.options.modelSelection.model }
     const handle = existing
@@ -312,27 +345,38 @@ export class WeComChannelRuntime {
     await this.options.domain.table('outbox').put(key, { target, content, attempts: 0, createdAt: now, updatedAt: now })
   }
 
-  private queueOutboxDrain(): void {
-    this.outboxTail = this.outboxTail.then(() => this.drainOutbox()).catch((error: unknown) => {
+  private async enqueueScheduledNotification(target: string, content: string): Promise<void> {
+    await this.enqueueOutbox(target, boundUtf8(content, this.options.config.maxReplyBytes))
+    this.queueOutboxDrain({ target })
+  }
+
+  private queueOutboxDrain(options: OutboxDrainOptions = {}): void {
+    this.outboxTail = this.outboxTail.then(() => this.drainOutbox(options)).catch((error: unknown) => {
       this.ctx.logger.warn(`channel-wecom: outbox drain failed: ${errorChain(error)}`)
     })
   }
 
-  private async drainOutbox(): Promise<void> {
+  private async drainOutbox(options: OutboxDrainOptions): Promise<void> {
     if (this.controller.signal.aborted) return
     const table = this.options.domain.table('outbox')
-    for (const [key, item] of table.entries()) {
+    const expiredBefore = Date.now() - this.options.config.outboxRetentionMs
+    for (const [key, item] of [...table.entries()]) {
+      if (item.createdAt < expiredBefore) {
+        await table.delete(key)
+        this.ctx.logger.warn('channel-wecom: outbox item expired before delivery')
+        continue
+      }
+      if (options.target !== undefined && item.target !== options.target) continue
+      if (options.retryExhausted === false && item.attempts >= this.options.config.maxOutboxAttempts) continue
       try {
         await this.options.client.sendMarkdown(item.target, item.content)
         await table.delete(key)
       } catch (error: unknown) {
         const attempts = item.attempts + 1
-        if (attempts >= this.options.config.maxOutboxAttempts) {
-          this.ctx.logger.warn(`channel-wecom: dropping exhausted outbox item: ${errorChain(error)}`)
-          await table.delete(key)
-        } else {
-          await table.put(key, { ...item, attempts, updatedAt: Date.now() })
-        }
+        await table.put(key, { ...item, attempts, updatedAt: Date.now() })
+        // The target and the content carry provider identity and message text, so
+        // only the attempt count and the provider diagnostic reach the log.
+        this.ctx.logger.warn(`channel-wecom: outbox send failed on attempt ${attempts}: ${errorChain(error)}`)
       }
     }
   }

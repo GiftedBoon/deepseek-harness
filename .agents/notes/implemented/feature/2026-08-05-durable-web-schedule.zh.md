@@ -16,6 +16,8 @@ Status: implemented
 
 用户可见边界是 `session-local`：原 Session 只有在 live 时才会准时运行提醒，cold 期间不发送任何外部通知；该 Session 再次 live 后才会处理 overdue 提醒。到期工作会等待 Agent 完全 idle，再通过 `followup()` 进入普通的下一轮队列；它绝不会中途引导当前轮次，也没有独立 Web 回执（[对话式交付](../../archived/simplification/2026-08-09-conversational-schedule-delivery.md)）。
 
+`schedule_create` schema 将 Schedule 限定为提醒和会话式跟进。它明确排除未来工具或命令执行，并要求有此需求的部署使用专用定时动作能力。到期 prompt 仍是未受信任的普通会话内容；Schedule 不会执行它。
+
 | 场景 | 持久事实 | live 行为 | 用户可见结果 |
 | --- | --- | --- | --- |
 | 创建与管理 | 原 Session 中的 `schedule/change` create／delete | Agent-scoped 工具在读取前、变更后执行 checkpoint | 稳定 id、UTC 目标、状态与 `session-local` 说明 |

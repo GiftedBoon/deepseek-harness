@@ -284,6 +284,7 @@ order: 1
           - '<admitted-user-id>'
         allowedChats: []
         groupConversationMode: shared
+        scheduledActionUtcOffset: '+08:00'
         messages:
           processing: '正在处理…'
           timeout: '处理超时，请稍后重试。'
@@ -291,9 +292,15 @@ order: 1
           emptyReply: '任务已完成，但没有文本回复。'
           unauthorized: '当前用户或会话未获授权。'
           duplicate: '该消息正在处理中。'
+          scheduledActionSuccess: '定时动作执行成功'
+          scheduledActionFailure: '定时动作执行失败'
+          scheduledActionUncertain: '定时动作的执行结果不确定；系统未自动重放'
+          scheduledActionDefinitionUnavailable: '定时动作的配置已变更、被移除或缺少已保存输入'
 ```
 
 在群聊访问单独获批前使用 `allowedChats: []`。启用群聊时添加准确的群 id，不得使用 `"*"`。
+
+`scheduledActions` 默认为空列表。只有当该无人值守渠道需要在未来时刻执行部署已批准的工具时，才应配置它。每个配置项固定工具名和静态参数，使用带首尾锚点的表达式校验模型提供的目标，并在调度时仍经过工具 policy。`targetArgumentFormat` 默认为 `scalar`；只有下游参数要求单元素目标数组时才设为 `singleton-array`。可选的 `input` 声明可以为一个已配置工具参数持久保存模型提供的字符串；应设置严格的 UTF-8 字节上限，并在值具有封闭语法时设置首尾锚点表达式。任意 shell 动作必须在调度前取得用户准确确认并通过语法检查。不得在静态参数或动态输入中持久保存凭据及其他敏感值。
 
 保护 profile 文件：
 

@@ -12,6 +12,18 @@ rules:
     environments: [development, staging, production]
     decision: allow
 
+  - id: harness-schedule
+    tools:
+      - schedule_create
+      - schedule_list
+      - schedule_delete
+      - scheduled_action_create
+      - scheduled_action_list
+      - scheduled_action_delete
+    risk: session_write
+    environments: [development, staging, production]
+    decision: allow
+
   - id: openviking-read
     tools:
       - mcp__openviking__read
@@ -53,6 +65,20 @@ rules:
     environments: [production]
     decision: require_approval
 
+  # bssh_ops authorizes the actor, target, and arguments and owns the audit
+  # record. The Harness approval path does not reach the WeCom channel, whose
+  # preset is approval: never, so every bssh_ops tool resolves to allow and the
+  # bssh-ops Skill requires preview plus explicit user confirmation.
+  - id: agent-database-read
+    tools:
+      - mcp__bssh-ops-remote__db_list_connections
+      - mcp__bssh-ops-remote__db_list_tables
+      - mcp__bssh-ops-remote__db_describe_table
+      - mcp__bssh-ops-remote__db_run_query
+    risk: read_only
+    environments: [development, staging, production]
+    decision: allow
+
   - id: bssh-ops-read
     tool_pattern: mcp__bssh-ops-remote__list_*
     risk: read_only
@@ -69,6 +95,7 @@ rules:
     tools:
       - mcp__bssh-ops-remote__preview_product_action
       - mcp__bssh-ops-remote__check_shell_syntax
+      - mcp__bssh-ops-remote__preview_change_cfg_paras
     risk: read_only
     environments: [development, staging, production]
     decision: allow
@@ -78,6 +105,8 @@ rules:
       - mcp__bssh-ops-remote__run_quick_command
       - mcp__bssh-ops-remote__run_scp
       - mcp__bssh-ops-remote__execute_product_action
+      - mcp__bssh-ops-remote__deploy_change_cfg_paras
+      - mcp__bssh-ops-remote__exec_change_cfg_paras
     risk: privileged_operation
     environments: [development, staging, production]
     decision: allow

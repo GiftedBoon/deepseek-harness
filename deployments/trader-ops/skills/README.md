@@ -8,6 +8,7 @@ This directory contains skill bundles discovered by Harness. Each direct child d
 
 - Complete steps, validations, and stopping conditions that the agent must follow for one task class.
 - Permitted MCP tools, input requirements, output format, and failure handling.
+- MCP tool references written with the full `mcp__<server>__<tool>` name in the tool inventory, which `../scripts/verify-skill-tool-policy.mjs` resolves against `../policies/tool-access.yaml`.
 - Skill-specific `references/`, `scripts/`, or `assets/` resources.
 - Valid YAML frontmatter: `name`, `description`, and, when required, `whenToUse`, `disable-model-invocation`, or `user-invocable`.
 

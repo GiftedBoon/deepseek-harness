@@ -16,7 +16,11 @@ HMAC-SHA-256 maps provider conversation and delivery ids to stable opaque keys. 
 
 Each conversation has a process-local promise queue. One delivery observes its deterministic Session id through `SessionPersistence.stat()`, creates or resumes one Agent from that current result, mounts the preset before publication, applies a confined noninteractive permission preset, and queues one ordinary user message. A Session deleted while the channel remains active is recreated under the same id on the next delivery. Exact Agent, Session, message, allocated-turn, and attempt correlation admits only that turn's `agent/assistant-stream` text deltas. The runtime waits for its `turn/end`, reaches quiescence, flushes the Session, and disposes the handle before processing the next message in that conversation.
 
-The `channel_wecom` domain stores conversation routing, delivery state, and an active-send outbox. Completed and failed duplicates replay stored text without another model call. Passive stream updates are cumulative, coalesced, ordered, and UTF-8 bounded. Final passive failure falls back to active Markdown; another failure commits the result to the outbox for bounded retry.
+The `channel_wecom` domain stores conversation routing, delivery state, and an active-send outbox. Completed and failed duplicates replay stored text without another model call. Passive stream updates are cumulative, coalesced, ordered, and UTF-8 bounded. Final passive failure falls back to active Markdown; another failure commits the result to the outbox, which retries on the configured interval and delivers when that conversation writes in again.
+
+An optional deployment action allowlist adds durable future execution without retaining an idle Agent. Each entry fixes an action id, registered tool name, static lossless-JSON arguments, target argument, scalar or singleton-array target encoding, and anchored target expression. An entry may also admit one bounded model-supplied string argument; its exact value is stored in the independent `channel_wecom_scheduled_action_input` domain. Agent-scoped management tools accept the action id, target, optional configured input, and either an explicit offset time or the next occurrence of `HH:mm[:ss]` under the deployment's fixed UTC offset. The independent action and input domains preserve pending and running work without changing the released `channel_wecom` generation or the released scheduled-action record format. [Parameterized WeCom scheduled actions](2026-09-14-parameterized-wecom-scheduled-actions.md) owns the dynamic-input decision and its security trade-offs.
+
+At the due time the process-global scheduler moves a pending record to running before invoking the configured tool without an Agent scope. The call still traverses the global tool policy and monotonic guards. The current action fingerprint must match the creation-time fingerprint; removal or change fails closed. The result enters the existing durable outbox before task deletion. Startup rearms pending records. A running record recovered after process loss produces an uncertain-outcome notification and is deleted without replay because the remote side effect may already have completed.
 
 ## Security and lifecycle
 
@@ -25,6 +29,8 @@ Wire admission checks BotID, text type, UTF-8 size, sender allowlist, and group 
 Trader Ops operator scripts project only rejected-user or rejected-group timestamps and ids from the journal, apply exact user and group-chat allowlist additions or removals through the validated configurator, and restart Harness with readiness and restart-stability checks. Allowlist changes preserve unspecified entries and require at least one admitted user.
 
 Disposal hides listeners, stops retries, aborts active intervals, disconnects the SDK, drains conversation queues and Agent handles, then closes storage. The SDK owns authentication, heartbeat, and reconnect behavior. One active process per BotID is required; distributed leader election is outside this package.
+
+Scheduled-action disposal also clears every timer, aborts and drains every started tool call, and leaves a call that crossed the running commit point for uncertain recovery. Background results are active WeCom notifications and tool-provider audit records; they are not fabricated assistant messages in Session history.
 
 ## Relationship to webhook ingress
 
@@ -36,13 +42,17 @@ This decision does not supersede [Fire-and-forget webhook Sessions](2026-08-22-f
 
 **Keep one Agent live for every chat.** Rejected because idle Agents retain scoped resources and complicate reload. Per-delivery activation reuses durable Session state with explicit ownership.
 
+**Turn an ordinary Schedule reminder into a command.** Rejected because Schedule deliberately presents due prompts as untrusted conversation content, owns no cold-Session recovery, and is disposed with a per-delivery WeCom Agent. Treating that reminder as authority would also allow arbitrary stored prose to become a remote operation.
+
+**Replay every running action after restart.** Rejected because the configured tool may have committed a non-idempotent remote side effect before the process lost its local result. Reporting uncertainty preserves at-most-once dispatch across that failure window.
+
 **Use raw user or chat ids as Session ids.** Rejected because Session ids appear in APIs, persistence, and diagnostics. HMAC preserves stable routing without publishing provider identifiers.
 
 **Project every Session event.** Rejected because reasoning and tool events are not reply content, while autonomous events may belong to another interval.
 
 ## Verification
 
-Tests cover opaque identity and group ownership, fresh creation after deletion, hostile wire admission, SDK log suppression, UTF-8 bounds, cumulative coalescing, and ordered finalization. Type checking covers the SDK adapter and Host services. Repository gates cover metadata, documentation pairing, generated catalogs, dependency policy, and the invariant companion.
+Tests cover opaque identity and group ownership, fresh creation after deletion, hostile wire admission, SDK log suppression, UTF-8 bounds, cumulative coalescing, ordered finalization, fake-clock due dispatch, parameter persistence and validation, policy traversal, pending restart recovery, cancellation, and non-replay of recovered running work. A keyless recorded Session pins the three scheduled-action schemas in the assembled model request. Type checking covers the SDK adapter and Host services. Repository gates cover metadata, documentation pairing, generated catalogs, dependency policy, and the invariant companion.
 
 ## Consequences
 
@@ -50,3 +60,4 @@ Tests cover opaque identity and group ownership, fresh creation after deletion, 
 - Web Workspace history remains the authoritative conversation record.
 - Operators must preserve the identity key and configure explicit allowlists.
 - Media messages, cards, horizontal scaling, and inbound replay are unsupported.
+- Scheduled actions are explicitly configured, bounded per conversation and by time horizon, and notify through the channel outbox rather than Session history; parameterized entries also bound the persisted input by UTF-8 byte length and may apply an anchored expression.

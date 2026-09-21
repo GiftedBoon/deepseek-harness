@@ -10,6 +10,26 @@ const silentSdkLogger: Logger = Object.freeze({
   error: (): void => {},
 })
 
+/**
+ * Render a rejected SDK reply as an Error that keeps the provider diagnostic.
+ *
+ * The SDK rejects with the acknowledgement frame, whose `errcode` and `errmsg`
+ * are the only statement of why the provider refused the send.
+ * @param error - the value the SDK rejected with.
+ * @returns an Error whose message names the provider error code.
+ */
+function replyFailure(error: unknown): Error {
+  if (error instanceof Error) return error
+  if (typeof error === 'object' && error !== null) {
+    const frame = error as { readonly errcode?: unknown; readonly errmsg?: unknown }
+    const parts: string[] = []
+    if (typeof frame.errcode === 'number') parts.push(`errcode=${frame.errcode}`)
+    if (typeof frame.errmsg === 'string') parts.push(`errmsg=${frame.errmsg}`)
+    if (parts.length > 0) return new Error(`WeCom reply rejected: ${parts.join(' ')}`, { cause: error })
+  }
+  return new Error(`WeCom reply rejected: ${String(error)}`, { cause: error })
+}
+
 /** Adapt the maintained official SDK and await the first successful authentication. */
 export class OfficialWeComClient implements WeComChannelClient {
   private readonly client: WSClient
@@ -68,11 +88,19 @@ export class OfficialWeComClient implements WeComChannelClient {
 
   /** Send one cumulative passive stream update. */
   async replyStream(frame: unknown, streamId: string, content: string, finish: boolean): Promise<void> {
-    await this.client.replyStream(frame as WsFrameHeaders, streamId, content, finish)
+    try {
+      await this.client.replyStream(frame as WsFrameHeaders, streamId, content, finish)
+    } catch (error: unknown) {
+      throw replyFailure(error)
+    }
   }
 
   /** Send an active Markdown fallback or retry. */
   async sendMarkdown(target: string, content: string): Promise<void> {
-    await this.client.sendMessage(target, { msgtype: 'markdown', markdown: { content } })
+    try {
+      await this.client.sendMessage(target, { msgtype: 'markdown', markdown: { content } })
+    } catch (error: unknown) {
+      throw replyFailure(error)
+    }
   }
 }

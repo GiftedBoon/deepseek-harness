@@ -64,7 +64,7 @@ ssh -t dsh-server \
   'sudo env TRADER_OPS_LAN_HOST=192.168.4.103 bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-debian-runtime.sh'
 ```
 
-在隐藏提示处输入已轮换的 AIHubMix key。脚本默认使用 `https://api.inferera.com/v1` 和 `deepseek-v4-flash-0731`，生成独立的 OpenViking root key，写入权限为 `0600` 的环境文件，启动 OpenViking，创建 `trader-ops/remote-admin` 租户身份，保存权限更窄的 user key，安装固定版本的 DSH 插件，并在加载 Trader Ops 插件的情况下验证一次真实远程模型回合。脚本会持久化显式传入的 `TRADER_OPS_LAN_HOST`，通过 `--trusted-host` 向 Harness 声明该 authority，并配置 systemd socket proxy，而不会改变 Harness 的回环监听。然后它会要求两条访问路径都成功响应或返回预期的 `401` 身份验证挑战，并确认 systemd 重启次数在十秒内保持稳定。Harness 单元在两分钟内启动失败五次后会停止重试。
+在隐藏提示处输入已轮换的 AIHubMix key。脚本默认使用 `https://api.inferera.com/v1` 和 `deepseek-v4.1-flash`，生成独立的 OpenViking root key，写入权限为 `0600` 的环境文件，启动 OpenViking，创建 `trader-ops/remote-admin` 租户身份，保存权限更窄的 user key，安装固定版本的 DSH 插件，并在加载 Trader Ops 插件的情况下验证一次真实远程模型回合。脚本会持久化显式传入的 `TRADER_OPS_LAN_HOST`，通过 `--trusted-host` 向 Harness 声明该 authority，并配置 systemd socket proxy，而不会改变 Harness 的回环监听。然后它会要求两条访问路径都成功响应或返回预期的 `401` 身份验证挑战，并确认 systemd 重启次数在十秒内保持稳定。Harness 单元在两分钟内启动失败五次后会停止重试。
 
 配置器可继续执行：环境文件存在后会复用它，不会再次询问或覆盖凭据。如果 OpenViking account 已存在但租户 key 仍为空，它会只重新生成该 admin key 并保存新值。Harness 永远不会取得 root key。
 
@@ -154,7 +154,9 @@ sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure
 sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure-bssh-ops-mcp.sh --disable
 ```
 
-启用后，工具会以 `mcp__bssh-ops-remote__` 为前缀出现。`policies/tool-access.yaml` 允许三个精确的写工具直接通过 Harness policy；`bssh-ops` Skill 仍要求预览和用户明确确认，MCP 服务负责下游授权与审计。不要把 API key 写入 patch、Skill、命令参数或工单。
+启用后，工具会以 `mcp__bssh-ops-remote__` 为前缀出现。`policies/tool-access.yaml` 对 `bssh-ops` Skill 和定时动作引用的每个工具做了分类并全部解析为 `allow`，不经过 Harness 审批；`scripts/verify-skill-tool-policy.mjs` 会拒绝策略判定为拒绝的引用工具。Skill 仍要求预览和用户明确确认，MCP 服务负责下游授权与审计。不要把 API key 写入 patch、Skill、命令参数或工单。
+
+企业微信 patch 暴露三个持久 bssh_ops 动作，接受任意非空目标：静态的 `ps_check` 兼容动作、使用 `list_quick_commands` 返回准确 key 的 `quick_command`，以及使用已通过 `check_shell_syntax` 并经用户准确确认命令的 `custom_shell`。动态输入具有 UTF-8 长度限制，独立于已发布的动作记录持久保存，并且只会在到点时传给 `run_quick_command`；其中仍禁止凭据及其他敏感值。`15:01` 这样的仅时间请求按 `+08:00` 解析为下一次发生时点。到期通知会说明动作已触发，并附上 bssh_ops 结果，通常是 `run_id`；由于 `run_quick_command` 会在远程执行完成前返回，需要最终输出时应再通过 `get_run_status` 查询该 id。通用 Schedule 仍只提供提醒，不会执行这些操作。
 
 ### 企业微信日常运维
 
@@ -199,13 +201,13 @@ sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure
 1. 使用新的、已评审的完整 commit SHA 运行 `install-debian-release.sh`。
 2. 加载 `/etc/deepseek-harness/trader-ops.env`，再以 `dsh` 身份针对新发布运行 `bootstrap-profile.sh` 和 `verify-deployment.sh`，然后才重启服务；这些命令会保留可选企业微信依赖与无人值守 preset。
 3. 执行任何数据迁移前，备份 `/var/lib/openviking` 与 `/var/lib/deepseek-harness`。
-4. 重启 `dsh-trader-ops`，重复监听地址、健康、空 skill 和空 knowledge 检查，并保留上一发布。
+4. 通过 `restart-runtime.sh` 重启 `dsh-trader-ops`；该脚本会先安装当前 release 的 systemd unit。重复监听地址、健康、空 skill 和空 knowledge 检查，并保留上一发布。
 5. 失败时，把 `current` 原子指回上一个已验证发布，再重启 Harness。只有失败发布执行过明确的不兼容迁移时，才恢复持久化数据。
 
 ## 上线前门禁
 
 - OpenViking `/health` 与 `/ready` 成功，`ov doctor` 通过，且容器重启后数据仍然存在。
-- `dsh --dump-config` 中只有一个预期的 `openviking-memory-runtime`，并包含 `trader-ops-tool-policy`、`trader-ops-skills` 与 AIHubMix 提供方。
+- `dsh --dump-config` 中只有一个预期的 `openviking-memory-runtime`，并包含 `trader-ops-tool-policy`、`trader-ops-skills`、AIHubMix 提供方以及 `@deepseek-ai/dsh-schedule`。
 - 实际环境不存在模板或已暴露凭据，密钥不会出现在 Git、日志、进程参数或 shell history 中。
 - AIHubMix 的端点归属、模型路由、保留策略与数据处理条款必须覆盖每一类模型可见数据并通过评审。
 - 在缺少业务知识、生产 skill、可信用户身份、持久审批与 Trader Ops MCP 授权层时，Harness 保持只读，并只允许可信开发内网或 SSH 隧道访问。

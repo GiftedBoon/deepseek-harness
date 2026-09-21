@@ -18,6 +18,11 @@
 - 故障处置步骤；放在 `../runbooks/`。
 - 产品当前绑定策略等实时结果。
 
+## 模板
+
+- [业务规则](../../templates/knowledge/business-rule.md)用于说明长期约束、适用条件、例外和权威来源。
+- [业务术语表](../../templates/knowledge/business-glossary.md)用于说明术语、计量口径和来源。
+
 ## 示例：`strategy-switch-rule.md`
 
 ```markdown

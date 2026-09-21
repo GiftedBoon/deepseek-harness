@@ -24,12 +24,12 @@ The channel family connects authenticated enterprise messaging transports to ord
 
 | Package | Role | ctx key |
 |---|---|---|
-| [`channel-wecom/`](channel-wecom/README.md) | Enterprise WeCom AI Bot long connection, durable conversation routing, and streamed replies | function plugin; no service key |
+| [`channel-wecom/`](channel-wecom/README.md) | Enterprise WeCom AI Bot long connection, durable conversation routing, streamed replies, and allowlisted scheduled actions | function plugin; no service key |
 
 <a id="related-documentation"></a>
 ## Related documentation
 
-Channels are protocol drivers rather than model-facing tools. They activate regular Agents and project only correlated visible assistant text back to the provider.
+Channels are protocol drivers. They activate regular Agents and project correlated visible assistant text back to the provider; a channel may also expose transport-owned tools such as WeCom's deployment-allowlisted scheduled actions.
 
 - [Core subsystem](../../docs/subsystems/core.md) — Agent creation, Session lifecycle, model routing, and the event flow that channels drive.
 

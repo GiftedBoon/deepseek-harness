@@ -6,4 +6,3 @@ recording: authored
 header:
   class: trader-ops-wecom-identity
   pin: true
-  toolSchemasSource: text-turn

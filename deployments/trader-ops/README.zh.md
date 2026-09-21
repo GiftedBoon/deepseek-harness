@@ -9,14 +9,18 @@ deployments/trader-ops/
 ├── config/       # DSH, OpenViking, and systemd configuration
 ├── knowledge/    # Facts, rules, and operational context indexed by OpenViking
 ├── policies/     # Enforced tool access plus future identity/approval contracts
+├── remote-deployment/ # Validated remote deployment record
 ├── scripts/      # Profile bootstrap and deployment verification scripts
 ├── skills/       # Task instructions loaded in full by Harness Skill Loader
+├── templates/    # Obsidian authoring templates excluded from knowledge ingestion
 ├── ARCHITECTURE.md
 ├── DEVELOPMENT.md
 └── DEPLOYMENT.md
 ```
 
 当前骨架支持知识文档和 `SKILL.md` 都为零的状态。先阅读[架构说明](ARCHITECTURE.md)，然后按[本地开发步骤](DEVELOPMENT.md)或[远程部署步骤](DEPLOYMENT.md)操作。
+
+当前远程验证快照位于[remote-deployment/](remote-deployment/README.zh.md)。其中记录已部署 revision、服务入口、健康检查和企业微信 Session 重建验收顺序，不保存凭据或消息内容。
 
 ## 应该放在这里
 

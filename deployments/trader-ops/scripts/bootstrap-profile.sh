@@ -14,6 +14,7 @@ logger_plugin="$repo_root/vendor/logger-console/lib/index.js"
 wecom_plugin="$repo_root/packages/channel/channel-wecom/lib/index.js"
 wecom_patch="$deployment_root/config/dsh/trader-ops-wecom.patch.yml"
 bssh_mcp_patch="$deployment_root/config/dsh/trader-ops-bssh-ops-mcp.patch.yml"
+schedule_patch="$repo_root/apps/cli/config/examples/schedule/cordis.yml"
 wecom_preset_source="$repo_root/packages/preset/agent-presets/presets/standard"
 lan_proxy_service="$deployment_root/config/systemd/dsh-trader-ops-lan-proxy.service"
 lan_proxy_socket="$deployment_root/config/systemd/dsh-trader-ops-lan-proxy.socket.in"
@@ -30,8 +31,8 @@ if [[ ! -f "$policy_plugin" || ! -f "$logger_plugin" ]]; then
   printf 'Built Trader Ops policy or console logger plugin is missing; install a completed release.\n' >&2
   exit 1
 fi
-if [[ ! -f "$wecom_plugin" || ! -f "$wecom_patch" || ! -f "$bssh_mcp_patch" ]]; then
-  printf 'Built WeCom channel or a Trader Ops MCP patch is missing from %s.\n' "$deployment_root" >&2
+if [[ ! -f "$wecom_plugin" || ! -f "$wecom_patch" || ! -f "$bssh_mcp_patch" || ! -f "$schedule_patch" ]]; then
+  printf 'Built WeCom channel, Trader Ops MCP patch, or Schedule overlay is missing from %s.\n' "$deployment_root" >&2
   exit 1
 fi
 if [[ ! -f "$lan_proxy_service" || ! -f "$lan_proxy_socket" ]]; then
@@ -57,6 +58,7 @@ dump_output="$(node "$dsh_cli" --profile "$profile" \
   --patch "$deployment_root/config/dsh/trader-ops.patch.yml" \
   --patch "$wecom_patch" \
   --patch "$bssh_mcp_patch" \
+  --patch "$schedule_patch" \
   --dump-config)"
 
 grep -q 'openviking-memory-runtime' <<<"$dump_output"
@@ -64,7 +66,8 @@ grep -q 'trader-ops-tool-policy' <<<"$dump_output"
 grep -q 'trader-ops-console-logger' <<<"$dump_output"
 grep -q 'trader-ops-skills' <<<"$dump_output"
 grep -q 'trader-ops-wecom' <<<"$dump_output"
+grep -q '@deepseek-ai/dsh-schedule' <<<"$dump_output"
 
 printf 'Profile %s is ready in %s.\n' "$profile" "$DSH_HOME"
 printf 'OpenViking plugin: @openviking/dsh-memory-plugin@%s\n' "$plugin_version"
-printf 'Effective configuration contains OpenViking, the Trader Ops tool policy, journal logging, the skill provider, and the optional WeCom channel.\n'
+printf 'Effective configuration contains OpenViking, the Trader Ops tool policy, journal logging, the skill provider, the optional WeCom channel, and Schedule reminders.\n'

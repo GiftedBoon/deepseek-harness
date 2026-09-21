@@ -25,7 +25,7 @@ Schedule lets you ask the model for durable reminders that return as ordinary fo
 <a id="use-this-package"></a>
 ## Use this package
 
-Use Schedule when you want a reminder to arrive as a message in the same conversation — for example, "remind me in 30 minutes to follow up on the migration" or "check back every hour while this build runs". The agent creates, lists, and cancels reminders through its ordinary tools; you only enable the overlay once.
+Use Schedule when you want a reminder to arrive as a message in the same conversation — for example, "remind me in 30 minutes to follow up on the migration" or "check back every hour while this build runs". Schedule never executes a recorded tool or command; use a deployment's dedicated scheduled-action capability for future side effects. The agent creates, lists, and cancels reminders through its ordinary tools; you only enable the overlay once.
 
 ### When to choose it
 

@@ -388,7 +388,7 @@ Source: [`packages/shell/bash-sandbox/src/index.ts:36`](../packages/shell/bash-s
 
 ## `@deepseek-ai/dsh-channel-wecom`
 
-Requires: `agents` · `agentDefaultModel` · `agentPresets` · `credentials` · `permissionPresets` · `sessionPersistence` · `sessions` · `sessionTitle` · `storageDomain` · `workspaceRegistry`
+Requires: `agents` · `agentDefaultModel` · `agentPresets` · `credentials` · `permissionPresets` · `sessionPersistence` · `sessions` · `sessionTitle` · `storageDomain` · `workspaceRegistry` · `tools`
 
 ```ts config-catalog
 /** Enterprise WeCom channel configuration. */
@@ -429,14 +429,46 @@ export interface Config {
   maxDeliveryRecords?: number
   /** Interval between active-send outbox retry passes. */
   outboxRetryIntervalMs?: number
-  /** Failed active sends allowed before an outbox item is dropped. */
+  /** Failed periodic active sends before an outbox item waits for the next active conversation. */
   maxOutboxAttempts?: number
+  /** Age after which an undelivered outbox item is removed. */
+  outboxRetentionMs?: number
+  /** Deployment allowlist for durable, future tool execution. */
+  scheduledActions?: ScheduledActionConfig[]
+  /** Maximum pending or running actions retained for one conversation. */
+  maxScheduledActionsPerConversation?: number
+  /** Furthest permitted future execution time from creation. */
+  maxScheduledActionDelayMs?: number
+  /** Cooperative deadline supplied to one background tool execution. */
+  scheduledActionTimeoutMs?: number
+  /** Fixed numeric offset used to resolve time-only scheduled-action requests. */
+  scheduledActionUtcOffset?: string
   /** Operator-localized text sent by channel-owned states. */
   messages: ChannelMessages
 }
 
 /** Supported conversation ownership for group messages. */
 export type GroupConversationMode = 'shared' | 'per-user'
+
+/** Deployment-owned allowlisted action available to the WeCom scheduling tools. */
+export interface ScheduledActionConfig {
+  /** Stable model-facing action identifier. */
+  id: string
+  /** Short model-facing description of the allowlisted operation. */
+  description: string
+  /** Exact registered tool name dispatched when the action becomes due. */
+  toolName: string
+  /** Top-level tool argument receiving the model-supplied target. */
+  targetArgument: string
+  /** Encoding used when placing the target into the configured tool argument. */
+  targetArgumentFormat?: 'scalar' | 'singleton-array'
+  /** Anchored regular expression admitting target identifiers for this action. */
+  targetPattern: string
+  /** Static lossless-JSON arguments merged with the target argument. */
+  arguments?: unknown
+  /** Optional model-supplied string argument persisted for due-time dispatch. */
+  input?: ScheduledActionInputConfig | undefined
+}
 
 /** Operator-owned user-visible channel messages. */
 export interface ChannelMessages {
@@ -452,10 +484,30 @@ export interface ChannelMessages {
   unauthorized: string
   /** Reply while the same delivery id is already processing. */
   duplicate: string
+  /** Prefix for a completed scheduled action notification. */
+  scheduledActionSuccess: string
+  /** Prefix for a failed scheduled action notification. */
+  scheduledActionFailure: string
+  /** Prefix for a scheduled action whose side-effect outcome is unknown after recovery. */
+  scheduledActionUncertain: string
+  /** Detail for a scheduled action whose definition or required persisted input is unavailable at dispatch. */
+  scheduledActionDefinitionUnavailable: string
+}
+
+/** One model-supplied string passed to the scheduled tool at dispatch. */
+export interface ScheduledActionInputConfig {
+  /** Top-level tool argument receiving the model-supplied value. */
+  toolArgument: string
+  /** Model-facing explanation of the required value. */
+  description: string
+  /** Maximum persisted UTF-8 byte length. */
+  maxBytes: number
+  /** Optional anchored regular expression admitting values. */
+  pattern?: string
 }
 ```
 
-Source: [`packages/channel/channel-wecom/src/config.ts:23`](../packages/channel/channel-wecom/src/config.ts)
+Source: [`packages/channel/channel-wecom/src/config.ts:63`](../packages/channel/channel-wecom/src/config.ts)
 
 <a id="deepseek-aidsh-client-connection"></a>
 

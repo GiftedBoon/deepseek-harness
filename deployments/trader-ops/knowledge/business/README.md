@@ -18,6 +18,11 @@ This directory defines business objects, their relationships, and durable busine
 - Incident-response steps; place them in `../runbooks/`.
 - Live results such as a product's currently bound strategy.
 
+## Templates
+
+- [Business rule](../../templates/knowledge/business-rule.md) defines a durable constraint, its applicability, exceptions, and authoritative sources.
+- [Business glossary](../../templates/knowledge/business-glossary.md) defines terms, measurement conventions, and sources.
+
 ## Example: `strategy-switch-rule.md`
 
 ```markdown

@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/user/guide/wecom-linux-deployment.md
-wecom-linux-deployment.md: fcf4aef1d5eea9daff1a3c3e578dbea70715cc84
-wecom-linux-deployment.zh.md: 73f1288af944277ca83108b834bcce91de8c8c83
+wecom-linux-deployment.md: 508afeefe5ed302d427782db77f1a14155fa5986
+wecom-linux-deployment.zh.md: bd6352a8ccefd62e6ec597deed15f7e188113438

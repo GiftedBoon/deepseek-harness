@@ -33,7 +33,7 @@ if [[ "$action" == --enable ]]; then
     read -r -s -p 'Enter the bssh_ops MCP X-API-Key: ' mcp_key
     printf '\n'
   fi
-  if [[ ! "$mcp_key" =~ ^[A-Za-z0-9._@/:+=-]+$ ]]; then
+  if [[ ! "$mcp_key" =~ ^[A-Za-z0-9._@/:+=,-]+$ ]]; then
     printf 'The bssh_ops MCP API key is empty or contains unsupported characters.\n' >&2
     exit 1
   fi

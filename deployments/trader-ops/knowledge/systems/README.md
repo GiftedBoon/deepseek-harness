@@ -18,6 +18,11 @@ This directory records system responsibilities, component relationships, data fl
 - Business concept definitions; place them in `../business/`.
 - Response procedures for a specific incident; place them in `../runbooks/`.
 
+## Templates
+
+- [System overview](../../templates/knowledge/system-overview.md) records responsibilities, dependencies, interfaces, observability, and failure behaviour.
+- [Data source](../../templates/knowledge/data-source.md) records authoritative facts, field meanings, freshness, access paths, and quality signals.
+
 ## Example: `strategy-control.md`
 
 ```markdown

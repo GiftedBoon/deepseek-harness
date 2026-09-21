@@ -27,7 +27,7 @@ DeepSeek Harness (web profile)
            默认禁用
 ```
 
-`knowledge/` 是待提交给 OpenViking 的受版本控制真源。OpenViking 插件负责会话记忆、检索和相关 MCP 工具的桥接，但不会自动扫描这个 Git 目录；后续应通过评审后的入库流水线、OpenViking Studio 或 `mcp__openviking__add_resource` 显式提交内容。
+`knowledge/` 是 OpenViking resource 的受版本控制真源。OpenViking 插件负责会话记忆、检索和相关 MCP 工具的桥接，但不会扫描这个 Git 目录。由运维人员运行的 `scripts/sync-knowledge.mjs` 发布器会校验已批准文档、按内容 hash 生成变更计划，并把每个变化文件提交到稳定的 `viking://resources/trader-ops/knowledge/...` URI。发布必须显式触发，stale resource 只会报告而不会删除。
 
 `skills/` 由额外的 `@deepseek-ai/dsh-skill-filesystem` 提供方发现。目录中的 `README.md` 只是说明文档，只有 `<skill-name>/SKILL.md` 才会进入 catalog，并在匹配任务时由 Harness Skill Loader 完整加载。
 
@@ -41,8 +41,10 @@ DeepSeek Harness (web profile)
 | OpenViking DSH 插件 | 可安装 | 固定使用 `@openviking/dsh-memory-plugin@0.3.0` |
 | AIHubMix 模型 | 可选、已验证 | `llm-pi-ai` 通过环境提供的端点和 key 为 Harness 与 OpenViking 语义提取提供模型 |
 | Trader Ops skill 根目录 | 已配置 | 空目录是合法状态，未来添加 `SKILL.md` 即可发现 |
-| Git 知识自动入库 | 未实现 | 必须单独实现评审、提交、更新和删除语义 |
+| Git 知识发布 | 运维显式触发 | 支持 dry-run 计划及已批准文档的新增/更新；绝不删除 stale resource |
 | bssh_ops MCP | 可选、默认关闭 | 使用 root 所有的 API key 启用 `trader-ops-bssh-ops-mcp.patch.yml` |
+| Schedule 提醒 | 已启用 | Web 服务应用 Schedule overlay，策略允许其 Session 内管理工具；到期 prompt 绝不直接执行 |
+| 企业微信定时执行 bssh_ops | 随企业微信启用 | 持久动作允许对任意非空目标执行 `ps_check`、任意当前快捷命令 key，或经过语法检查并由用户准确确认的自定义 shell；执行时仍经过工具策略，具体目标由 bssh_ops 授权 |
 | Harness 工具策略 | 实验性、已强制执行 | 首条匹配 allow/ask/deny、默认拒绝，并带防绕过 guard |
 | 身份、资源授权、审计 | 未实现 | 必须由 Trader Ops MCP 服务和审批存储强制执行 |
 
@@ -55,6 +57,7 @@ DeepSeek Harness (web profile)
 - DSH 默认从 `DSH_PERMISSION_MODE=read-only` 开始。该值约束 Harness 本地沙箱，不等价于业务 tool guard。
 - OpenViking 凭据只通过环境变量注入。`OPENVIKING_ROOT_API_KEY` 用于账户管理并与 `server.root_api_key` 一致；Harness 使用权限更窄的租户级 `OPENVIKING_API_KEY` 访问数据。
 - `mcp__openviking__forget` 是永久删除操作，当前策略已显式拒绝它。OpenViking 仍必须独立认证并授权绕过 Harness 的直接客户端。
+- 记忆也会在没有工具调用的情况下进入 OpenViking：`@openviking/dsh-memory-plugin` 的会话 capture 会把每条用户与助手消息写入会话，并在达到 `commitTokenThreshold` 或会话销毁时提交，因此约束 `add_resource`、`write`、`remember`、`edit` 的工具策略看不到这条路径。`captureToolResults: false` 使工具结果不进入该数据流，但助手回复中复述的这些内容仍会被捕获。
 - 所有动态业务状态应实时从 MCP/API 查询，不能以检索到的旧 Markdown 代替。
 
 ## 配置分层
@@ -65,6 +68,7 @@ DSH 内置 web profile
   + config/dsh/trader-ops.patch.yml
   + （可选）config/dsh/trader-ops-aihubmix.patch.yml
   + （可选）config/dsh/trader-ops-bssh-ops-mcp.patch.yml
+  + apps/cli/config/examples/schedule/cordis.yml
 ```
 
 后加载的 patch 会覆盖同一配置项的完整 `config`，不是深度合并。因此修改 `openviking-memory-runtime` 时必须保留本文件中仍需生效的全部字段，并用 `--dump-config` 检查最终配置。

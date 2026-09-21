@@ -53,6 +53,7 @@ const AT_PROMPT = 'Review the release window'
 const AT_READY = 'Ready for a browser-local reminder request.'
 const AT_ACK = 'Scheduled in your browser time zone.'
 const AT_REPLY = 'Reminder: Review the release window.'
+const SCHEDULE_CREATE_ROUTE = 'Do not use this tool to execute a tool or command at a future time'
 const EVERY_PROMPTS = ['Check primary metrics', 'Check secondary metrics'] as const
 const EVERY_REPLY = 'Reminders: Check primary metrics; Check secondary metrics.'
 const EVERY_INTERVAL_SECONDS = 60 * 60
@@ -533,7 +534,9 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
       `Browser time zone for this request: ${AT_BROWSER_ZONE}. `
       + 'Interpret otherwise-unqualified dates and times in this zone.',
     )
-    expect(firstRequest.tools?.some(tool => tool.name === 'schedule_create')).toBe(true)
+    const scheduleCreate = firstRequest.tools?.find(tool => tool.name === 'schedule_create')
+    expect(scheduleCreate).toBeDefined()
+    expect(scheduleCreate?.description).toContain(SCHEDULE_CREATE_ROUTE)
     const selectedAt = atAdapter.selectedAt
     const scheduledAt = atAdapter.scheduledAt
     if (selectedAt === undefined || scheduledAt === undefined) {

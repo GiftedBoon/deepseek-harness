@@ -27,5 +27,6 @@ Agent（智能体）可以读取和编辑工作区文件、运行命令、委派
 - [配置模型](./providers.zh.md)
 - [在 Linux 上部署企业微信 Agent](./wecom-linux-deployment.zh.md)
 - [使用 Python SDK](./python-sdk.zh.md)
+- [构建受控的团队级 Agent 平台](./team-agent-platform.zh.md)
 - [使用其他 CLI 模式](../../../apps/cli/README.zh.md)
 - [开发插件](../develop/basic/index.zh.md)

@@ -9,7 +9,10 @@ import { isAbsolute } from 'node:path'
 import { OfficialWeComClient } from './client.ts'
 import { Config, type ResolvedConfig } from './config.ts'
 import { channelWeComDomainSpec } from './domain.ts'
+import { weComScheduledActionInputDomainSpec } from './scheduled-action-input-domain.ts'
+import { weComScheduledActionDomainSpec } from './scheduled-action-domain.ts'
 import { WeComChannelRuntime } from './runtime.ts'
+import { resolveScheduledActions } from './scheduled-actions.ts'
 
 export { Config }
 export * from './types.ts'
@@ -20,12 +23,14 @@ export const name = 'channel-wecom'
 export const inject = [
   'agents', 'agentDefaultModel', 'agentPresets', 'credentials', 'permissionPresets',
   'sessionPersistence', 'sessions', 'sessionTitle', 'storageDomain', 'workspaceRegistry',
+  'tools',
 ]
 
 /** Resolve credentials and deployment referents before opening the provider connection. */
 export function apply(ctx: Context, config: Config): Promise<void> {
   return (async () => {
     const resolved = config as ResolvedConfig
+    resolveScheduledActions(resolved.scheduledActions)
     if (!isAbsolute(resolved.workspacePath)) throw new Error('channel-wecom: workspacePath must be absolute')
     const permission = ctx.permissionPresets.resolve(resolved.permissionPreset)
     if (permission.approval !== 'never' || permission.sandbox === 'danger-full-access') {
@@ -39,6 +44,21 @@ export function apply(ctx: Context, config: Config): Promise<void> {
     if (identity === undefined) throw new Error(`channel-wecom: credential ${resolved.sessionKeyEnv} is not configured`)
     const workspace = await ctx.workspaceRegistry.create(resolved.workspacePath)
     const domain = await ctx.storageDomain.open(channelWeComDomainSpec)
+    let scheduledActionDomain
+    try {
+      scheduledActionDomain = await ctx.storageDomain.open(weComScheduledActionDomainSpec)
+    } catch (error: unknown) {
+      await domain.close()
+      throw error
+    }
+    let scheduledActionInputDomain
+    try {
+      scheduledActionInputDomain = await ctx.storageDomain.open(weComScheduledActionInputDomainSpec)
+    } catch (error: unknown) {
+      await scheduledActionDomain.close()
+      await domain.close()
+      throw error
+    }
     const runtime = new WeComChannelRuntime(ctx, {
       config: resolved,
       client: new OfficialWeComClient({
@@ -47,6 +67,8 @@ export function apply(ctx: Context, config: Config): Promise<void> {
         connectTimeoutMs: resolved.connectTimeoutMs,
       }),
       domain,
+      scheduledActionDomain,
+      scheduledActionInputDomain,
       identitySecret: identity.value,
       workspace,
       modelSelection: ctx.agentDefaultModel.currentSelection(),

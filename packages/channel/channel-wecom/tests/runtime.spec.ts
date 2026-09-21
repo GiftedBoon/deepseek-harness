@@ -3,6 +3,7 @@ import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ResolvedConfig } from '../src/config.ts'
 import { conversationIdentity, deliveryIdentity } from '../src/identity.ts'
 import { WeComChannelRuntime } from '../src/runtime.ts'
+import { resolveScheduledActions } from '../src/scheduled-actions.ts'
 import type { WeComChannelClient } from '../src/types.ts'
 
 interface DeliveryRecord {
@@ -16,6 +17,18 @@ interface OutboxRecord {
   target: string
   content: string
   attempts: number
+  createdAt: number
+  updatedAt: number
+}
+
+interface ScheduledActionRecord {
+  sessionId: string
+  conversationKey: string
+  actionId: string
+  definitionFingerprint: string
+  target: string
+  runAt: number
+  state: 'pending' | 'running'
   createdAt: number
   updatedAt: number
 }
@@ -41,6 +54,20 @@ class Domain {
     throw new Error(`unexpected table: ${name}`)
   }
 
+  close(): Promise<void> { this.closed++; return Promise.resolve() }
+}
+
+class ScheduledActionDomain {
+  readonly actions = new Table<ScheduledActionRecord>()
+  closed = 0
+  table(): Table<ScheduledActionRecord> { return this.actions }
+  close(): Promise<void> { this.closed++; return Promise.resolve() }
+}
+
+class ScheduledActionInputDomain {
+  readonly inputs = new Table<{ value: string }>()
+  closed = 0
+  table(): Table<{ value: string }> { return this.inputs }
   close(): Promise<void> { this.closed++; return Promise.resolve() }
 }
 
@@ -91,11 +118,14 @@ interface RuntimeHarness {
   readonly runtime: WeComChannelRuntime
   readonly client: Client
   readonly domain: Domain
+  readonly scheduledActionDomain: ScheduledActionDomain
+  readonly scheduledActionInputDomain: ScheduledActionInputDomain
   readonly config: ResolvedConfig
   readonly calls: string[]
   readonly modelResults: unknown[]
   readonly persistedSessions: Set<string>
   readonly warnings: ReturnType<typeof vi.fn>
+  readonly registeredTools: Map<string, { readonly description: string; readonly parameters: unknown }>
   emit(name: string, ...args: unknown[]): void
 }
 
@@ -113,10 +143,16 @@ function baseConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     allowedUsers: ['allowed'], allowedChats: ['chat'], sessionTitlePrefix: 'WeCom',
     connectTimeoutMs: 20, streamFlushIntervalMs: 1, maxInputBytes: 100, maxReplyBytes: 100,
     turnTimeoutMs: 50, deliveryRetentionMs: 100_000, maxDeliveryRecords: 100,
-    outboxRetryIntervalMs: 100_000, maxOutboxAttempts: 2,
+    outboxRetryIntervalMs: 100_000, maxOutboxAttempts: 2, outboxRetentionMs: 100_000,
+    scheduledActions: [], maxScheduledActionsPerConversation: 32,
+    maxScheduledActionDelayMs: 1_000_000, scheduledActionTimeoutMs: 1_000,
+    scheduledActionUtcOffset: '+08:00',
     messages: {
       processing: 'processing', timeout: 'timeout', failure: 'failure', emptyReply: 'empty',
       unauthorized: 'unauthorized', duplicate: 'duplicate',
+      scheduledActionSuccess: 'scheduled success', scheduledActionFailure: 'scheduled failure',
+      scheduledActionUncertain: 'scheduled uncertain',
+      scheduledActionDefinitionUnavailable: 'scheduled definition unavailable',
     },
     ...overrides,
   }
@@ -143,10 +179,13 @@ function harness(options: {
   const config = baseConfig(options.config)
   const client = options.client ?? new Client()
   const domain = options.domain ?? new Domain()
+  const scheduledActionDomain = new ScheduledActionDomain()
+  const scheduledActionInputDomain = new ScheduledActionInputDomain()
   const calls: string[] = []
   const modelResults: unknown[] = []
   const persistedSessions = new Set<string>()
   const warnings = vi.fn()
+  const registeredTools = new Map<string, { readonly description: string; readonly parameters: unknown }>()
   const listeners = new Map<string, Set<(...args: unknown[]) => void>>()
   const emit = (name: string, ...args: unknown[]): void => {
     for (const listener of listeners.get(name) ?? []) listener(...args)
@@ -196,6 +235,12 @@ function harness(options: {
     }
     const requestListeners: Array<(_payload: unknown, next: () => Promise<unknown>) => Promise<unknown>> = []
     await agentOptions.setup?.({
+      tools: {
+        register: (definition: { readonly name: string; readonly description: string; readonly parameters: unknown }) => {
+          registeredTools.set(definition.name, definition)
+          return () => { registeredTools.delete(definition.name) }
+        },
+      },
       on: (name: string, listener: (_payload: unknown, next: () => Promise<unknown>) => Promise<unknown>) => {
         if (name === 'agent/request') requestListeners.push(listener)
         return () => {}
@@ -231,6 +276,7 @@ function harness(options: {
     },
     sessionTitle: { rename: () => { calls.push('title') } },
     sessions: { flush: async (session: { id: string }) => { calls.push('flush'); persistedSessions.add(session.id) } },
+    tools: { execute: async () => ({ content: [{ type: 'text', text: 'run-1' }] }) },
   }
   const workspace = {
     path: '/workspace',
@@ -244,12 +290,17 @@ function harness(options: {
     config,
     client,
     domain: domain as never,
+    scheduledActionDomain: scheduledActionDomain as never,
+    scheduledActionInputDomain: scheduledActionInputDomain as never,
     identitySecret: 'identity',
     workspace: workspace as never,
     modelSelection: { provider: 'provider', model: 'model', reasoningEffort: ReasoningEffortId('high') },
   })
   runtimes.push(runtime)
-  return { runtime, client, domain, config, calls, modelResults, persistedSessions, warnings, emit }
+  return {
+    runtime, client, domain, scheduledActionDomain, scheduledActionInputDomain, config, calls, modelResults, persistedSessions,
+    warnings, registeredTools, emit,
+  }
 }
 
 async function waitForDelivery(domain: Domain, state: DeliveryRecord['state']): Promise<DeliveryRecord> {
@@ -285,6 +336,33 @@ describe('WeComChannelRuntime', () => {
     await test.runtime.close()
     expect(test.client.disconnected).toBe(1)
     expect(test.domain.closed).toBe(1)
+    expect(test.scheduledActionDomain.closed).toBe(1)
+    expect(test.scheduledActionInputDomain.closed).toBe(1)
+  })
+
+  it('presents only deployment-allowlisted scheduled actions to a mapped Agent', async () => {
+    const test = harness({
+      behavior: { output: 'scheduled' },
+      config: {
+        scheduledActions: [{
+          id: 'ps_check', description: 'Run the read-only process check.', toolName: 'quick',
+          targetArgument: 'colos', targetArgumentFormat: 'singleton-array',
+          targetPattern: '^cf-sh-(?:1|2)$', arguments: { command: 'check' },
+        }],
+      },
+    })
+    await test.runtime.start()
+    test.client.emitText(frame())
+    await waitForDelivery(test.domain, 'completed')
+    expect([...test.registeredTools.keys()]).toEqual([
+      'scheduled_action_create', 'scheduled_action_list', 'scheduled_action_delete',
+    ])
+    expect(test.registeredTools.get('scheduled_action_create')?.description).toContain(
+      'Use this instead of executing the action now',
+    )
+    expect(test.registeredTools.get('scheduled_action_create')?.parameters).toMatchObject({
+      properties: { action: { enum: ['ps_check'] } },
+    })
   })
 
   it('resumes persisted Sessions and returns the empty-output message', async () => {
@@ -413,17 +491,85 @@ describe('WeComChannelRuntime', () => {
     await vi.waitFor(() => { expect(queued.domain.outbox.records.size).toBe(0) })
   })
 
-  it('drops exhausted outbox items and contains drain failures', async () => {
+  it('delivers a due scheduled action result through the outbox', async () => {
+    const scheduledActions = [{
+      id: 'ps_check', description: 'Run the read-only process check.', toolName: 'quick',
+      targetArgument: 'colos', targetArgumentFormat: 'singleton-array' as const,
+      targetPattern: '^[a-z0-9-]+$', arguments: { command: 'check' },
+    }]
+    const test = harness({ config: { scheduledActions } })
+    await test.runtime.start()
+    const conversationKey = conversationIdentity('bot', 'identity', 'shared', {
+      messageId: 'message', requestId: 'request', botId: 'bot', chatType: 'single',
+      userId: 'allowed', target: 'allowed', text: 'hello', frame: {},
+    }).key
+    await test.domain.conversations.put(conversationKey, {
+      sessionId: 'session', target: 'allowed', chatType: 'single', updatedAt: Date.now(),
+    })
+    const definition = resolveScheduledActions(scheduledActions).get('ps_check')
+    if (definition === undefined) throw new Error('the scheduled action was not resolved')
+    await test.scheduledActionDomain.actions.put('action', {
+      sessionId: 'session', conversationKey, actionId: 'ps_check',
+      definitionFingerprint: definition.fingerprint, target: 'csc-sz-12',
+      runAt: Date.now(), state: 'pending', createdAt: Date.now(), updatedAt: Date.now(),
+    })
+    const internals = test.runtime as unknown as { scheduledActions: { dispatch(id: string): Promise<void> } }
+    await internals.scheduledActions.dispatch('action')
+    expect(test.client.sends).toHaveLength(1)
+    expect(test.client.sends[0]?.target).toBe('allowed')
+    expect(test.client.sends[0]?.content).toContain('scheduled success')
+    expect(test.client.sends[0]?.content).toContain('csc-sz-12')
+    expect(test.scheduledActionDomain.actions.records.size).toBe(0)
+    expect(test.domain.outbox.records.size).toBe(0)
+  })
+
+  it('keeps an exhausted outbox item, prunes expired items, and reports each failed attempt', async () => {
+    vi.useFakeTimers()
+    const now = Date.now()
     const domain = new Domain()
     domain.outbox.records.set('exhausted', {
-      target: 'target', content: 'content', attempts: 1, createdAt: 1, updatedAt: 1,
+      target: 'allowed', content: 'content', attempts: 1, createdAt: now, updatedAt: now,
+    })
+    domain.outbox.records.set('expired', {
+      target: 'allowed', content: 'old', attempts: 0, createdAt: now - 200_000, updatedAt: now - 200_000,
     })
     const client = new Client()
     client.failSend = true
-    const test = harness({ domain, client, config: { maxOutboxAttempts: 2 } })
+    const test = harness({
+      domain,
+      client,
+      config: { maxOutboxAttempts: 2, outboxRetentionMs: 100_000, outboxRetryIntervalMs: 1_000 },
+    })
     await test.runtime.start()
-    expect(domain.outbox.records.size).toBe(0)
-    expect(test.warnings).toHaveBeenCalledWith(expect.stringContaining('dropping exhausted outbox item'))
+    expect(domain.outbox.records.has('expired')).toBe(false)
+    expect(test.warnings).toHaveBeenCalledWith(expect.stringContaining('outbox item expired before delivery'))
+    expect(domain.outbox.records.get('exhausted')?.attempts).toBe(2)
+    expect(test.warnings).toHaveBeenCalledWith(expect.stringContaining('outbox send failed on attempt 2'))
+    const deliveries = client.sends.length
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(client.sends).toHaveLength(deliveries)
+    expect(domain.outbox.records.get('exhausted')?.attempts).toBe(2)
+  })
+
+  it('delivers pending items for a conversation once that conversation writes in', async () => {
+    const now = Date.now()
+    const domain = new Domain()
+    domain.outbox.records.set('pending', {
+      target: 'allowed', content: 'notification', attempts: 0, createdAt: now, updatedAt: now,
+    })
+    domain.outbox.records.set('other', {
+      target: 'someone-else', content: 'other', attempts: 0, createdAt: now, updatedAt: now,
+    })
+    const client = new Client()
+    client.failSend = true
+    const test = harness({ domain, client, behavior: { output: 'answer' } })
+    await test.runtime.start()
+    expect(domain.outbox.records.size).toBe(2)
+    client.failSend = false
+    test.client.emitText(frame())
+    await waitForDelivery(test.domain, 'completed')
+    await vi.waitFor(() => { expect(domain.outbox.records.has('pending')).toBe(false) })
+    expect(domain.outbox.records.has('other')).toBe(true)
   })
 
   it('disposes an active interval and reports startup connection failure', async () => {

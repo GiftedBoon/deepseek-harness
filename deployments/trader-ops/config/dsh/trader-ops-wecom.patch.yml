@@ -48,6 +48,39 @@
         allowedUsers: !!js (process.env.WECOM_ALLOWED_USERS ?? '').split(',').map(value => value.trim()).filter(Boolean)
         allowedChats: !!js (process.env.WECOM_ALLOWED_CHATS ?? '').split(',').map(value => value.trim()).filter(Boolean)
         groupConversationMode: !!js process.env.WECOM_GROUP_CONVERSATION_MODE ?? 'shared'
+        scheduledActionUtcOffset: '+08:00'
+        # Targets are not restricted to a colo list. The pattern rejects only
+        # empty and multi-line targets; bssh_ops authorizes the exact target.
+        scheduledActions:
+          - id: ps_check
+            description: Run the bssh_ops allowlisted read-only "ps check" quick command on one colo.
+            toolName: mcp__bssh-ops-remote__run_quick_command
+            targetArgument: colos
+            targetArgumentFormat: singleton-array
+            targetPattern: '^.+$'
+            arguments:
+              command: check
+          - id: quick_command
+            description: Run any quick-command key currently configured by bssh_ops on one colo; list the keys before scheduling.
+            toolName: mcp__bssh-ops-remote__run_quick_command
+            targetArgument: colos
+            targetArgumentFormat: singleton-array
+            targetPattern: '^.+$'
+            input:
+              toolArgument: command
+              description: Exact key returned by list_quick_commands.
+              maxBytes: 128
+              pattern: '^[A-Za-z0-9_.-]+$'
+          - id: custom_shell
+            description: Run an exact user-confirmed custom shell command through bssh_ops on one colo after checking its syntax.
+            toolName: mcp__bssh-ops-remote__run_quick_command
+            targetArgument: colos
+            targetArgumentFormat: singleton-array
+            targetPattern: '^.+$'
+            input:
+              toolArgument: custom_shell
+              description: Exact user-confirmed shell command that passed check_shell_syntax.
+              maxBytes: 16384
         messages:
           processing: '正在处理…'
           timeout: '处理超时，请稍后重试。'
@@ -55,3 +88,7 @@
           emptyReply: '任务已完成，但没有文本回复。'
           unauthorized: '当前用户或会话未获授权。'
           duplicate: '该消息正在处理中。'
+          scheduledActionSuccess: '✅ 定时动作已触发'
+          scheduledActionFailure: '❌ 定时动作执行失败'
+          scheduledActionUncertain: '⚠️ 定时动作的执行结果不确定；为避免重复副作用，系统没有自动重放'
+          scheduledActionDefinitionUnavailable: '定时动作的配置已变更、被移除或缺少已保存输入'

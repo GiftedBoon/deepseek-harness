@@ -25,7 +25,7 @@ if [[ ! -x /lib/systemd/systemd-socket-proxyd ]]; then
   exit 1
 fi
 aihubmix_base_url="${AIHUBMIX_BASE_URL:-https://api.inferera.com/v1}"
-aihubmix_model="${AIHUBMIX_MODEL:-deepseek-v4-flash-0731}"
+aihubmix_model="${AIHUBMIX_MODEL:-deepseek-v4.1-flash}"
 openviking_image="${OPENVIKING_IMAGE:-ghcr.io/volcengine/openviking@sha256:68394a4ed13f60e3c0644adda97c16bb1094c8261e12fc2e9e69d5aefaea3da1}"
 requested_lan_host="${TRADER_OPS_LAN_HOST:-}"
 trader_ops_lan_host="$requested_lan_host"

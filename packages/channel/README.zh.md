@@ -24,12 +24,12 @@ Channel 系列把经过身份验证的企业消息传输连接到普通 Workspac
 
 | 包 | 角色 | ctx key |
 |---|---|---|
-| [`channel-wecom/`](channel-wecom/README.zh.md) | 企业微信智能机器人长连接、持久会话路由与流式回复 | 函数插件；无 service key |
+| [`channel-wecom/`](channel-wecom/README.zh.md) | 企业微信智能机器人长连接、持久会话路由、流式回复与白名单定时动作 | 函数插件；无 service key |
 
 <a id="related-documentation"></a>
 ## 相关文档
 
-渠道是协议驱动器，而不是模型工具。它们激活普通 Agent，并且只把已关联的可见 assistant 文本投影回提供方。
+渠道是协议驱动器。它们激活普通 Agent，并把已关联的可见 assistant 文本投影回提供方；渠道也可以暴露传输层所有的工具，例如企业微信的部署白名单定时动作。
 
 - [Core 子系统](../../docs/subsystems/core.zh.md) — 渠道驱动的 Agent 创建、Session 生命周期、模型路由和事件流程。
 

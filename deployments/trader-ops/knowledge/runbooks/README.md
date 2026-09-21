@@ -18,6 +18,11 @@ This directory contains reviewed diagnostic and recovery procedures. OpenViking 
 - Unverified chat transcripts, temporary guesses, or raw incident logs.
 - Secrets or commands that bypass a tool guard.
 
+## Templates
+
+- [Incident runbook](../../templates/knowledge/incident-runbook.md) covers symptoms, diagnosis, recovery, escalation, and verification.
+- [Change runbook](../../templates/knowledge/change-runbook.md) covers approvals, pre-change checks, guarded execution, rollback, and post-change verification.
+
 ## Example: `switch-strategy.md`
 
 ```markdown

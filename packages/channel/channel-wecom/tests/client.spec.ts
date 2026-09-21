@@ -7,6 +7,8 @@ const sdk = vi.hoisted(() => {
     readonly sends: unknown[][] = []
     connected = 0
     disconnected = 0
+    replyError: unknown
+    sendError: unknown
 
     constructor(readonly options: { logger: {
       debug: (...args: unknown[]) => void
@@ -33,8 +35,14 @@ const sdk = vi.hoisted(() => {
 
     connect(): void { this.connected++ }
     disconnect(): void { this.disconnected++ }
-    replyStream(...args: unknown[]): Promise<void> { this.replies.push(args); return Promise.resolve() }
-    sendMessage(...args: unknown[]): Promise<void> { this.sends.push(args); return Promise.resolve() }
+    replyStream(...args: unknown[]): Promise<void> {
+      this.replies.push(args)
+      return this.replyError === undefined ? Promise.resolve() : Promise.reject(this.replyError)
+    }
+    sendMessage(...args: unknown[]): Promise<void> {
+      this.sends.push(args)
+      return this.sendError === undefined ? Promise.resolve() : Promise.reject(this.sendError)
+    }
   }
   const state: { instances: Client[] } = { instances: [] }
   return { Client, state }
@@ -141,5 +149,36 @@ describe('OfficialWeComClient', () => {
     expect(client.sends).toEqual([['target', { msgtype: 'markdown', markdown: { content: '**answer**' } }]])
     await adapter.disconnect()
     expect(client.disconnected).toBe(1)
+  })
+
+  it('reports the provider error code when a reply or an active send is rejected', async () => {
+    const { adapter, client } = harness()
+
+    client.sendError = { errcode: 45009, errmsg: 'api freq out of limit' }
+    await expect(adapter.sendMarkdown('target', 'content'))
+      .rejects.toThrow('WeCom reply rejected: errcode=45009 errmsg=api freq out of limit')
+
+    client.replyError = { errmsg: 'no code present' }
+    await expect(adapter.replyStream({}, 'stream', 'content', true))
+      .rejects.toThrow('WeCom reply rejected: errmsg=no code present')
+
+    client.replyError = { errcode: 0 }
+    await expect(adapter.replyStream({}, 'stream', 'content', true))
+      .rejects.toThrow('WeCom reply rejected: errcode=0')
+
+    client.replyError = { unrelated: true }
+    await expect(adapter.replyStream({}, 'stream', 'content', true))
+      .rejects.toThrow('WeCom reply rejected: [object Object]')
+
+    client.replyError = 'plain rejection'
+    await expect(adapter.replyStream({}, 'stream', 'content', true))
+      .rejects.toThrow('WeCom reply rejected: plain rejection')
+
+    client.replyError = null
+    await expect(adapter.replyStream({}, 'stream', 'content', true))
+      .rejects.toThrow('WeCom reply rejected: null')
+
+    client.replyError = new Error('already an Error')
+    await expect(adapter.replyStream({}, 'stream', 'content', true)).rejects.toThrow('already an Error')
   })
 })

@@ -178,6 +178,14 @@ const homeAndGuide = pairedPages([
     section: { root: '集成', en: 'Integrations' },
     order: 1,
   },
+  {
+    source: 'docs/user/guide/team-agent-platform.md',
+    route: 'guide/team-agent-platform.md',
+    label: { root: '团队级 Agent 平台', en: 'Team Agent platform' },
+    sidebar: { root: 'zh-guide', en: 'en-guide' },
+    section: { root: '集成', en: 'Integrations' },
+    order: 3,
+  },
 ])
 
 const develop = pairedPages([
