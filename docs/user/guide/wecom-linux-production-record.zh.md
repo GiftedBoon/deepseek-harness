@@ -38,7 +38,6 @@ description: "记录 2026-09-01 企业微信 Harness Linux 生产实例的发布
 |---|---|
 | 部署日期 | `2026-09-01` |
 | 发布 tag | `wecom-prod-2026-09-01` |
-| Git commit | `de30d099356043e6d034c12d8715e6e7377eb659` |
 | 发布目录 | `/opt/deepseek-harness/releases/wecom-prod-2026-09-01` |
 | 当前版本链接 | `/opt/deepseek-harness/current` |
 | 服务名 | `dsh-wecom.service` |

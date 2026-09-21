@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-这个私有实验插件把经过评审的 YAML 文件变成真正的 Harness 侧执行边界。它按已配置环境解析首条匹配规则，通过 `tools/pre-execute` 返回 `allow`、`ask` 或 `deny`，并用 `ctx.tools.guard()` 重复拒绝边界。未匹配工具默认拒绝。重复 guard 是有意的：即使另一个 pre-execute 监听器提前结束 waterfall、导致本插件未执行，该调用仍会失败关闭。
+这个私有实验插件把经过评审的 YAML 文件变成 Harness 侧执行边界。它按已配置环境解析首条匹配规则，通过 `tools/pre-execute` 返回 `allow`、`ask` 或 `deny`，并用 `ctx.tools.guard()` 重复拒绝边界。未匹配工具默认拒绝。重复 guard 是有意的：即使另一个 pre-execute 监听器提前结束 waterfall、导致本插件未执行，该调用仍会失败关闭。
 
 它只是一层纵深防御，不是完整授权系统。业务 MCP 服务仍必须在服务边界再次认证调用者、授权资源与参数、校验审批记录并记录审计。
 

@@ -38,7 +38,6 @@ This instance is a fresh deployment and does not migrate old Session data. The f
 |---|---|
 | Deployment date | `2026-09-01` |
 | Release tag | `wecom-prod-2026-09-01` |
-| Git commit | `de30d099356043e6d034c12d8715e6e7377eb659` |
 | Release directory | `/opt/deepseek-harness/releases/wecom-prod-2026-09-01` |
 | Current release link | `/opt/deepseek-harness/current` |
 | Service name | `dsh-wecom.service` |

@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This private experimental plugin turns a reviewed YAML file into a real Harness-side execution boundary. It resolves the first matching rule for the configured environment, returns `allow`, `ask`, or `deny` from `tools/pre-execute`, and repeats the deny boundary through `ctx.tools.guard()`. Unmatched tools are denied. The duplicate guard is deliberate: if another pre-execute listener short-circuits the waterfall before this plugin runs, the execution still fails closed.
+This private experimental plugin turns a reviewed YAML file into a Harness-side execution boundary. It resolves the first matching rule for the configured environment, returns `allow`, `ask`, or `deny` from `tools/pre-execute`, and repeats the deny boundary through `ctx.tools.guard()`. Unmatched tools are denied. The duplicate guard is deliberate: if another pre-execute listener short-circuits the waterfall before this plugin runs, the execution still fails closed.
 
 This is one layer of defense, not the complete authorization system. A business MCP server must authenticate its caller, authorize the requested resource and arguments, validate approval records, and audit the operation again at the service boundary.
 
