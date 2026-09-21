@@ -57,6 +57,7 @@ DeepSeek Harness (web profile)
 - DSH 默认从 `DSH_PERMISSION_MODE=read-only` 开始。该值约束 Harness 本地沙箱，不等价于业务 tool guard。
 - OpenViking 凭据只通过环境变量注入。`OPENVIKING_ROOT_API_KEY` 用于账户管理并与 `server.root_api_key` 一致；Harness 使用权限更窄的租户级 `OPENVIKING_API_KEY` 访问数据。
 - `mcp__openviking__forget` 是永久删除操作，当前策略已显式拒绝它。OpenViking 仍必须独立认证并授权绕过 Harness 的直接客户端。
+- 记忆也会在没有工具调用的情况下进入 OpenViking：`@openviking/dsh-memory-plugin` 的会话 capture 会把每条用户与助手消息写入会话，并在达到 `commitTokenThreshold` 或会话销毁时提交，因此约束 `add_resource`、`write`、`remember`、`edit` 的工具策略看不到这条路径。`captureToolResults: false` 使工具结果不进入该数据流，但助手回复中复述的这些内容仍会被捕获。
 - 所有动态业务状态应实时从 MCP/API 查询，不能以检索到的旧 Markdown 代替。
 
 ## 配置分层

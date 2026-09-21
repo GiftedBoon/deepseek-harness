@@ -57,6 +57,7 @@ DeepSeek Harness (web profile)
 - DSH starts with `DSH_PERMISSION_MODE=read-only`. This value controls the local Harness sandbox; it is not a business tool guard.
 - OpenViking credentials enter through the environment only. `OPENVIKING_ROOT_API_KEY` administers accounts and matches `server.root_api_key`; Harness uses the narrower tenant `OPENVIKING_API_KEY` for data access.
 - `mcp__openviking__forget` permanently deletes data and is explicitly denied by the current policy. OpenViking must still authenticate and authorize direct clients independently of Harness.
+- Memory also enters OpenViking without a tool call: the `@openviking/dsh-memory-plugin` session capture writes each user and assistant message into the session and commits it at `commitTokenThreshold` or on session disposal, so the tool policy that gates `add_resource`, `write`, `remember`, and `edit` never sees that path. `captureToolResults: false` keeps tool results out of the captured stream, while an assistant reply that repeats their content is still captured.
 - Dynamic business state must come from live MCP/API queries. Retrieved Markdown must not substitute for current state.
 
 ## Configuration layers
