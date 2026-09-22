@@ -93,6 +93,7 @@ rules:
 
   - id: bssh-ops-preview
     tools:
+      - mcp__bssh-ops-remote__check_daily_preopen
       - mcp__bssh-ops-remote__preview_product_action
       - mcp__bssh-ops-remote__check_shell_syntax
       - mcp__bssh-ops-remote__preview_change_cfg_paras
