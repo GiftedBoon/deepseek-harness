@@ -89,7 +89,7 @@ The local debugging interface is available at `http://127.0.0.1:1933/studio`. Do
 
 ## 3. Install the DSH plugin and validate the Profile
 
-The bootstrap script installs `@openviking/dsh-memory-plugin@0.3.0` into the `web` Profile, then verifies that the effective configuration contains OpenViking, the Trader Ops tool policy, and the skill provider:
+The bootstrap script installs `@openviking/dsh-memory-plugin@0.3.0` into the `web` Profile, applies the reviewed first-step-only recall patch, renders the minimal WeCom preset, then verifies that the effective configuration contains OpenViking, the Trader Ops tool policy, and the skill provider:
 
 ```bash
 deployments/trader-ops/scripts/bootstrap-profile.sh
@@ -97,6 +97,8 @@ deployments/trader-ops/scripts/verify-deployment.sh
 ```
 
 This plugin version requires the related DSH 0.1.x packages to be at least `0.1.0-rc.6` and below `0.2.0`; this repository's `0.1.3-alpha.1` version is in that range. Recheck the peer dependency range and rerun configuration composition whenever Harness or the plugin changes.
+
+The recall patch matches the pinned plugin source exactly and fails bootstrap on any version or source drift. The generated WeCom preset does not inherit the standard coding tools; it keeps only the channel persona, Skill loading, and automatic compaction. Run `bootstrap-profile.sh` again after installing a release so both generated artifacts are refreshed before restart.
 
 The isolated Profile install currently reports those three DSH packages as missing peer dependencies because the DSH host supplies them rather than the Profile package. The observed install is acceptable only when the host versions satisfy the range and `--dump-config` succeeds; investigate any additional peer warning.
 

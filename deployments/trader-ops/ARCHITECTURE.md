@@ -38,7 +38,7 @@ DeepSeek Harness (web profile)
 | Capability | Current state | Detail |
 |---|---|---|
 | OpenViking service | Deployable | Docker Compose, persistence, and health checks are defined |
-| OpenViking DSH plugin | Installable | Pinned to `@openviking/dsh-memory-plugin@0.3.0` |
+| OpenViking DSH plugin | Installable | Pinned to `@openviking/dsh-memory-plugin@0.3.0`; bootstrap applies the reviewed first-step-only recall patch |
 | AIHubMix model | Optional, validated | `llm-pi-ai` serves Harness and OpenViking semantic extraction through an environment-provided endpoint and key |
 | Trader Ops skill root | Configured | An empty root is valid; adding `SKILL.md` enables discovery |
 | Git knowledge publishing | Operator-controlled | Dry-run planning plus approved-document add/update; stale resources are never deleted |
@@ -58,6 +58,7 @@ DeepSeek Harness (web profile)
 - OpenViking credentials enter through the environment only. `OPENVIKING_ROOT_API_KEY` administers accounts and matches `server.root_api_key`; Harness uses the narrower tenant `OPENVIKING_API_KEY` for data access.
 - `mcp__openviking__forget` permanently deletes data and is explicitly denied by the current policy. OpenViking must still authenticate and authorize direct clients independently of Harness.
 - Memory also enters OpenViking without a tool call: the `@openviking/dsh-memory-plugin` session capture writes each user and assistant message into the session and commits it at `commitTokenThreshold` or on session disposal, so the tool policy that gates `add_resource`, `write`, `remember`, and `edit` never sees that path. `captureToolResults: false` keeps tool results out of the captured stream, while an assistant reply that repeats their content is still captured.
+- Recall runs on the first model step of each turn. Later tool-follow-up steps reuse the recalled context already recorded for that turn and do not make another OpenViking request. `bootstrap-profile.sh` applies this exact-source patch only to plugin version `0.3.0` and stops if the installed source differs from the reviewed version.
 - Dynamic business state must come from live MCP/API queries. Retrieved Markdown must not substitute for current state.
 
 ## Configuration layers
@@ -74,3 +75,5 @@ Built-in DSH web profile
 A later patch replaces the complete `config` of a matching row; it does not deep-merge that object. Any change to `openviking-memory-runtime` must retain every field that still needs to apply, then use `--dump-config` to inspect the final composition.
 
 The Debian deployment separates root-owned host and secret configuration from a non-root immutable release build. `bootstrap-debian-host.sh` owns system packages, service users, persistent directories, and the restricted Ollama listener; `install-debian-release.sh` owns exact-revision checkout and build; `configure-debian-runtime.sh` owns mode-`0600` secrets, OpenViking tenant creation, Profile bootstrap, and systemd activation.
+
+The WeCom channel selects a generated minimal preset instead of the shipped coding preset. It contains the channel persona, the Skill catalog/loader, and automatic compaction only; MCP, Schedule, memory, and policy remain host-plane capabilities, while shell, filesystem, web, planning, goals, delegation, workflow, todo, and interactive-question tools are absent from the agent preset.

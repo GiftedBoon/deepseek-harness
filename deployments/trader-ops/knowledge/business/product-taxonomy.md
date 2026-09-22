@@ -3,7 +3,7 @@ type: glossary
 domain: trading
 owner: bwpan
 status: approved
-updated_at: "2026-09-21"
+updated_at: "2026-09-22"
 tags: [product, index, business-line, dual, longshort]
 ---
 
@@ -27,7 +27,7 @@ tags: [product, index, business-line, dual, longshort]
 `Index` 列为 `LS` 的产品是多空类型产品，分为多头与空头两种：
 
 - **空头产品**：与一个多头产品一一对应，产品名是多头产品名加上 `SHORT` 前缀。例如多头产品 `MSLS1` 对应的空头产品是 `SHORTMSLS1`。
-- **多头产品**：没有额外的命名特征。注意并非每个多头产品都有对应的空头产品。
+- **多头产品**：没有额外的命名特征；查询时必须同时确认是否存在带 `SHORT` 前缀的对应空头产品。
 
 ## 业务线（`Index` 列取值）
 

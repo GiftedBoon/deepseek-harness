@@ -201,7 +201,7 @@ sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure
 ## 每次发布
 
 1. 使用新的、已评审的完整 commit SHA 运行 `install-debian-release.sh`。
-2. 加载 `/etc/deepseek-harness/trader-ops.env`，再以 `dsh` 身份针对新发布运行 `bootstrap-profile.sh` 和 `verify-deployment.sh`，然后才重启服务；这些命令会保留可选企业微信依赖与无人值守 preset。
+2. 加载 `/etc/deepseek-harness/trader-ops.env`，再以 `dsh` 身份针对新发布运行 `bootstrap-profile.sh` 和 `verify-deployment.sh`，然后才重启服务；这些命令会应用固定版本的 OpenViking 检索补丁、刷新最小无人值守企业微信 preset，并保留可选渠道依赖。
 3. 执行任何数据迁移前，备份 `/var/lib/openviking` 与 `/var/lib/deepseek-harness`。
 4. 通过 `restart-runtime.sh` 重启 `dsh-trader-ops`；该脚本会先安装当前 release 的 systemd unit。重复监听地址、健康、空 skill 和空 knowledge 检查，并保留上一发布。
 5. 失败时，把 `current` 原子指回上一个已验证发布，再重启 Harness。只有失败发布执行过明确的不兼容迁移时，才恢复持久化数据。

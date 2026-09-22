@@ -18,6 +18,7 @@ endpoint="${OPENVIKING_URL:-http://127.0.0.1:1933}"
 
 : "${DSH_HOME:?Set DSH_HOME to the Harness configuration directory used by this deployment}"
 wecom_preset="$DSH_HOME/profiles/$profile/agent-presets/trader-ops-wecom/agent.cordis.yml"
+openviking_plugin="$DSH_HOME/profiles/$profile/node_modules/@openviking/dsh-memory-plugin/index.mjs"
 if [[ ! -f "$dsh_cli" ]]; then
   printf 'Built DSH CLI is missing at %s; install a completed release.\n' "$dsh_cli" >&2
   exit 1
@@ -26,7 +27,7 @@ if [[ ! -f "$policy_plugin" || ! -f "$logger_plugin" ]]; then
   printf 'Built Trader Ops policy or console logger plugin is missing; install a completed release.\n' >&2
   exit 1
 fi
-if [[ ! -f "$wecom_plugin" || ! -f "$wecom_patch" || ! -f "$bssh_mcp_patch" || ! -f "$schedule_patch" || ! -f "$wecom_preset" ]]; then
+if [[ ! -f "$wecom_plugin" || ! -f "$wecom_patch" || ! -f "$bssh_mcp_patch" || ! -f "$schedule_patch" || ! -f "$wecom_preset" || ! -f "$openviking_plugin" ]]; then
   printf 'Trader Ops WeCom plugin, MCP patch, Schedule overlay, or generated preset is missing.\n' >&2
   exit 1
 fi
@@ -79,14 +80,18 @@ grep -q 'targetArgument: colos' <<<"$dump_output"
 grep -q 'targetArgumentFormat: singleton-array' <<<"$dump_output"
 grep -q 'targetArgument: plan_id' <<<"$dump_output"
 grep -Fq '我是CFI 股票交易组的 AI Agent 智能助手' "$wecom_preset"
-awk '
-  $0 == "- id: tool-ask-user" {
-    getline
-    getline
-    if ($0 == "  disabled: true") found = 1
-  }
-  END { exit found ? 0 : 1 }
-' "$wecom_preset"
+grep -q 'async ({ agent, messages, signal, step }, next)' "$openviking_plugin"
+grep -q 'if (step !== 1) return decision;' "$openviking_plugin"
+expected_preset_ids='persona
+tool-skill
+compaction
+compaction-basic
+tool-result-pruner'
+actual_preset_ids="$(sed -n 's/^ *- id: //p' "$wecom_preset")"
+if [[ "$actual_preset_ids" != "$expected_preset_ids" ]]; then
+  printf 'Trader Ops WeCom preset contains unexpected rows:\n%s\n' "$actual_preset_ids" >&2
+  exit 1
+fi
 if [[ "${TRADER_OPS_WECOM_ENABLED:-0}" == 1 ]]; then
   : "${WECOM_BOT_ID:?Set the enterprise WeCom bot id}"
   : "${WECOM_BOT_SECRET:?Set the enterprise WeCom bot secret}"

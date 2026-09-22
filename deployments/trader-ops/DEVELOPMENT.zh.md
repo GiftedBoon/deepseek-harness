@@ -89,7 +89,7 @@ curl --fail http://127.0.0.1:1933/ready
 
 ## 3. 安装 DSH 插件并验证 Profile
 
-引导脚本把 `@openviking/dsh-memory-plugin@0.3.0` 安装到 `web` Profile，并验证最终配置中同时存在 OpenViking、Trader Ops 工具策略和 skill 提供方：
+引导脚本把 `@openviking/dsh-memory-plugin@0.3.0` 安装到 `web` Profile，应用已审阅的仅首步骤检索补丁，生成企业微信最小 preset，然后验证最终配置中同时存在 OpenViking、Trader Ops 工具策略和 skill 提供方：
 
 ```bash
 deployments/trader-ops/scripts/bootstrap-profile.sh
@@ -97,6 +97,8 @@ deployments/trader-ops/scripts/verify-deployment.sh
 ```
 
 当前插件版本要求 DSH 0.1.x 的相关包至少为 `0.1.0-rc.6`，并低于 `0.2.0`；本仓库 `0.1.3-alpha.1` 落在该范围内。升级 Harness 或插件时，应重新检查对等依赖（peer dependency）范围，并再次运行配置装配验证。
+
+检索补丁会精确匹配固定版本的插件源码；版本或源码发生任何偏移都会使引导失败。生成的企业微信 preset 不继承标准编码工具，只保留渠道 persona、Skill 加载和自动压缩。安装发布版本后再次运行 `bootstrap-profile.sh`，确保重启前刷新这两项生成产物。
 
 隔离的 Profile 安装目前会把这三个由 DSH 宿主提供、而非由 Profile 包提供的 DSH 包报告为缺失的对等依赖。只有宿主版本满足范围且 `--dump-config` 成功时，观测到的安装才可接受；任何额外的 peer 警告都必须调查。
 

@@ -15,7 +15,6 @@ wecom_plugin="$repo_root/packages/channel/channel-wecom/lib/index.js"
 wecom_patch="$deployment_root/config/dsh/trader-ops-wecom.patch.yml"
 bssh_mcp_patch="$deployment_root/config/dsh/trader-ops-bssh-ops-mcp.patch.yml"
 schedule_patch="$repo_root/apps/cli/config/examples/schedule/cordis.yml"
-wecom_preset_source="$repo_root/packages/preset/agent-presets/presets/standard"
 lan_proxy_service="$deployment_root/config/systemd/dsh-trader-ops-lan-proxy.service"
 lan_proxy_socket="$deployment_root/config/systemd/dsh-trader-ops-lan-proxy.socket.in"
 plugin_version="${OPENVIKING_DSH_PLUGIN_VERSION:-0.3.0}"
@@ -52,7 +51,9 @@ node -e '
 cd "$repo_root"
 node "$dsh_cli" plugin --profile "$profile" add "@openviking/dsh-memory-plugin@$plugin_version"
 node "$dsh_cli" plugin --profile "$profile" add "$repo_root/packages/channel/channel-wecom"
-node "$deployment_root/scripts/render-wecom-preset.mjs" "$wecom_preset_source" "$wecom_preset"
+node "$deployment_root/scripts/patch-openviking-recall-once.mjs" \
+  "$DSH_HOME/profiles/$profile/node_modules/@openviking/dsh-memory-plugin"
+node "$deployment_root/scripts/render-wecom-preset.mjs" "$wecom_preset"
 
 dump_output="$(node "$dsh_cli" --profile "$profile" \
   --patch "$deployment_root/config/dsh/trader-ops.patch.yml" \

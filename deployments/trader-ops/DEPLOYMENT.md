@@ -201,7 +201,7 @@ Before production approval, complete the channel-owned [Linux acceptance procedu
 ## Each release
 
 1. Run `install-debian-release.sh` with a new reviewed full commit SHA.
-2. Load `/etc/deepseek-harness/trader-ops.env`, then run `bootstrap-profile.sh` and `verify-deployment.sh` as `dsh` against the new release before restarting the service; these commands preserve the optional WeCom dependency and unattended preset.
+2. Load `/etc/deepseek-harness/trader-ops.env`, then run `bootstrap-profile.sh` and `verify-deployment.sh` as `dsh` against the new release before restarting the service; these commands apply the pinned OpenViking recall patch and refresh the minimal unattended WeCom preset while preserving the optional channel dependency.
 3. Back up `/var/lib/openviking` and `/var/lib/deepseek-harness` before any data migration.
 4. Restart `dsh-trader-ops` through `restart-runtime.sh`; it installs the current release's systemd unit before restarting. Repeat the listener, health, empty-skill, and empty-knowledge checks, and retain the previous release.
 5. On failure, atomically point `current` to the previous validated release and restart Harness. Restore persistent data only when the failed release performed an explicit incompatible migration.

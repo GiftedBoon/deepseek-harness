@@ -38,7 +38,7 @@ DeepSeek Harness (web profile)
 | 能力 | 当前状态 | 说明 |
 |---|---|---|
 | OpenViking 服务 | 可部署 | Docker Compose、持久化目录和健康检查已定义 |
-| OpenViking DSH 插件 | 可安装 | 固定使用 `@openviking/dsh-memory-plugin@0.3.0` |
+| OpenViking DSH 插件 | 可安装 | 固定使用 `@openviking/dsh-memory-plugin@0.3.0`；引导时应用已审阅的仅首步骤检索补丁 |
 | AIHubMix 模型 | 可选、已验证 | `llm-pi-ai` 通过环境提供的端点和 key 为 Harness 与 OpenViking 语义提取提供模型 |
 | Trader Ops skill 根目录 | 已配置 | 空目录是合法状态，未来添加 `SKILL.md` 即可发现 |
 | Git 知识发布 | 运维显式触发 | 支持 dry-run 计划及已批准文档的新增/更新；绝不删除 stale resource |
@@ -58,6 +58,7 @@ DeepSeek Harness (web profile)
 - OpenViking 凭据只通过环境变量注入。`OPENVIKING_ROOT_API_KEY` 用于账户管理并与 `server.root_api_key` 一致；Harness 使用权限更窄的租户级 `OPENVIKING_API_KEY` 访问数据。
 - `mcp__openviking__forget` 是永久删除操作，当前策略已显式拒绝它。OpenViking 仍必须独立认证并授权绕过 Harness 的直接客户端。
 - 记忆也会在没有工具调用的情况下进入 OpenViking：`@openviking/dsh-memory-plugin` 的会话 capture 会把每条用户与助手消息写入会话，并在达到 `commitTokenThreshold` 或会话销毁时提交，因此约束 `add_resource`、`write`、`remember`、`edit` 的工具策略看不到这条路径。`captureToolResults: false` 使工具结果不进入该数据流，但助手回复中复述的这些内容仍会被捕获。
+- 每轮只在第一个模型步骤执行检索。后续工具跟进步骤复用本轮已经记录的检索上下文，不再请求 OpenViking。`bootstrap-profile.sh` 只对插件版本 `0.3.0` 应用这项精确源码补丁；如果已安装源码与审阅版本不同，脚本会停止。
 - 所有动态业务状态应实时从 MCP/API 查询，不能以检索到的旧 Markdown 代替。
 
 ## 配置分层
@@ -74,3 +75,5 @@ DSH 内置 web profile
 后加载的 patch 会覆盖同一配置项的完整 `config`，不是深度合并。因此修改 `openviking-memory-runtime` 时必须保留本文件中仍需生效的全部字段，并用 `--dump-config` 检查最终配置。
 
 Debian 部署把 root 所有的主机与密钥配置同非 root 的不可变发布构建分开。`bootstrap-debian-host.sh` 负责系统软件包、服务用户、持久化目录和受限 Ollama 监听；`install-debian-release.sh` 负责精确 revision 检出与构建；`configure-debian-runtime.sh` 负责权限为 `0600` 的密钥、OpenViking 租户创建、Profile 引导和 systemd 激活。
+
+企业微信渠道选择生成的最小 preset，而不是随附的编码 preset。该 preset 仅包含渠道 persona、Skill 目录/加载工具和自动压缩；MCP、Schedule、记忆与策略仍由 host plane 提供，agent preset 不再包含 shell、文件系统、网页、规划、目标、委派、工作流、todo 和交互式提问工具。
