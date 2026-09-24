@@ -262,13 +262,13 @@ printf '%s' "$OPENVIKING_API_KEY" | docker exec -i trader-ops-openviking \
 docker exec trader-ops-openviking ov doctor
 
 cd "$repo_root"
-/usr/sbin/runuser --preserve-environment -u dsh -- env \
+/usr/sbin/runuser --preserve-environment -u cfi -- env \
   CI=true HOME=/var/lib/deepseek-harness PATH=/usr/local/bin:/usr/bin:/bin \
   "$deployment_root/scripts/bootstrap-profile.sh"
-/usr/sbin/runuser --preserve-environment -u dsh -- env \
+/usr/sbin/runuser --preserve-environment -u cfi -- env \
   CI=true HOME=/var/lib/deepseek-harness PATH=/usr/local/bin:/usr/bin:/bin \
   "$deployment_root/scripts/verify-deployment.sh"
-model_output="$(/usr/sbin/runuser --preserve-environment -u dsh -- env \
+model_output="$(/usr/sbin/runuser --preserve-environment -u cfi -- env \
   CI=true HOME=/var/lib/deepseek-harness PATH=/usr/local/bin:/usr/bin:/bin \
   node "$dsh_cli" --profile headless \
   --patch "$deployment_root/config/dsh/trader-ops.patch.yml" \
