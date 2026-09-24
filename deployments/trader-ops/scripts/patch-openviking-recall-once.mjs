@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readFile, rename, stat, writeFile } from 'node:fs/promises'
+import { readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -46,7 +46,7 @@ export async function patchOpenVikingRecallOnce(packageDirectory) {
   return true
 }
 
-if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === await realpath(process.argv[1])) {
   const [packageDirectory] = process.argv.slice(2)
   if (packageDirectory === undefined) {
     throw new Error('Usage: patch-openviking-recall-once.mjs <package-directory>')
