@@ -2,11 +2,11 @@
 
 English | [中文](README.zh.md)
 
-This record describes the validated Trader Ops deployment on the remote Debian host. It records the running release, service wiring, checks performed after the WeCom session-recreation fix, and the safe operator path for the next verification. It contains no credential values, WeCom identity values, Session keys, URL tokens, or message content.
+This record describes the validated Trader Ops deployment on the remote Debian host. It records the running release, service wiring, checks performed after the service-account change, and the safe operator path for the next verification. It contains no credential values, WeCom identity values, Session keys, URL tokens, or message content.
 
 ## Summary
 
-The remote deployment runs Harness and OpenViking on one Debian host. Harness listens on loopback and on the selected private-LAN socket proxy, while OpenViking stays on its loopback port and Ollama stays on the Docker bridge. The `dsh-trader-ops` systemd service loads the `trader-ops` profile and the WeCom channel patch.
+The remote deployment runs Harness and OpenViking on one Debian host. Harness listens on loopback; a socket proxy exposes the selected private-LAN address. OpenViking stays on its loopback port and Ollama stays on the Docker bridge. The `dsh-trader-ops` systemd service runs as `cfi:cfi` and loads the `web` profile with Trader Ops patches.
 
 The deployed channel checks whether a mapped persistent Session still exists before resuming it. A missing mapped Session starts a fresh Session, so deleting a Session no longer prevents the next WeCom message from creating a new conversation.
 
@@ -31,14 +31,14 @@ The deployed channel checks whether a mapped persistent Session still exists bef
 |---|---|
 | SSH target | `dsh-server` |
 | Hostname | `debian` |
-| Deployment date | `2026-09-11` |
-| Deployed source revision | `c13dd3f8e7298936fa068b6fdd830e5b550287b4` |
-| Merged repository revision | `820412b41b71ac97452dfa2d9a3fef5fb1aa924f` |
+| Verification date | `2026-09-24` |
+| Release marker | `/opt/deepseek-harness/current/.trader-ops-built` |
 | Release entry | `/opt/deepseek-harness/current` |
 | Harness service | `dsh-trader-ops.service` |
-| Profile | `trader-ops` |
+| Profile | `web` |
+| Service account | `cfi:cfi` |
 
-The running release contains the session-recreation fix. The merged repository revision also contains the release-family version alignment; the remote runtime does not require another restart for that metadata-only change.
+The release marker names the complete source commit used to build the active release. The running service and its OpenViking MCP proxy both use the `cfi` account.
 
 <a id="service-and-network"></a>
 ## Service and network
@@ -52,7 +52,7 @@ The running release contains the session-recreation fix. The merged repository r
 | Private-LAN response | HTTP `401` without Web authentication |
 | OpenViking health | HTTP `200` |
 | OpenViking readiness | HTTP `200` |
-| Harness listeners | `127.0.0.1:3180` and `192.168.4.103:3180` |
+| Listener addresses | Harness at `127.0.0.1:3180`; socket proxy at `192.168.4.103:3180` |
 
 The service starts the built CLI through systemd with the `trader-ops` patch files, binds Harness to `127.0.0.1:3180`, and declares the private-LAN authority `192.168.4.103:3180`. The proxy exposes the private address without changing the loopback bind used by Harness.
 
@@ -61,7 +61,7 @@ The service starts the built CLI through systemd with the `trader-ops` patch fil
 
 The remote operator completed the runtime configuration and restart after the release was installed.
 
-- The `trader-ops` profile loads the base runtime, AIHubMix route, OpenViking memory integration, and WeCom channel patch.
+- The `web` profile loads the base runtime, AIHubMix route, OpenViking memory integration, and WeCom channel patch.
 - The WeCom channel keeps exact allowlists and does not use a wildcard entry.
 - The channel uses the unattended noninteractive preset with the confined workspace permission preset.
 - Harness keeps its Web endpoint on loopback; the private-LAN socket proxy is the only additional entry point.
@@ -76,11 +76,11 @@ The following checks were run against the remote host after configuration:
 |---|---|
 | systemd state | `ActiveState=active`, `SubState=running` |
 | systemd supervision | `NRestarts=0` for the current activation |
+| Service ownership | Harness and the OpenViking MCP proxy ran as `cfi:cfi`; release, profile, and workspace directories belonged to `cfi:cfi` |
 | Harness authentication boundary | Loopback and private-LAN requests returned `401` without credentials |
 | OpenViking health and readiness | Both endpoints returned `200` |
-| Listener scope | Harness exposed the loopback listener and the selected private-LAN proxy address |
-| Built channel artifact | The deployed bundle contains the `sessionPersistence.stat` existence check |
-| WeCom journal at verification time | No new WeCom entries were present during the status check |
+| Listener scope | Harness listened on loopback; the socket proxy exposed the selected private-LAN address |
+| Profile verification | OpenViking patch, minimal WeCom preset, policy, skills, and knowledge checks passed |
 
 The status checks prove that the service and its dependent endpoints are ready. They do not replace a real WeCom message after deleting a mapped Session; that behavior still needs one operator-side acceptance message.
 
@@ -109,10 +109,10 @@ curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:1933/health
 curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:1933/ready
 ```
 
-Restart only through the service manager after a reviewed configuration change:
+Restart through the reviewed runtime script after a configuration change:
 
 ```bash
-sudo systemctl restart dsh-trader-ops
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/restart-runtime.sh
 ```
 
 Follow the existing [remote deployment runbook](../DEPLOYMENT.md) for release installation, allowlist changes, backup, rollback, and log handling.
@@ -142,6 +142,6 @@ Follow the existing [remote deployment runbook](../DEPLOYMENT.md) for release in
 <details>
 <summary>Non-authoritative maintenance context</summary>
 
-This README is a deployment snapshot for `2026-09-11`. Update the recorded revision, endpoint values, service state, and verification table when the remote release or runtime wiring changes.
+This README is a deployment snapshot for `2026-09-24`. Update the release marker, endpoint values, service state, and verification table when the remote release or runtime wiring changes.
 
 </details>

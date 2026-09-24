@@ -69,7 +69,7 @@ Profile 只公开 Agent preset 所需的 tool。`quant-tool-policy` 把每个可
 
 **把业务流程实现为大型 MCP tool。** 这会把证据收集与决策步骤隐藏在一次服务端发版之后，使业务所有者无法评审流程。原子 tool 加 Git 评审 skill，使执行权限留在服务端，业务推理留在可评审 SOP 中。
 
-**把 OpenViking 作为权威文档存储。** 运行时检索与提取记忆是可变的派生数据。Git 历史、评审、所有权与回滚使 Vault 成为权威来源；OpenViking 记录 provenance 并可重建。
+**把 OpenViking 作为权威文档存储。** 运行时检索与提取记忆是可变的派生数据。Git 历史、评审、所有权与回滚使 Vault 成为权威来源；OpenViking 保存来源文档引用并可重建。
 
 **在第一个 milestone 引入 Temporal。** 首批场景为只读或单次幂等有界操作。在衡量到可靠多步骤需求之前，Temporal 会增加运维依赖，同时仍不能把内置 workflow 引擎误认为最终持久层。
 

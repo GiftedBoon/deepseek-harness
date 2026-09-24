@@ -69,7 +69,7 @@ Add Temporal only when a validated use case needs process-independent waits, mul
 
 **Implement business procedures as large MCP tools.** This would hide evidence collection and decision steps behind one server release and make procedure review inaccessible to business owners. Atomic tools plus Git-reviewed skills keep execution authority in the server and business reasoning in reviewable SOPs.
 
-**Use OpenViking as the authoritative document store.** Runtime retrieval and extracted memory are mutable derived data. Git history, review, ownership, and rollback make the vault the authoritative source; OpenViking records provenance and can be rebuilt.
+**Use OpenViking as the authoritative document store.** Runtime retrieval and extracted memory are mutable derived data. Git history, review, ownership, and rollback make the vault the authoritative source; OpenViking stores source document references and can be rebuilt.
 
 **Introduce Temporal in the first milestone.** The first use cases are read-only or one idempotent bounded action. Temporal would add an operating dependency before a durable multi-step requirement is measured, while the built-in workflow engine still must not be mistaken for the eventual durability layer.
 

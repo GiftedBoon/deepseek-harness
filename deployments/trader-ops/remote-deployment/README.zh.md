@@ -2,11 +2,11 @@
 
 [English](README.md) | 中文
 
-本文记录远程 Debian 主机上已验证的 Trader Ops 部署，包括正在运行的发布版本、服务连接方式、企业微信 Session 重建修复后的检查结果，以及下一次安全验证的操作路径。本文不包含凭据值、企业微信身份值、Session Key、URL token 或消息内容。
+本文记录远程 Debian 主机上已验证的 Trader Ops 部署，包括正在运行的发布版本、服务连接方式、服务账号切换后的检查结果，以及下一次安全验证的操作路径。本文不包含凭据值、企业微信身份值、Session Key、URL token 或消息内容。
 
 ## 概要
 
-远程部署在一台 Debian 主机上运行 Harness 和 OpenViking。Harness 监听回环地址和选定的内网 socket proxy，OpenViking 保持在回环端口，Ollama 保持在 Docker bridge。`dsh-trader-ops` systemd 服务加载 `trader-ops` profile 和企业微信渠道 patch。
+远程部署在一台 Debian 主机上运行 Harness 和 OpenViking。Harness 监听回环地址，socket proxy 对外提供选定的内网地址。OpenViking 保持在回环端口，Ollama 保持在 Docker bridge。`dsh-trader-ops` systemd 服务以 `cfi:cfi` 运行，并加载带 Trader Ops patch 的 `web` profile。
 
 已部署的渠道会在恢复映射的持久 Session 前检查该 Session 是否仍然存在。映射的 Session 不存在时，渠道会创建新的 Session，因此删除 Session 不会再阻止下一条企业微信消息创建新会话。
 
@@ -31,14 +31,14 @@
 |---|---|
 | SSH 目标 | `dsh-server` |
 | 主机名 | `debian` |
-| 部署日期 | `2026-09-11` |
-| 已部署源码 revision | `c13dd3f8e7298936fa068b6fdd830e5b550287b4` |
-| 已合并仓库 revision | `820412b41b71ac97452dfa2d9a3fef5fb1aa924f` |
+| 验证日期 | `2026-09-24` |
+| 发布标记 | `/opt/deepseek-harness/current/.trader-ops-built` |
 | 发布入口 | `/opt/deepseek-harness/current` |
 | Harness 服务 | `dsh-trader-ops.service` |
-| Profile | `trader-ops` |
+| Profile | `web` |
+| 服务账号 | `cfi:cfi` |
 
-正在运行的发布版本包含 Session 重建修复。已合并的仓库 revision 还包含发布族版本对齐；这项仅涉及元数据的变更不要求远程运行时再次重启。
+发布标记给出构建当前版本所用的完整源码 commit。运行中的服务和 OpenViking MCP 代理均使用 `cfi` 账号。
 
 <a id="service-and-network"></a>
 ## 服务与网络
@@ -52,7 +52,7 @@
 | 内网响应 | 未经过 Web 身份验证时返回 HTTP `401` |
 | OpenViking 健康状态 | HTTP `200` |
 | OpenViking 就绪状态 | HTTP `200` |
-| Harness listeners | `127.0.0.1:3180` 与 `192.168.4.103:3180` |
+| 监听地址 | Harness 使用 `127.0.0.1:3180`；socket proxy 使用 `192.168.4.103:3180` |
 
 服务通过 systemd 使用 `trader-ops` patch 文件启动已构建 CLI，把 Harness 绑定到 `127.0.0.1:3180`，并声明 `192.168.4.103:3180` 为内网 authority。代理只暴露内网地址，不改变 Harness 使用的回环绑定。
 
@@ -61,7 +61,7 @@
 
 远程运维人员在安装发布版本后完成了运行时配置和重启。
 
-- `trader-ops` profile 加载基础运行时、AIHubMix 路由、OpenViking memory 集成和企业微信渠道 patch。
+- `web` profile 加载基础运行时、AIHubMix 路由、OpenViking memory 集成和企业微信渠道 patch。
 - 企业微信渠道保持精确白名单，不使用通配条目。
 - 渠道使用无人值守的非交互 preset 和受限工作区权限 preset。
 - Harness 的 Web endpoint 保持在回环地址；内网 socket proxy 是唯一额外入口。
@@ -76,11 +76,11 @@
 |---|---|
 | systemd 状态 | `ActiveState=active`、`SubState=running` |
 | systemd 监管 | 当前激活周期 `NRestarts=0` |
+| 服务归属 | Harness 和 OpenViking MCP 代理以 `cfi:cfi` 运行；发布、profile 与工作区目录归 `cfi:cfi` 所有 |
 | Harness 身份验证边界 | 未提供凭据时，回环和内网请求都返回 `401` |
 | OpenViking 健康与就绪 | 两个 endpoint 都返回 `200` |
-| 监听范围 | Harness 暴露回环 listener 和选定的内网代理地址 |
-| 已构建渠道产物 | 部署 bundle 包含 `sessionPersistence.stat` 存在性检查 |
-| 验证时的企业微信 journal | 状态检查期间没有新的企业微信记录 |
+| 监听范围 | Harness 监听回环地址；socket proxy 暴露选定的内网地址 |
+| Profile 验证 | OpenViking 补丁、企业微信最小 preset、策略、Skill 和知识检查均通过 |
 
 这些状态检查证明服务及其依赖已就绪，但不能替代删除映射 Session 后发送真实企业微信消息的验收；该行为仍需要运维人员执行一次验收消息。
 
@@ -109,10 +109,10 @@ curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:1933/health
 curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:1933/ready
 ```
 
-评审过配置变更后，只通过服务管理器重启：
+评审过配置变更后，通过运行时脚本重启：
 
 ```bash
-sudo systemctl restart dsh-trader-ops
+sudo /opt/deepseek-harness/current/deployments/trader-ops/scripts/restart-runtime.sh
 ```
 
 发布安装、白名单修改、备份、回滚和日志处理遵循现有的[远程部署运行手册](../DEPLOYMENT.md)。
@@ -142,6 +142,6 @@ sudo systemctl restart dsh-trader-ops
 <details>
 <summary>非权威维护上下文</summary>
 
-本文是 `2026-09-11` 的部署快照。远程发布版本或运行时连接方式变更后，更新记录中的 revision、入口值、服务状态和验证表。
+本文是 `2026-09-24` 的部署快照。远程发布版本或运行时连接方式变更后，更新发布标记、入口值、服务状态和验证表。
 
 </details>
