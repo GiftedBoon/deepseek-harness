@@ -32,6 +32,8 @@ Run this plugin in one long-lived `web` profile or a custom profile layered on `
 
 The [Linux production deployment guide](../../../docs/user/guide/wecom-linux-deployment.md) provides the dedicated profile, unattended preset, systemd, cutover, acceptance, and rollback procedure.
 
+Declare the configured Agent preset through `dsh-agent-preset` in the Host composition. Startup acquires and releases a registry revision lease to reject missing or unusable presets before connecting to WeCom; each delivery retains the mounted revision for its Agent lifetime.
+
 <a id="configuration"></a>
 ## Configuration
 

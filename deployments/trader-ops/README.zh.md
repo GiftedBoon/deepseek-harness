@@ -37,6 +37,8 @@ deployments/trader-ops/
 
 ## 加载关系
 
+`bootstrap-profile.sh` 将经审阅的企业微信组装写成 `preset.cordis.yml` 中的 `dsh-agent-preset` 声明，企业微信 patch 会包含该文件。Schedule 从可选的 `schedule-bundle` patch 加载；即使目标 Session 未处于 live 状态，也会通过 Host 投递到期 prompt。
+
 ```text
 knowledge/*.md  ----submit/sync---> OpenViking ----retrieved fragments---> Agent context
 skills/*/SKILL.md ----------------> Harness Skill Loader ----full content---> Agent

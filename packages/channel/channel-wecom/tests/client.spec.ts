@@ -37,10 +37,12 @@ const sdk = vi.hoisted(() => {
     disconnect(): void { this.disconnected++ }
     replyStream(...args: unknown[]): Promise<void> {
       this.replies.push(args)
+      // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- The provider can reject with non-Error protocol values.
       return this.replyError === undefined ? Promise.resolve() : Promise.reject(this.replyError)
     }
     sendMessage(...args: unknown[]): Promise<void> {
       this.sends.push(args)
+      // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- The provider can reject with non-Error protocol values.
       return this.sendError === undefined ? Promise.resolve() : Promise.reject(this.sendError)
     }
   }

@@ -110,7 +110,8 @@ interface ScheduledActionInternals {
 }
 
 function internals(scheduled: WeComScheduledActions): ScheduledActionInternals {
-  return scheduled as unknown as ScheduledActionInternals
+  // @ts-expect-error The fixture exposes private scheduler methods to place dispatch races deterministically.
+  return scheduled
 }
 
 beforeEach(() => {

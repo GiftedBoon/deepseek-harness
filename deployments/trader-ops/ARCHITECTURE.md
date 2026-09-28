@@ -69,7 +69,7 @@ Built-in DSH web profile
   + config/dsh/trader-ops.patch.yml
   + (optional) config/dsh/trader-ops-aihubmix.patch.yml
   + (optional) config/dsh/trader-ops-bssh-ops-mcp.patch.yml
-  + apps/cli/config/examples/schedule/cordis.yml
+  + packages/experimental/schedule-bundle/cordis.patch.yml
 ```
 
 A later patch replaces the complete `config` of a matching row; it does not deep-merge that object. Any change to `openviking-memory-runtime` must retain every field that still needs to apply, then use `--dump-config` to inspect the final composition.

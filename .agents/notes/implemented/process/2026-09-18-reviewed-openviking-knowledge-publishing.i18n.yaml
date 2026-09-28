@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-18-reviewed-openviking-knowledge-publishing.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-18-reviewed-openviking-knowledge-publishing.md
-2026-09-18-reviewed-openviking-knowledge-publishing.md: 16e99e89cc430819c8a03142d78f05c42dd5ca3b
-2026-09-18-reviewed-openviking-knowledge-publishing.zh.md: 3e742d9b7173963ca0e6588f38f00d3ca0bffebc
+/agent-note-reviewed-openviking-knowledge-publishing:
+  en: 09f9c489a497cd43
+  zh: de75c8f01e1a9890
+/agent-note-reviewed-openviking-knowledge-publishing/problem:
+  en: 8e5126a1ea577eab
+  zh: 4ee958b82a1133e2
+/agent-note-reviewed-openviking-knowledge-publishing/decision:
+  en: 89377eb0f4e5d89e
+  zh: a3fe7b5e93cf0986
+/agent-note-reviewed-openviking-knowledge-publishing/alternatives-considered:
+  en: d43d848532b8077d
+  zh: 3cb6618e832c5978
+/agent-note-reviewed-openviking-knowledge-publishing/verification:
+  en: be2dc9f629fe9095
+  zh: a180fda8fa4fddf0
+/agent-note-reviewed-openviking-knowledge-publishing/consequences:
+  en: c2b0043ddad07275
+  zh: fe46787ab4a7cd79

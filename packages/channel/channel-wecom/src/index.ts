@@ -2,7 +2,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent-default-model'
-import type {} from '@deepseek-ai/dsh-agent-presets'
+import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-permission-presets'
 import { isAbsolute } from 'node:path'
@@ -37,7 +37,8 @@ export function apply(ctx: Context, config: Config): Promise<void> {
       throw new Error('channel-wecom: permissionPreset must use approval=never and a confined sandbox')
     }
     const preset = await ctx.agentPresets.resolve(resolved.agentPreset)
-    await ctx.agentPresets.standingKeyFor(preset.id)
+    await using presetScope = await ctx.agentPresets.acquireScope(preset.id)
+    void presetScope
     const secret = await ctx.credentials.resolve(credentialRef(resolved.secretEnv))
     if (secret === undefined) throw new Error(`channel-wecom: credential ${resolved.secretEnv} is not configured`)
     const identity = await ctx.credentials.resolve(credentialRef(resolved.sessionKeyEnv))

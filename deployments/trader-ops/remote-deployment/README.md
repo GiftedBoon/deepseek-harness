@@ -32,8 +32,8 @@ The deployed channel checks whether a mapped persistent Session still exists bef
 | SSH target | `dsh-server` |
 | Hostname | `debian` |
 | Deployment date | `2026-09-11` |
-| Deployed source revision | `c13dd3f8e7298936fa068b6fdd830e5b550287b4` |
-| Merged repository revision | `820412b41b71ac97452dfa2d9a3fef5fb1aa924f` |
+| Deployed source change | `fix(wecom): recreate deleted mapped sessions` (2026-09-11) |
+| Merged repository change | Pull request #1, `codex/wecom-session-recreate` (2026-09-11) |
 | Release entry | `/opt/deepseek-harness/current` |
 | Harness service | `dsh-trader-ops.service` |
 | Profile | `trader-ops` |

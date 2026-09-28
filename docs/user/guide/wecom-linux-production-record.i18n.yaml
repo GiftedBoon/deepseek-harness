@@ -1,6 +1,58 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for wecom-linux-production-record.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/user/guide/wecom-linux-production-record.md
-wecom-linux-production-record.md: ef7dd2102f3aa27c909625cae3297f99899ccf67
-wecom-linux-production-record.zh.md: 185aa9885a8db4f0a3f0b767f173ce5f412814f6
+/:
+  en: 3c06fcdb2736f868
+  zh: b98418d8afe9478e
+/wecom-linux-production-deployment-record:
+  en: 45b636846365486c
+  zh: e223196c99cd4061
+/wecom-linux-production-deployment-record/summary:
+  en: 4952e0ef370fb0db
+  zh: e96d96c4ff3f3859
+/wecom-linux-production-deployment-record/table-of-contents:
+  en: b6239f708e919d04
+  zh: a971060e90fca459
+/wecom-linux-production-deployment-record/deployment-identity:
+  en: 6582387067d07ae4
+  zh: d09b3470cdcab405
+/wecom-linux-production-deployment-record/host-and-runtime:
+  en: 5b488f1ea38eaf79
+  zh: 215b4306c36e5608
+/wecom-linux-production-deployment-record/directories-and-permissions:
+  en: 258746c0035c6b33
+  zh: d8b10f7fefb9faf3
+/wecom-linux-production-deployment-record/profile-configuration:
+  en: 17458fd14accf30f
+  zh: 0f08f4e9314cbfc3
+/wecom-linux-production-deployment-record/credentials-and-model:
+  en: a2b35b6798f04ebf
+  zh: f7511954f1529da7
+/wecom-linux-production-deployment-record/systemd-service:
+  en: e47fc07767ab3ce8
+  zh: ef6384b650932b3c
+/wecom-linux-production-deployment-record/internal-web-access:
+  en: 5d725960745bd461
+  zh: ba077a47645c5b8c
+/wecom-linux-production-deployment-record/acceptance-results:
+  en: 9340b11938ecae4a
+  zh: 58b3eb425121d1c6
+/wecom-linux-production-deployment-record/open-items:
+  en: b8bd6846e004f97a
+  zh: 6dcf238e5fac1d1d
+/wecom-linux-production-deployment-record/routine-operations:
+  en: b7674607ecdbcdd3
+  zh: 5ca1633dad1d925d
+/wecom-linux-production-deployment-record/upgrade-and-rollback:
+  en: 25be9fa34bb9c623
+  zh: f59e3bed6373a35c
+/wecom-linux-production-deployment-record/security-constraints:
+  en: 45bf29395991d2be
+  zh: 5d7dd3d51b60eaa2
+/wecom-linux-production-deployment-record/further-exploration:
+  en: 142425dd6d591699
+  zh: 60c03d97b9be7fb9
+/wecom-linux-production-deployment-record/dev-note:
+  en: 70257657b47cab6e
+  zh: 3acfd54d5ff552fb

@@ -203,34 +203,7 @@ sudo -u dsh env DSH_HOME=/var/lib/deepseek-harness pnpm dsh plugin --profile wec
 
 ### 创建无人值守 preset
 
-把随附 standard preset 复制到生产 profile：
-
-```sh
-sudo -u dsh mkdir -p /var/lib/deepseek-harness/profiles/wecom/agent-presets
-sudo -u dsh cp -R packages/preset/agent-presets/presets/standard /var/lib/deepseek-harness/profiles/wecom/agent-presets/standard
-```
-
-在复制的 `agent.cordis.yml` 中，把 persona 文本替换为固定的无人值守渠道指令，并禁用 `tool-ask-user` 配置项。结果必须包含以下值：
-
-```yaml
-- id: persona
-  name: '@deepseek-ai/dsh-persona'
-  config:
-    text: >-
-      You are a coding agent serving an unattended enterprise WeCom text channel. Answer directly and never request interactive input.
-
-- id: tool-ask-user
-  name: '@deepseek-ai/dsh-tool-ask-user'
-  disabled: true
-```
-
-设置复制后的 `preset.yml` 元数据：
-
-```yaml
-name: Enterprise WeCom unattended mode
-description: Standard coding tools without interactive questions for the enterprise WeCom long-connection channel.
-order: 1
-```
+在下面的生产 patch 中通过 `preset-standard` 声明配置无人值守 Agent，列出所需工具并省略交互式提问。Registry 不扫描 preset 目录；`config.plugins` 是完整的 Agent 插件列表。
 
 ### 创建生产 patch
 
@@ -243,15 +216,34 @@ order: 1
 - id: client-hmr
   disabled: true
 
-- id: agent-presets
-  name: '@deepseek-ai/dsh-agent-presets'
+- id: preset-standard
+  name: '@deepseek-ai/dsh-agent-preset'
   config:
-    default: standard
-    roots:
-      - path: '/var/lib/deepseek-harness/profiles/wecom/agent-presets'
-        trust: system
-    includeShippedRoot: false
-    includeUserRoot: false
+    id: standard
+    name: Enterprise WeCom unattended mode
+    description: Coding tools without interactive questions for WeCom.
+    order: 1
+    plugins:
+      - id: persona
+        name: '@deepseek-ai/dsh-persona'
+        config:
+          suffix: Your working directory is {{cwd}}.
+          prefix: >-
+            You are a coding agent serving an unattended enterprise WeCom text channel. Answer directly and never request interactive input.
+      - id: agent-instructions
+        name: '@deepseek-ai/dsh-agent-instructions'
+      - id: tool-bash
+        name: '@deepseek-ai/dsh-tool-bash'
+      - id: tool-fs
+        name: '@deepseek-ai/dsh-tool-fs'
+      - id: tool-fs-search
+        name: '@deepseek-ai/dsh-tool-fs-search'
+      - id: skill-filesystem
+        name: '@deepseek-ai/dsh-skill-filesystem'
+      - id: tool-skill
+        name: '@deepseek-ai/dsh-tool-skill'
+      - id: compaction-basic
+        name: '@deepseek-ai/dsh-compaction-basic'
 
 - id: permission
   name: '@deepseek-ai/dsh-permission-presets'

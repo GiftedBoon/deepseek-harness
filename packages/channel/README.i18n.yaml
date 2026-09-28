@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/channel/README.md
-README.md: 81583fb367111e957e00584b81a61ad8dfb2c4b3
-README.zh.md: 5f9a1262af9d5e638c734eb5afda1c0e0ef2e5fb
+/:
+  en: dcabf132b93f3f58
+  zh: a2753d144a166e71
+/channel-enterprise-messaging-channels:
+  en: 61edb349c2d6fc98
+  zh: 4b9ef9cee204b688
+/channel-enterprise-messaging-channels/summary:
+  en: bdb292380955bd33
+  zh: 35ff881ccaf71af9
+/channel-enterprise-messaging-channels/table-of-contents:
+  en: 1eb35b015a6c423f
+  zh: a8a3dceee2c9e943
+/channel-enterprise-messaging-channels/packages:
+  en: 76941be732694b8d
+  zh: 35e7612466847d1b
+/channel-enterprise-messaging-channels/related-documentation:
+  en: a920c0148ed55332
+  zh: 1805f9d896a9b187
+/channel-enterprise-messaging-channels/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

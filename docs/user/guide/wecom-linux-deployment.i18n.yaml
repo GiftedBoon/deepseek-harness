@@ -1,6 +1,106 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for wecom-linux-deployment.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/user/guide/wecom-linux-deployment.md
-wecom-linux-deployment.md: 508afeefe5ed302d427782db77f1a14155fa5986
-wecom-linux-deployment.zh.md: bd6352a8ccefd62e6ec597deed15f7e188113438
+/:
+  en: d38d937a4ef5cc98
+  zh: 2064b7d1eb876fb8
+/deploy-the-enterprise-wecom-agent-on-linux:
+  en: 7dd49e4af00bf52c
+  zh: 36b70e6c617c30d2
+/deploy-the-enterprise-wecom-agent-on-linux/summary:
+  en: 228472eb49c05d85
+  zh: 2d11e730c145f43d
+/deploy-the-enterprise-wecom-agent-on-linux/table-of-contents:
+  en: 251fbf439d1ca613
+  zh: 981a86e982ff9f56
+/deploy-the-enterprise-wecom-agent-on-linux/deployment-outcome:
+  en: 6c7f1638ea701011
+  zh: 44ecd079dfe40f6c
+/deploy-the-enterprise-wecom-agent-on-linux/prerequisites:
+  en: 4af17fc7e8026f63
+  zh: 2a9cebfe1bc4e96e
+/deploy-the-enterprise-wecom-agent-on-linux/prerequisites/choose-a-migration-mode:
+  en: 09642068f1ba0fb8
+  zh: ec96e3c3065cf4c4
+/deploy-the-enterprise-wecom-agent-on-linux/prepare-the-release:
+  en: 1a7e84680737675d
+  zh: 56535a423837aaa0
+/deploy-the-enterprise-wecom-agent-on-linux/prepare-the-linux-host:
+  en: 8fde5d751fd09aca
+  zh: 0d43f1ba69beb90a
+/deploy-the-enterprise-wecom-agent-on-linux/install-and-build-dsh:
+  en: 2747824d2f2bb770
+  zh: 4f404deb3b467d8e
+/deploy-the-enterprise-wecom-agent-on-linux/create-the-wecom-profile:
+  en: d5de75ab45e54046
+  zh: f9f2129553dd1b3e
+/deploy-the-enterprise-wecom-agent-on-linux/create-the-wecom-profile/create-the-unattended-preset:
+  en: 4aa78f559041206e
+  zh: 0f5cdc16c95afd1c
+/deploy-the-enterprise-wecom-agent-on-linux/create-the-wecom-profile/create-the-production-patch:
+  en: 1dc8fc9e5d77feab
+  zh: 806e9f2667301387
+/deploy-the-enterprise-wecom-agent-on-linux/configure-credentials:
+  en: 315c1eae394d7704
+  zh: f788bf5e3f0668d4
+/deploy-the-enterprise-wecom-agent-on-linux/install-the-systemd-service:
+  en: bb4fa6034e98b433
+  zh: 21a2dec98cfe24c5
+/deploy-the-enterprise-wecom-agent-on-linux/cut-over-the-botid:
+  en: fc61b442f3a88e83
+  zh: 8891423dee3d4a8e
+/deploy-the-enterprise-wecom-agent-on-linux/acceptance-procedure:
+  en: 53df969632e80fd2
+  zh: d3bceae5ff864302
+/deploy-the-enterprise-wecom-agent-on-linux/acceptance-procedure/1-process-and-restart-state:
+  en: 524789413ebfe946
+  zh: 68582cfb8b83aa92
+/deploy-the-enterprise-wecom-agent-on-linux/acceptance-procedure/2-local-listener-and-outbound-connection:
+  en: 029c82b95a0b42ac
+  zh: 7abe6159f4e10144
+/deploy-the-enterprise-wecom-agent-on-linux/acceptance-procedure/3-authorized-conversation:
+  en: a465e7f9caac12db
+  zh: 19fae677d9acd2e6
+/deploy-the-enterprise-wecom-agent-on-linux/acceptance-procedure/4-session-continuity:
+  en: 8538d4ba351c808a
+  zh: 75ecdc740969b624
+/deploy-the-enterprise-wecom-agent-on-linux/acceptance-procedure/5-confined-workspace-write:
+  en: 53074ba54b9e3366
+  zh: 069368e7cea151dd
+/deploy-the-enterprise-wecom-agent-on-linux/acceptance-procedure/6-admission-policy:
+  en: 94d12a003994227b
+  zh: 4ffad370d06160df
+/deploy-the-enterprise-wecom-agent-on-linux/acceptance-procedure/7-restart-recovery:
+  en: 5c2e36ef6fb514fb
+  zh: f9fe89f9dd90e4cb
+/deploy-the-enterprise-wecom-agent-on-linux/acceptance-procedure/8-supervisor-recovery:
+  en: cfc61e26fd45bf9a
+  zh: f594d66a3c76d2e6
+/deploy-the-enterprise-wecom-agent-on-linux/acceptance-procedure/9-log-privacy:
+  en: b04f981fd5759a11
+  zh: 762591c54c9aa88a
+/deploy-the-enterprise-wecom-agent-on-linux/acceptance-procedure/acceptance-record:
+  en: f827840ba2f751db
+  zh: cb681c43652dc183
+/deploy-the-enterprise-wecom-agent-on-linux/operations-and-rollback:
+  en: 9c4867f384ebce59
+  zh: 1c139e196a5851ef
+/deploy-the-enterprise-wecom-agent-on-linux/operations-and-rollback/upgrade:
+  en: 2c0ce13ed6f4d146
+  zh: faa14c29542d48c3
+/deploy-the-enterprise-wecom-agent-on-linux/operations-and-rollback/rollback:
+  en: 4856f96b772d0a20
+  zh: 346d16b9192ec979
+/deploy-the-enterprise-wecom-agent-on-linux/security-checklist:
+  en: 53b5a8c2c399d5db
+  zh: c566d9ee1e277f0b
+/deploy-the-enterprise-wecom-agent-on-linux/troubleshooting:
+  en: 947e301cde96f241
+  zh: 54898a652cf76e23
+/deploy-the-enterprise-wecom-agent-on-linux/further-exploration:
+  en: a5195ffb57226b05
+  zh: 99b2f00ae3f387c1
+/deploy-the-enterprise-wecom-agent-on-linux/dev-note:
+  en: 6d5f295a37cac9bc
+  zh: bd139d9f940f85fc

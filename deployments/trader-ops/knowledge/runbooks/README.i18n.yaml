@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write deployments/trader-ops/knowledge/runbooks/README.md
-README.md: 9064339525ca4f401e27499ad729fa3670690d85
-README.zh.md: 915fba4fbd87904267b6d4e1b53fe6ed1b82dab9
+/runbooks-retrievable-operating-procedures:
+  en: db0b0e6c30e18201
+  zh: f0ca6356b88ac529
+/runbooks-retrievable-operating-procedures/what-belongs-here:
+  en: 2fbdf510265dee6d
+  zh: a35db3eba7af9d18
+/runbooks-retrievable-operating-procedures/what-does-not-belong-here:
+  en: aed53a4b89e964ce
+  zh: 1b97ad1cb4535baa
+/runbooks-retrievable-operating-procedures/templates:
+  en: 658ee5a438df3fa6
+  zh: b22ca631aa00f0a4
+/runbooks-retrievable-operating-procedures/example-switch-strategy-md:
+  en: d28c0914f198bd91
+  zh: 540ac0fd558e1050

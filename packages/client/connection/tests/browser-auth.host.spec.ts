@@ -51,7 +51,7 @@ function response(): { value: ConnectionIndexResponse; state: ResponseState } {
 }
 
 function loginRequest(method: string, body = '', headers: Record<string, string> = {}): IncomingMessage {
-  const request = Readable.from(body === '' ? [] : [Buffer.from(body)]) as unknown as IncomingMessage
+  const request = Readable.from(body === '' ? [] : [Buffer.from(body)]) as IncomingMessage
   Object.assign(request, {
     method,
     url: '/login',
@@ -62,11 +62,11 @@ function loginRequest(method: string, body = '', headers: Record<string, string>
 
 function serverResponse(): { value: ServerResponse; state: ResponseState } {
   const { value, state } = response()
-  return { value: Object.assign(new EventEmitter(), value) as unknown as ServerResponse, state }
+  return { value: Object.assign(new EventEmitter(), value) as ServerResponse, state }
 }
 
 function credentials(store: RecordCredentials): CredentialProvider {
-  return store as unknown as CredentialProvider
+  return store
 }
 
 function createAuth(
@@ -161,7 +161,7 @@ describe('BrowserAuth', () => {
     await auth.handleLogin(loginRequest('POST', 'username=trader&password=rotated+password', {
       'content-type': 'application/x-www-form-urlencoded',
     }), accepted.value)
-    expect(accepted.state).toMatchObject({ status: 303, headers: { location: '/' } })
+    expect(accepted.state).toMatchObject({ status: 303, headers: { location: './' } })
     const cookie = accepted.state.headers?.['set-cookie']?.split(';', 1)[0]
     expect(cookie).toBeDefined()
     if (cookie === undefined) throw new Error('password login did not set a cookie')
@@ -215,7 +215,7 @@ describe('BrowserAuth', () => {
       status: 303,
       headers: {
         'cache-control': 'no-store',
-        'location': '/',
+        'location': './',
         'referrer-policy': 'no-referrer',
       },
     })
@@ -248,10 +248,33 @@ describe('BrowserAuth', () => {
       status: 303,
       headers: {
         'cache-control': 'no-store',
-        'location': '/',
+        'location': './',
         'referrer-policy': 'no-referrer',
       },
     })
+  })
+
+  it('preserves the caller authority and mount while adding only this process token', async () => {
+    const auth = await createAuth(new RecordCredentials())
+    const mounted = new URL(auth.authenticatedUrl('https://gateway.example/tools/dsh/'))
+    expect(mounted.origin).toBe('https://gateway.example')
+    expect(mounted.pathname).toBe('/tools/dsh/')
+    expect([...mounted.searchParams.keys()]).toEqual(['token'])
+
+    const loopback = new URL(auth.authenticatedUrl('http://127.0.0.1:3080/'))
+    expect(loopback.origin).toBe('http://127.0.0.1:3080')
+    expect(loopback.pathname).toBe('/')
+    expect(loopback.searchParams.get('token')).toBe(mounted.searchParams.get('token'))
+
+    // The proxy preserves the browser-facing Host and strips the mount.
+    const token = mounted.searchParams.get('token')
+    const exchanged = response()
+    expect(auth.authorizeIndex(request(`/?token=${String(token)}`, 'gateway.example'), exchanged.value)).toBe(false)
+    const setCookie = exchanged.state.headers?.['set-cookie']
+    if (setCookie === undefined) throw new Error('mount exchange did not set a cookie')
+    expect(auth.isAuthenticated(request(
+      '/', 'gateway.example', { cookie: setCookie.split(';', 1)[0]! },
+    ))).toBe(true)
   })
 
   it('accepts the cookie for index serving and gives every unauthenticated request one response', async () => {

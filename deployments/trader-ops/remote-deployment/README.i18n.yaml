@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write deployments/trader-ops/remote-deployment/README.md
-README.md: 05fc2a5bc4dcc82252b8f8f364b70716626d06e0
-README.zh.md: 228c95045abd04d3e3176f19d0cab069360f9fa9
+/remote-deployment-record:
+  en: b93b867e8aede19d
+  zh: 876b881285d1107b
+/remote-deployment-record/summary:
+  en: 1131cd350f3516d4
+  zh: 0b065205303d2796
+/remote-deployment-record/table-of-contents:
+  en: 6235d4a089b3d949
+  zh: fd97d38e2532bc6e
+/remote-deployment-record/deployment-identity:
+  en: 8e62f9e84b1ad8bf
+  zh: 8430c737ae4fd612
+/remote-deployment-record/service-and-network:
+  en: 710a2ad7b4173856
+  zh: 135db941db1ed7dc
+/remote-deployment-record/configuration-applied:
+  en: 02b0417ee2194b7e
+  zh: adf7e8de38b0bf79
+/remote-deployment-record/verification-evidence:
+  en: 1e883d3a61a06ea9
+  zh: d26f9fff668381b6
+/remote-deployment-record/wecom-session-recreation:
+  en: 20957caa641bd7a3
+  zh: db72a2c749376017
+/remote-deployment-record/routine-operations:
+  en: 8378458789d72ae8
+  zh: c973593b65ee81cd
+/remote-deployment-record/safety-constraints:
+  en: df99b7ecd143ca0f
+  zh: 426108e5b73d913f
+/remote-deployment-record/further-exploration:
+  en: 2808618981b15258
+  zh: 41666b23cb3cc99f
+/remote-deployment-record/dev-note:
+  en: fd78990306c7b36e
+  zh: aa9e607de5f1b205

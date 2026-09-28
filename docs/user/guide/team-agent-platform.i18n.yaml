@@ -1,6 +1,46 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for team-agent-platform.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/user/guide/team-agent-platform.md
-team-agent-platform.md: b91bc6c2df0aa090903ee2dadb4f94123e366101
-team-agent-platform.zh.md: fdc04b5e2da106efb14d0ef305601c78a5ff4ba5
+/:
+  en: c1245409334171b2
+  zh: 3d1f2745ce496882
+/build-a-controlled-team-agent-platform:
+  en: 98f2b3a020535b6c
+  zh: 640aa0572f21e296
+/build-a-controlled-team-agent-platform/summary:
+  en: 86074bb0887653e1
+  zh: 0fb8472492f90577
+/build-a-controlled-team-agent-platform/table-of-contents:
+  en: e2c8aab314c78326
+  zh: 3ebd662d34a906df
+/build-a-controlled-team-agent-platform/goals-and-boundaries:
+  en: 50b0e62e92fd8a39
+  zh: 1dca6c819d3f54b1
+/build-a-controlled-team-agent-platform/architecture:
+  en: e0246bb9816a8c10
+  zh: 01e7f5c8878f9afc
+/build-a-controlled-team-agent-platform/responsibilities:
+  en: c9b9d4589bcdd966
+  zh: 7a3a12d6f5c3cf12
+/build-a-controlled-team-agent-platform/responsibilities/skill-and-tool-split:
+  en: 95530a04740416d9
+  zh: 23408114b9a034e7
+/build-a-controlled-team-agent-platform/responsibilities/vault-git-and-openviking-split:
+  en: 7c9b59e52efcdd75
+  zh: 726eca2563477cc0
+/build-a-controlled-team-agent-platform/permissions-approval-and-audit:
+  en: 752f445e8d4bae8d
+  zh: 64670725868cc7ce
+/build-a-controlled-team-agent-platform/version-1-deployment:
+  en: a15d831c789e1aa2
+  zh: e6b23693dc068bd9
+/build-a-controlled-team-agent-platform/upgrade-path:
+  en: e81dafea501480fb
+  zh: 89c24facf4ffefbf
+/build-a-controlled-team-agent-platform/further-exploration:
+  en: 0698e631a2a10292
+  zh: 3d3e1c41286e566e
+/build-a-controlled-team-agent-platform/dev-note:
+  en: 50621a034f2a0fd3
+  zh: aa409c2b3e5cf2be

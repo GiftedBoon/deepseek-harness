@@ -513,8 +513,8 @@ describe('WeComChannelRuntime', () => {
       definitionFingerprint: definition.fingerprint, target: 'csc-sz-12',
       runAt: Date.now(), state: 'pending', createdAt: Date.now(), updatedAt: Date.now(),
     })
-    const internals = test.runtime as unknown as { scheduledActions: { dispatch(id: string): Promise<void> } }
-    await internals.scheduledActions.dispatch('action')
+    // @ts-expect-error The fixture dispatches a pending action through the runtime's private scheduler.
+    await test.runtime.scheduledActions.dispatch('action')
     expect(test.client.sends).toHaveLength(1)
     expect(test.client.sends[0]?.target).toBe('allowed')
     expect(test.client.sends[0]?.content).toContain('scheduled success')

@@ -59,7 +59,10 @@ function context(options: {
     },
     agentPresets: {
       resolve: async (id: string) => ({ id }),
-      standingKeyFor: async () => { calls.push('standing') },
+      acquireScope: async () => {
+        calls.push('standing')
+        return { [Symbol.asyncDispose]: async () => { calls.push('release-standing') } }
+      },
     },
     credentials: {
       resolve: async (value: string) => {
@@ -92,7 +95,7 @@ describe('channel-wecom plugin', () => {
     expect(inject).toContain('storageDomain')
     const test = context()
     await apply(test.ctx as never, config())
-    expect(test.calls).toEqual(['standing'])
+    expect(test.calls).toEqual(['standing', 'release-standing'])
     expect(mocks.state.clientOptions[0]).toEqual({ botId: 'bot', secret: 'bot-secret', connectTimeoutMs: 10 })
     expect(mocks.state.runtimes).toHaveLength(1)
   })

@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-14-schedulable-product-actions.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-09-14-schedulable-product-actions.md
-2026-09-14-schedulable-product-actions.md: 87adcc534d06995aa11769ac0cdfb78cb57b880b
-2026-09-14-schedulable-product-actions.zh.md: dd7f2dbe5d9725e43115ce7dc11ab80c40f3eefa
+/agent-note-schedulable-product-actions-for-the-trader-ops-wecom-channel:
+  en: 37ff6ff191c27702
+  zh: 76470f43a0453134
+/agent-note-schedulable-product-actions-for-the-trader-ops-wecom-channel/problem:
+  en: 0c6dabbe9a8119dc
+  zh: 8d5e00c14f61fc9c
+/agent-note-schedulable-product-actions-for-the-trader-ops-wecom-channel/proposal:
+  en: 7e873c0fc8540e09
+  zh: 9c80a78102e76fd4
+/agent-note-schedulable-product-actions-for-the-trader-ops-wecom-channel/proposal/server-entry-point:
+  en: 8406b3d963f9fd71
+  zh: ae0b876dbd5186ee
+/agent-note-schedulable-product-actions-for-the-trader-ops-wecom-channel/proposal/harness-side-registration:
+  en: 8b8da40a1ad08c99
+  zh: 2cb1f8cd0d499e78
+/agent-note-schedulable-product-actions-for-the-trader-ops-wecom-channel/proposal/dispatch-time-authorization:
+  en: 24b8b6c5852bd5d3
+  zh: 146025d07093fc43
+/agent-note-schedulable-product-actions-for-the-trader-ops-wecom-channel/alternatives-considered:
+  en: f20577adbcdd5e41
+  zh: 5dd5cedfb798ea63
+/agent-note-schedulable-product-actions-for-the-trader-ops-wecom-channel/acceptance-criteria:
+  en: 38893eea2a62fe8b
+  zh: 585b358f194bfdfb
+/agent-note-schedulable-product-actions-for-the-trader-ops-wecom-channel/risks:
+  en: 94ee936e625e0e6d
+  zh: 539452fda7f0cd7c

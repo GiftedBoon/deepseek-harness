@@ -1,6 +1,49 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/channel/channel-wecom/README.md
-README.md: b6dd46245232fea3b7955d7d60f7db72c82bd9b7
-README.zh.md: 2ff46a32642d79b621db2237c0ac4b5824f8b1b5
+/:
+  en: ebf95810d5fe9da9
+  zh: 8d13937d8a7d0b43
+/deepseek-ai-dsh-channel-wecom:
+  en: f0259e7635e88107
+  zh: e26ed5a4bf5dd2a1
+/deepseek-ai-dsh-channel-wecom/summary:
+  en: 0ba35772859426ec
+  zh: b79725e8d012c57f
+/deepseek-ai-dsh-channel-wecom/table-of-contents:
+  en: e45c1097395736b6
+  zh: 66cbdec889bc7419
+/deepseek-ai-dsh-channel-wecom/prerequisites:
+  en: 7c2fbf94426d22e2
+  zh: d604d0d6bb121875
+/deepseek-ai-dsh-channel-wecom/configuration:
+  en: bac908cdef285e71
+  zh: 17ea7c84b5d4ae6d
+/deepseek-ai-dsh-channel-wecom/conversation-and-delivery-lifecycle:
+  en: fe7443445a9b71db
+  zh: bf8fe529b4eea348
+/deepseek-ai-dsh-channel-wecom/security:
+  en: 9f3655fa3a6acc21
+  zh: 9de3551fe8fb061b
+/deepseek-ai-dsh-channel-wecom/model-experience:
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/deepseek-ai-dsh-channel-wecom/model-experience/wecom-user-message:
+  en: 661fc8ef3ecc106e
+  zh: d8c11cf2c8ed60b8
+/deepseek-ai-dsh-channel-wecom/model-experience/wecom-user-message/what-the-model-sees:
+  en: 5f63f49548b0b3e2
+  zh: b361d0cdc9083f05
+/deepseek-ai-dsh-channel-wecom/model-experience/wecom-user-message/token-effect:
+  en: 6652f72a37447ba8
+  zh: d064589e62d37db1
+/deepseek-ai-dsh-channel-wecom/model-experience/wecom-user-message/kv-cache-effect:
+  en: 634bb0d136c94561
+  zh: d506a8e5cb3934cd
+/deepseek-ai-dsh-channel-wecom/known-limitations-and-deferred-work:
+  en: 3097477110a800cf
+  zh: 952c7c39e6bcae0e
+/deepseek-ai-dsh-channel-wecom/known-limitations-and-deferred-work/dev-note:
+  en: bea05bdca14fd8a7
+  zh: 3862aa4c7301104e

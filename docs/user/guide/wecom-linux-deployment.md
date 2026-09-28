@@ -203,34 +203,7 @@ Set `/var/lib/deepseek-harness/profiles/wecom/package.json` to use the base and 
 
 ### Create the unattended preset
 
-Copy the shipped standard preset into the production profile:
-
-```sh
-sudo -u dsh mkdir -p /var/lib/deepseek-harness/profiles/wecom/agent-presets
-sudo -u dsh cp -R packages/preset/agent-presets/presets/standard /var/lib/deepseek-harness/profiles/wecom/agent-presets/standard
-```
-
-In the copied `agent.cordis.yml`, replace the persona text with a fixed unattended-channel instruction and disable the `tool-ask-user` row. The resulting entries must include these values:
-
-```yaml
-- id: persona
-  name: '@deepseek-ai/dsh-persona'
-  config:
-    text: >-
-      You are a coding agent serving an unattended enterprise WeCom text channel. Answer directly and never request interactive input.
-
-- id: tool-ask-user
-  name: '@deepseek-ai/dsh-tool-ask-user'
-  disabled: true
-```
-
-Set the copied `preset.yml` metadata:
-
-```yaml
-name: Enterprise WeCom unattended mode
-description: Standard coding tools without interactive questions for the enterprise WeCom long-connection channel.
-order: 1
-```
+Configure the unattended Agent through the `preset-standard` declaration in the production patch below, listing the required tools and omitting interactive questions. The registry does not scan preset directories; `config.plugins` is the complete Agent plugin list.
 
 ### Create the production patch
 
@@ -243,15 +216,34 @@ Create `/var/lib/deepseek-harness/profiles/wecom/cordis.patch.yml`. Replace ever
 - id: client-hmr
   disabled: true
 
-- id: agent-presets
-  name: '@deepseek-ai/dsh-agent-presets'
+- id: preset-standard
+  name: '@deepseek-ai/dsh-agent-preset'
   config:
-    default: standard
-    roots:
-      - path: '/var/lib/deepseek-harness/profiles/wecom/agent-presets'
-        trust: system
-    includeShippedRoot: false
-    includeUserRoot: false
+    id: standard
+    name: Enterprise WeCom unattended mode
+    description: Coding tools without interactive questions for WeCom.
+    order: 1
+    plugins:
+      - id: persona
+        name: '@deepseek-ai/dsh-persona'
+        config:
+          suffix: Your working directory is {{cwd}}.
+          prefix: >-
+            You are a coding agent serving an unattended enterprise WeCom text channel. Answer directly and never request interactive input.
+      - id: agent-instructions
+        name: '@deepseek-ai/dsh-agent-instructions'
+      - id: tool-bash
+        name: '@deepseek-ai/dsh-tool-bash'
+      - id: tool-fs
+        name: '@deepseek-ai/dsh-tool-fs'
+      - id: tool-fs-search
+        name: '@deepseek-ai/dsh-tool-fs-search'
+      - id: skill-filesystem
+        name: '@deepseek-ai/dsh-skill-filesystem'
+      - id: tool-skill
+        name: '@deepseek-ai/dsh-tool-skill'
+      - id: compaction-basic
+        name: '@deepseek-ai/dsh-compaction-basic'
 
 - id: permission
   name: '@deepseek-ai/dsh-permission-presets'

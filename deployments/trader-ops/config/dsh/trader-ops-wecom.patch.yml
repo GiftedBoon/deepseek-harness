@@ -7,16 +7,6 @@
   config:
     includeHarnessIdentity: false
 
-- id: agent-presets
-  name: '@deepseek-ai/dsh-agent-presets'
-  config:
-    default: standard
-    roots:
-      - path: !!js (process.env.DSH_HOME ?? '/var/lib/deepseek-harness') + '/profiles/' + (process.env.TRADER_OPS_PROFILE ?? 'web') + '/agent-presets'
-        trust: system
-    includeShippedRoot: true
-    includeUserRoot: true
-
 - id: permission
   name: '@deepseek-ai/dsh-permission-presets'
   config:
@@ -35,6 +25,11 @@
         approval: never
 
 - insert:
+    - id: trader-ops-wecom-preset
+      name: cordis:include
+      config:
+        path: !!js (process.env.DSH_HOME ?? '/var/lib/deepseek-harness') + '/profiles/' + (process.env.TRADER_OPS_PROFILE ?? 'web') + '/agent-presets/trader-ops-wecom/preset.cordis.yml'
+
     - id: trader-ops-wecom-channel
       name: '@deepseek-ai/dsh-channel-wecom'
       disabled: !!js process.env.TRADER_OPS_WECOM_ENABLED !== '1'

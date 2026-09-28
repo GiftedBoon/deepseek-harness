@@ -69,7 +69,7 @@ DSH 内置 web profile
   + config/dsh/trader-ops.patch.yml
   + （可选）config/dsh/trader-ops-aihubmix.patch.yml
   + （可选）config/dsh/trader-ops-bssh-ops-mcp.patch.yml
-  + apps/cli/config/examples/schedule/cordis.yml
+  + packages/experimental/schedule-bundle/cordis.patch.yml
 ```
 
 后加载的 patch 会覆盖同一配置项的完整 `config`，不是深度合并。因此修改 `openviking-memory-runtime` 时必须保留本文件中仍需生效的全部字段，并用 `--dump-config` 检查最终配置。

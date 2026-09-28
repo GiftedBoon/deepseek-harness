@@ -1,8 +1,15 @@
-import type { Context } from '@deepseek-ai/cordis'
-import type { CredentialProvider, CredentialRecord, CredentialRef, ResolvedCredential } from '@deepseek-ai/dsh-credentials'
+import { Context } from '@deepseek-ai/cordis'
+import { CredentialProvider } from '@deepseek-ai/dsh-credentials'
+import type { CredentialRecord, CredentialRef, ResolvedCredential } from '@deepseek-ai/dsh-credentials'
 
 /** Mutable credential-record double for Connection authentication tests. */
-export class RecordCredentials {
+export class RecordCredentials extends CredentialProvider {
+  constructor(ctx = new Context()) { super(ctx) }
+  async describe(): Promise<never> { throw new Error('describe is not used by this fixture') }
+  async set(): Promise<never> { throw new Error('set is not used by this fixture') }
+  async unset(): Promise<never> { throw new Error('unset is not used by this fixture') }
+  async describeRecord(): Promise<never> { throw new Error('describeRecord is not used by this fixture') }
+  async listRecords(): Promise<never> { throw new Error('listRecords is not used by this fixture') }
   record: CredentialRecord | undefined
   readonly references = new Map<string, string>()
   discardWrites = false
@@ -38,5 +45,5 @@ export class RecordCredentials {
 
 /** Provide the record operations Connection needs during authentication setup. */
 export function provideBrowserCredentials(ctx: Context): void {
-  ctx.provide('credentials', new RecordCredentials() as unknown as CredentialProvider)
+  new RecordCredentials(ctx)
 }

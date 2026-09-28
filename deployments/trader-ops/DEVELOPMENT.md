@@ -123,7 +123,7 @@ pnpm dsh web \
   --patch deployments/trader-ops/config/dsh/trader-ops-aihubmix.patch.yml \
   --patch deployments/trader-ops/config/dsh/trader-ops-wecom.patch.yml \
   --patch deployments/trader-ops/config/dsh/trader-ops-bssh-ops-mcp.patch.yml \
-  --patch apps/cli/config/examples/schedule/cordis.yml \
+  --patch packages/experimental/schedule-bundle/cordis.patch.yml \
   --no-open
 ```
 

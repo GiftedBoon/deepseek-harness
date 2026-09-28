@@ -13,7 +13,7 @@
     { "path": "../../core/session" },
     { "path": "../../core/agent" },
     { "path": "../../core/agent-default-model" },
-    { "path": "../../preset/agent-presets" },
+    { "path": "../../preset/agent-preset-registry" },
     { "path": "../../credentials/credentials" },
     { "path": "../../interaction/permission-presets" },
     { "path": "../../session/session-persistence" },

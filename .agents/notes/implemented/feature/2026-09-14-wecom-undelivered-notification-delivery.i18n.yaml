@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-14-wecom-undelivered-notification-delivery.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-14-wecom-undelivered-notification-delivery.md
-2026-09-14-wecom-undelivered-notification-delivery.md: 6f0f921c72a4b43139d7d489563f0f1a10c1ecb8
-2026-09-14-wecom-undelivered-notification-delivery.zh.md: 265a98bdeb634eeeef4ca7d0dc041b703bb67b9f
+/agent-note-undelivered-wecom-notifications-survive-until-the-conversation-returns:
+  en: b7a65a220e5083c5
+  zh: c4a30df61243fb2a
+/agent-note-undelivered-wecom-notifications-survive-until-the-conversation-returns/problem:
+  en: 954d33cf1cea7436
+  zh: 3c1411a2083a8e7d
+/agent-note-undelivered-wecom-notifications-survive-until-the-conversation-returns/decision:
+  en: 15d911b2eaf2f237
+  zh: d3976662f2ea3fb4
+/agent-note-undelivered-wecom-notifications-survive-until-the-conversation-returns/delivery-triggers:
+  en: d24563e280641179
+  zh: c3d2e0c7c815d47f
+/agent-note-undelivered-wecom-notifications-survive-until-the-conversation-returns/alternatives-considered:
+  en: 50bc3f922ffcb2c3
+  zh: b6183727dbd3bf40
+/agent-note-undelivered-wecom-notifications-survive-until-the-conversation-returns/consequences:
+  en: 1e2dc4c3fa84ab9d
+  zh: a62375b5711ee20f

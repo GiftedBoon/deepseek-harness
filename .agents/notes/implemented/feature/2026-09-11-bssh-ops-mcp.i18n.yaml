@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-11-bssh-ops-mcp.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-11-bssh-ops-mcp.md
-2026-09-11-bssh-ops-mcp.md: b3e06f04fe38f3975efe03387d0b288e4a135dfa
-2026-09-11-bssh-ops-mcp.zh.md: 9cc7601a8fc9bdc12a83acd14f0ccc365a24478e
+/agent-note-bssh-ops-remote-operations-mcp-integration:
+  en: 067fe37c0129a59d
+  zh: d757f9f6ce7cb8d2
+/agent-note-bssh-ops-remote-operations-mcp-integration/problem:
+  en: 95ac71dd1927e2dd
+  zh: e281031baa4b67ef
+/agent-note-bssh-ops-remote-operations-mcp-integration/decision:
+  en: 668b1cfd27e18249
+  zh: 924f70f6b934bebe
+/agent-note-bssh-ops-remote-operations-mcp-integration/alternatives-considered:
+  en: 6c1b1a00c830e573
+  zh: 8c9e2f34904a9a97
+/agent-note-bssh-ops-remote-operations-mcp-integration/security-and-lifecycle:
+  en: 1af654827c398c69
+  zh: be8437434ef9ff79
+/agent-note-bssh-ops-remote-operations-mcp-integration/verification:
+  en: 37997ce892fabc3f
+  zh: 40c5557f1353d95a
+/agent-note-bssh-ops-remote-operations-mcp-integration/consequences:
+  en: 7391fd8b889804b6
+  zh: 906c9f433e946575

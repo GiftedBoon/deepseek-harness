@@ -11,13 +11,13 @@ logger_plugin="$repo_root/vendor/logger-console/lib/index.js"
 wecom_plugin="$repo_root/packages/channel/channel-wecom/lib/index.js"
 wecom_patch="$deployment_root/config/dsh/trader-ops-wecom.patch.yml"
 bssh_mcp_patch="$deployment_root/config/dsh/trader-ops-bssh-ops-mcp.patch.yml"
-schedule_patch="$repo_root/apps/cli/config/examples/schedule/cordis.yml"
+schedule_patch="$repo_root/packages/experimental/schedule-bundle/cordis.patch.yml"
 lan_proxy_service="$deployment_root/config/systemd/dsh-trader-ops-lan-proxy.service"
 lan_proxy_socket="$deployment_root/config/systemd/dsh-trader-ops-lan-proxy.socket.in"
 endpoint="${OPENVIKING_URL:-http://127.0.0.1:1933}"
 
 : "${DSH_HOME:?Set DSH_HOME to the Harness configuration directory used by this deployment}"
-wecom_preset="$DSH_HOME/profiles/$profile/agent-presets/trader-ops-wecom/agent.cordis.yml"
+wecom_preset="$DSH_HOME/profiles/$profile/agent-presets/trader-ops-wecom/preset.cordis.yml"
 openviking_plugin="$DSH_HOME/profiles/$profile/node_modules/@openviking/dsh-memory-plugin/index.mjs"
 if [[ ! -f "$dsh_cli" ]]; then
   printf 'Built DSH CLI is missing at %s; install a completed release.\n' "$dsh_cli" >&2

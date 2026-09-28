@@ -14,14 +14,17 @@ import { HostConnectionService } from './rpc-host.ts'
 import { ConnectionRecoveryConfigSchema, resolveConnectionConfig, type ConnectionRecoveryConfig } from './recovery-config.ts'
 
 export type {
+  PeerAdmission,
   ConnectionFetchMethod,
   ConnectionFetchHandler,
   ConnectionFetchRoute,
   ConnectionIndexRequest,
   ConnectionIndexResponse,
   ConnectionRpcEndpointMatcher,
+  ConnectionRpcAttachment,
   ConnectionRpcFailure,
   ConnectionRpcHandler,
+  ConnectionRpcHandlerResult,
   ConnectionRequestRejection,
   ConnectionRpcResult,
   ConnectionRequestBodyMode,
@@ -33,7 +36,9 @@ export type {
   RpcMessage,
   ServerResponse,
 } from './rpc.ts'
+export type { PeerId, PeerScope, RemoteInvocation } from '@deepseek-ai/dsh-typert-protocol'
 export { RpcId, transportError } from './rpc.ts'
+export { OperatorPeer } from './operator-peer.ts'
 export {
   clientRequestSchema,
   rpcErrorSchema,
@@ -112,14 +117,17 @@ export interface PasswordLoginConfig {
   passwordEnv: string
 }
 
+// An omitted optional login must remain undefined, not an empty object.
+const passwordLoginSchema = z.object({
+  username: z.string().min(1).required(),
+  passwordEnv: z.string().min(1).required(),
+})
+delete passwordLoginSchema.meta.default
+
 export const Config: z<ConnectionConfig> = z.object({
   recovery: ConnectionRecoveryConfigSchema.default({}),
   trustedHosts: z.array(String).default([]),
-  // Prevent Schemastery from materializing an omitted optional object as `{}`.
-  passwordLogin: z.object({
-    username: z.string().min(1).required(),
-    passwordEnv: z.string().min(1).required(),
-  }).default(undefined as unknown as PasswordLoginConfig),
+  passwordLogin: passwordLoginSchema,
   cookieMaxAgeDays: z.natural().min(1).default(30),
   maxRequestBodyBytes: z.natural().min(1).default(DEFAULT_MAX_REQUEST_BODY_BYTES),
 })
@@ -175,10 +183,10 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
       kind: 'prefix',
       path: API_PATH,
       handler: async (req, res) => {
-        const rejection = connection.requestRejection(req)
-        if (rejection !== undefined) {
-          res.writeHead(rejection)
-          res.end(rejection === 401 ? 'unauthorized' : 'forbidden')
+        const admission = connection.admit(req)
+        if ('rejection' in admission) {
+          res.writeHead(admission.rejection)
+          res.end(admission.rejection === 401 ? 'unauthorized' : 'forbidden')
           return
         }
         await webCtx.waterfall('connection/request', req, res, () => bridge(req, res, fetchHandler, maxRequestBodyBytes))

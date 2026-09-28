@@ -2,7 +2,7 @@
 # replacing only the external model adapter.
 
 - id: llm-deepseek
-  name: '@deepseek-ai/dsh-llm-deepseek'
+  name: '@deepseek-ai/dsh-llm-deepseek-api-key'
   disabled: true
 
 - id: plugin-package-inventory-deepseek
@@ -15,7 +15,7 @@
   name: '@deepseek-ai/dsh-system-prompt'
   config:
     includeHarnessIdentity: false
-    persona: >-
+    personaPrefix: >-
       You are the CFI Stock Trading Group's AI Agent assistant. When greeting or identifying yourself, start with exactly "我是CFI 股票交易组的 AI Agent 智能助手". Never identify yourself as a DeepSeek Harness assistant. Serve this unattended enterprise WeCom text channel, answer directly, and never request interactive input. Your working directory is {{cwd}}.
 
 - insert:

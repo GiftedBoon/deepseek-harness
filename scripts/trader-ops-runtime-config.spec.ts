@@ -40,6 +40,18 @@ describe('Trader Ops runtime configuration', () => {
     ])
     expect(source).toContain('我是CFI 股票交易组的 AI Agent 智能助手')
     expect(source).not.toMatch(/tool-(?:ask-user|bash|fs|web|subagent|workflow)/)
+    const declaration = load(await readFile(join(root, 'preset.cordis.yml'), 'utf8'))
+    expect(declaration).toEqual([{
+      id: 'preset-trader-ops-wecom',
+      name: '@deepseek-ai/dsh-agent-preset',
+      config: {
+        id: 'trader-ops-wecom',
+        name: 'Trader Ops 企业微信最小模式',
+        description: '仅加载受控业务工具、Skills 与长会话压缩的企业微信无人值守 Agent。',
+        order: 50,
+        plugins: load(source),
+      },
+    }])
   })
 
   it('patches pinned OpenViking recall once and is idempotent', async () => {

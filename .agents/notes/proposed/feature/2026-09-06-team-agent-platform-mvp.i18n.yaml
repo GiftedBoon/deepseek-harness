@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-06-team-agent-platform-mvp.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-09-06-team-agent-platform-mvp.md
-2026-09-06-team-agent-platform-mvp.md: 54506ba72e87590452d0cc38e3908e494b0ab1a9
-2026-09-06-team-agent-platform-mvp.zh.md: 47fb2bb716922ededef57ef29db402b62bb7fffa
+/agent-note-controlled-team-agent-platform-mvp:
+  en: 4180553bc667fedc
+  zh: 03efe01962ea745c
+/agent-note-controlled-team-agent-platform-mvp/problem:
+  en: c5d1d8c87b553efd
+  zh: 4eec4e583d28bec5
+/agent-note-controlled-team-agent-platform-mvp/proposal:
+  en: f6e3f56be4e9d39e
+  zh: 2abd47522857fef6
+/agent-note-controlled-team-agent-platform-mvp/proposal/repository-topology:
+  en: 0de78df407c13121
+  zh: 0cbd9f90bb6ebc23
+/agent-note-controlled-team-agent-platform-mvp/proposal/first-mcp-tools:
+  en: 78fbc27cba929bce
+  zh: f9f31d3008a4aee7
+/agent-note-controlled-team-agent-platform-mvp/proposal/first-skills:
+  en: 5b082f30e2363bb8
+  zh: 880ba72bd593887c
+/agent-note-controlled-team-agent-platform-mvp/proposal/openviking-integration:
+  en: 7e6b57f9f6b9de1f
+  zh: c391bb3ce2bcea4e
+/agent-note-controlled-team-agent-platform-mvp/proposal/policy-approval-and-audit:
+  en: 090aae520037b0e1
+  zh: 8d1e7dc0fd95cf63
+/agent-note-controlled-team-agent-platform-mvp/proposal/execution-and-temporal-boundary:
+  en: 2afcd3522490e709
+  zh: dd4173a062e51568
+/agent-note-controlled-team-agent-platform-mvp/alternatives-considered:
+  en: f343e6100b3f7b51
+  zh: 4623a0d0f52b6389
+/agent-note-controlled-team-agent-platform-mvp/acceptance-criteria:
+  en: 28d4913d0a3ba002
+  zh: badf709a4410d160
+/agent-note-controlled-team-agent-platform-mvp/risks:
+  en: 84fcf2f4c35342e6
+  zh: 5e8d8c98dd24378a

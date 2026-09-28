@@ -50,6 +50,8 @@ export async function renderWeComPreset(targetDirectory) {
   await mkdir(targetDirectory, { recursive: true, mode: 0o700 })
   await writeFile(resolve(targetDirectory, 'agent.cordis.yml'), agent, { mode: 0o600 })
   await writeFile(resolve(targetDirectory, 'preset.yml'), metadata, { mode: 0o600 })
+  const declaration = `- id: preset-trader-ops-wecom\n  name: '@deepseek-ai/dsh-agent-preset'\n  config:\n    id: trader-ops-wecom\n${metadata.split('\n').filter(Boolean).map(line => `    ${line}`).join('\n')}\n    plugins:\n${agent.split('\n').map(line => line ? `      ${line}` : '').join('\n')}`
+  await writeFile(resolve(targetDirectory, 'preset.cordis.yml'), declaration, { mode: 0o600 })
 }
 
 if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {

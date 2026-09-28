@@ -32,6 +32,8 @@ kind: "package-reference"
 
 [Linux 生产部署指南](../../../docs/user/guide/wecom-linux-deployment.zh.md)提供专用 profile、无人值守 preset、systemd、切换、验收与回滚流程。
 
+通过 Host 组装中的 `dsh-agent-preset` 声明配置的 Agent preset。启动时获取并释放 registry 版本租约，在连接企业微信之前拒绝缺失或不可用的 preset；每次交付在 Agent 的生命周期内保留挂载的版本。
+
 <a id="configuration"></a>
 ## 配置
 

@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-14-parameterized-wecom-scheduled-actions.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-14-parameterized-wecom-scheduled-actions.md
-2026-09-14-parameterized-wecom-scheduled-actions.md: ea67f25e55fa33e3dfefe92b95ca92311d96763c
-2026-09-14-parameterized-wecom-scheduled-actions.zh.md: ae34608906c75641540112c2e24ac749f538de95
+/agent-note-parameterized-wecom-scheduled-actions:
+  en: 745a30e2d07e0fe5
+  zh: 07d4a52dd1e522cb
+/agent-note-parameterized-wecom-scheduled-actions/problem:
+  en: fb252fac4c63ff33
+  zh: 491373874cdea27e
+/agent-note-parameterized-wecom-scheduled-actions/decision:
+  en: c72f84348789a164
+  zh: e5db6356e9513981
+/agent-note-parameterized-wecom-scheduled-actions/security-and-recovery:
+  en: ca609a42110173e3
+  zh: 646ad462defc4940
+/agent-note-parameterized-wecom-scheduled-actions/alternatives-considered:
+  en: 9bc7427c029062c8
+  zh: d3a3b39ec76b48ed
+/agent-note-parameterized-wecom-scheduled-actions/verification:
+  en: 15380d522650bb5b
+  zh: 7b7a09b0cd795704
+/agent-note-parameterized-wecom-scheduled-actions/consequences:
+  en: c1378c445a70c7ce
+  zh: 0f37673bf309f261

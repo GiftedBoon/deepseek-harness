@@ -32,8 +32,8 @@
 | SSH 目标 | `dsh-server` |
 | 主机名 | `debian` |
 | 部署日期 | `2026-09-11` |
-| 已部署源码 revision | `c13dd3f8e7298936fa068b6fdd830e5b550287b4` |
-| 已合并仓库 revision | `820412b41b71ac97452dfa2d9a3fef5fb1aa924f` |
+| 已部署源码变更 | `fix(wecom): recreate deleted mapped sessions`（2026-09-11） |
+| 已合并仓库变更 | Pull request #1，`codex/wecom-session-recreate`（2026-09-11） |
 | 发布入口 | `/opt/deepseek-harness/current` |
 | Harness 服务 | `dsh-trader-ops.service` |
 | Profile | `trader-ops` |

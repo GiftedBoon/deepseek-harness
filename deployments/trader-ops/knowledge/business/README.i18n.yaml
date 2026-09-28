@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write deployments/trader-ops/knowledge/business/README.md
-README.md: 39094b73c68a128f5a0f62a236d0ff9fac1264b7
-README.zh.md: c58d020fa5f6e5033773b062fc924e995f91e649
+/business-concepts-and-rules:
+  en: 674802e6c04aef02
+  zh: 6257d25d12d466b7
+/business-concepts-and-rules/what-belongs-here:
+  en: 78d743a82e3ac8d3
+  zh: 7a1e06c65498bdbb
+/business-concepts-and-rules/what-does-not-belong-here:
+  en: 9bbfe505b30b00f2
+  zh: 1e4abdc7f36c1d9b
+/business-concepts-and-rules/templates:
+  en: 4342dbf2ab50bd47
+  zh: dbed336e725a1109
+/business-concepts-and-rules/example-strategy-switch-rule-md:
+  en: 66c77fd91d0cfb46
+  zh: 45cd4edf8f1b5999
