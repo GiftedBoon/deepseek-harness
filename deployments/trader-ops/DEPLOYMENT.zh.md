@@ -30,10 +30,10 @@ Harness 与 OpenViking 分别只监听 `127.0.0.1:3180` 和 `127.0.0.1:1933`。�
 
 ```bash
 ssh -t dsh-server \
-  'sudo env TRADER_OPS_DEPLOY_OPERATOR=boon bash /home/boon/bootstrap-debian-host.sh'
+  'sudo env TRADER_OPS_DEPLOY_OPERATOR=cfi bash /home/cfi/bootstrap-debian-host.sh'
 ```
 
-脚本会验证 Debian 12/amd64，拒绝冲突的容器软件包，从签名 apt 软件源安装 Docker，校验 Node 与 Ollama 下载，创建 `dsh` 和 `ollama` 服务用户，配置持久化目录，把 Ollama 限制到 Docker bridge 地址，并且只拉取以下模型：
+脚本要求已有 `cfi` 账号，验证 Debian 12/amd64，拒绝冲突的容器软件包，从签名 apt 软件源安装 Docker，校验 Node 与 Ollama 下载，创建 `ollama` 服务用户，配置持久化目录，把 Ollama 限制到 Docker bridge 地址，并且只拉取以下模型：
 
 ```text
 qwen3-embedding:0.6b
@@ -48,7 +48,7 @@ guoxuter/ov_intent_analysis_sft:v7_q8
 
 ```bash
 ssh dsh-server \
-  '/home/boon/trader-ops-install-release.sh <40-character-git-commit>'
+  '/home/cfi/trader-ops-install-release.sh <40-character-git-commit>'
 ```
 
 如果主机访问 GitHub 过慢，应在可信机器上创建带顶层目录的 `git archive`，其中 `.trader-ops-source-commit` 保存同一个完整 commit SHA。把归档复制到主机并计算 SHA-256，再通过 `TRADER_OPS_RELEASE_ARCHIVE` 传入绝对路径，通过 `TRADER_OPS_RELEASE_ARCHIVE_SHA256` 传入 digest。安装器会先校验两者，再解压和构建；由于源码归档没有 `.git` 目录，安装器会把已校验的 revision 作为 `DSH_CLIENT_COMMIT_HASH` 传给构建过程。
@@ -201,7 +201,7 @@ sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure
 ## 每次发布
 
 1. 使用新的、已评审的完整 commit SHA 运行 `install-debian-release.sh`。
-2. 加载 `/etc/deepseek-harness/trader-ops.env`，再以 `dsh` 身份针对新发布运行 `bootstrap-profile.sh` 和 `verify-deployment.sh`，然后才重启服务；这些命令会应用固定版本的 OpenViking 检索补丁、刷新最小无人值守企业微信 preset，并保留可选渠道依赖。
+2. 加载 `/etc/deepseek-harness/trader-ops.env`，再以 `cfi` 身份针对新发布运行 `bootstrap-profile.sh` 和 `verify-deployment.sh`，然后才重启服务；这些命令会应用固定版本的 OpenViking 检索补丁、刷新最小无人值守企业微信 preset，并保留可选渠道依赖。
 3. 执行任何数据迁移前，备份 `/var/lib/openviking` 与 `/var/lib/deepseek-harness`。
 4. 通过 `restart-runtime.sh` 重启 `dsh-trader-ops`；该脚本会先安装当前 release 的 systemd unit。重复监听地址、健康、空 skill 和空 knowledge 检查，并保留上一发布。
 5. 失败时，把 `current` 原子指回上一个已验证发布，再重启 Harness。只有失败发布执行过明确的不兼容迁移时，才恢复持久化数据。

@@ -24,8 +24,8 @@ if [[ "$(dpkg --print-architecture)" != amd64 ]]; then
   printf 'Unsupported architecture: expected amd64.\n' >&2
   exit 1
 fi
-if [[ -z "$deploy_operator" || "$deploy_operator" == root ]] || ! id "$deploy_operator" >/dev/null 2>&1; then
-  printf 'Set TRADER_OPS_DEPLOY_OPERATOR to an existing non-root deployment user.\n' >&2
+if [[ "$deploy_operator" != cfi ]] || ! id cfi >/dev/null 2>&1 || ! getent group cfi >/dev/null; then
+  printf 'Set TRADER_OPS_DEPLOY_OPERATOR to the existing cfi account and group.\n' >&2
   exit 1
 fi
 
@@ -116,21 +116,17 @@ if [[ -z "$installed_ollama_version" ]]; then
   tar --use-compress-program=unzstd -xf "$ollama_archive_source" -C /usr
 fi
 
-if ! id dsh >/dev/null 2>&1; then
-  useradd --system --user-group --home-dir /var/lib/deepseek-harness \
-    --create-home --shell /usr/sbin/nologin dsh
-fi
 if ! id ollama >/dev/null 2>&1; then
   useradd --system --user-group --home-dir /usr/share/ollama \
     --create-home --shell /usr/sbin/nologin ollama
 fi
 
-install -d -o "$deploy_operator" -g dsh -m 2750 /opt/deepseek-harness
-install -d -o "$deploy_operator" -g dsh -m 2750 /opt/deepseek-harness/releases
+install -d -o "$deploy_operator" -g cfi -m 2750 /opt/deepseek-harness
+install -d -o "$deploy_operator" -g cfi -m 2750 /opt/deepseek-harness/releases
 install -d -o root -g root -m 0700 /etc/deepseek-harness
-install -d -o dsh -g dsh -m 0700 /var/lib/deepseek-harness
+install -d -o cfi -g cfi -m 0700 /var/lib/deepseek-harness
 install -d -o root -g root -m 0700 /var/lib/openviking
-install -d -o dsh -g dsh -m 0750 /srv/dsh-workspace
+install -d -o cfi -g cfi -m 0750 /srv/dsh-workspace
 
 docker_gateway="$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')"
 if [[ -z "$docker_gateway" ]]; then

@@ -30,10 +30,10 @@ Copy `scripts/bootstrap-debian-host.sh` to the remote operator's home directory,
 
 ```bash
 ssh -t dsh-server \
-  'sudo env TRADER_OPS_DEPLOY_OPERATOR=boon bash /home/boon/bootstrap-debian-host.sh'
+  'sudo env TRADER_OPS_DEPLOY_OPERATOR=cfi bash /home/cfi/bootstrap-debian-host.sh'
 ```
 
-The script validates Debian 12/amd64, refuses conflicting container packages, installs Docker from its signed apt repository, verifies the Node and Ollama downloads, creates the `dsh` and `ollama` service users, configures persistent directories, restricts Ollama to the Docker bridge address, and pulls only these models:
+The script requires the existing `cfi` account, validates Debian 12/amd64, refuses conflicting container packages, installs Docker from its signed apt repository, verifies the Node and Ollama downloads, creates the `ollama` service user, configures persistent directories, restricts Ollama to the Docker bridge address, and pulls only these models:
 
 ```text
 qwen3-embedding:0.6b
@@ -48,7 +48,7 @@ Run the release installer as the non-root deployment operator, using the full re
 
 ```bash
 ssh dsh-server \
-  '/home/boon/trader-ops-install-release.sh <40-character-git-commit>'
+  '/home/cfi/trader-ops-install-release.sh <40-character-git-commit>'
 ```
 
 When the host's GitHub route is too slow, create a `git archive` on a trusted machine with a top-level directory and `.trader-ops-source-commit` containing the same full commit SHA. Copy it to the host, calculate its SHA-256, and pass its absolute path through `TRADER_OPS_RELEASE_ARCHIVE` and the digest through `TRADER_OPS_RELEASE_ARCHIVE_SHA256`. The installer verifies both before extracting and building it, and supplies the verified revision as `DSH_CLIENT_COMMIT_HASH` because a source archive has no `.git` directory.
@@ -201,7 +201,7 @@ Before production approval, complete the channel-owned [Linux acceptance procedu
 ## Each release
 
 1. Run `install-debian-release.sh` with a new reviewed full commit SHA.
-2. Load `/etc/deepseek-harness/trader-ops.env`, then run `bootstrap-profile.sh` and `verify-deployment.sh` as `dsh` against the new release before restarting the service; these commands apply the pinned OpenViking recall patch and refresh the minimal unattended WeCom preset while preserving the optional channel dependency.
+2. Load `/etc/deepseek-harness/trader-ops.env`, then run `bootstrap-profile.sh` and `verify-deployment.sh` as `cfi` against the new release before restarting the service; these commands apply the pinned OpenViking recall patch and refresh the minimal unattended WeCom preset while preserving the optional channel dependency.
 3. Back up `/var/lib/openviking` and `/var/lib/deepseek-harness` before any data migration.
 4. Restart `dsh-trader-ops` through `restart-runtime.sh`; it installs the current release's systemd unit before restarting. Repeat the listener, health, empty-skill, and empty-knowledge checks, and retain the previous release.
 5. On failure, atomically point `current` to the previous validated release and restart Harness. Restore persistent data only when the failed release performed an explicit incompatible migration.

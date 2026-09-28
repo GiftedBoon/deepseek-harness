@@ -7,9 +7,10 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
-User=dsh
-Group=dsh
+User=cfi
+Group=cfi
 WorkingDirectory=/opt/deepseek-harness/current
+Environment=HOME=/var/lib/deepseek-harness
 EnvironmentFile=/etc/deepseek-harness/trader-ops.env
 Environment=CI=true
 Environment=PATH=/usr/local/bin:/usr/bin:/bin

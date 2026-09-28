@@ -176,10 +176,10 @@ if [[ "$enabled" == 1 ]]; then
 fi
 
 cd "$repo_root"
-/usr/sbin/runuser --preserve-environment -u dsh -- env \
+/usr/sbin/runuser --preserve-environment -u cfi -- env \
   CI=true HOME=/var/lib/deepseek-harness PATH=/usr/local/bin:/usr/bin:/bin \
   "$deployment_root/scripts/bootstrap-profile.sh"
-/usr/sbin/runuser --preserve-environment -u dsh -- env \
+/usr/sbin/runuser --preserve-environment -u cfi -- env \
   CI=true HOME=/var/lib/deepseek-harness PATH=/usr/local/bin:/usr/bin:/bin \
   "$deployment_root/scripts/verify-deployment.sh"
 

@@ -3,32 +3,32 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write deployments/trader-ops/remote-deployment/README.md
 /remote-deployment-record:
-  en: b93b867e8aede19d
-  zh: 876b881285d1107b
+  en: 09bf08a177766bde
+  zh: 774805007192997d
 /remote-deployment-record/summary:
-  en: 1131cd350f3516d4
-  zh: 0b065205303d2796
+  en: 0b9214f024860738
+  zh: 712097ad8e60a4ac
 /remote-deployment-record/table-of-contents:
   en: 6235d4a089b3d949
   zh: fd97d38e2532bc6e
 /remote-deployment-record/deployment-identity:
-  en: 8e62f9e84b1ad8bf
-  zh: 8430c737ae4fd612
+  en: 04a2ecd86aedadba
+  zh: d12bbda8a4d9e17c
 /remote-deployment-record/service-and-network:
-  en: 710a2ad7b4173856
-  zh: 135db941db1ed7dc
+  en: 4b09f31aa6174e4e
+  zh: 5f932ab9c520aa9f
 /remote-deployment-record/configuration-applied:
-  en: 02b0417ee2194b7e
-  zh: adf7e8de38b0bf79
+  en: 965243fd637a12e3
+  zh: 6d21c6b5c5935109
 /remote-deployment-record/verification-evidence:
-  en: 1e883d3a61a06ea9
-  zh: d26f9fff668381b6
+  en: ebea09271cdf684b
+  zh: f07be286fc9e80f5
 /remote-deployment-record/wecom-session-recreation:
   en: 20957caa641bd7a3
   zh: db72a2c749376017
 /remote-deployment-record/routine-operations:
-  en: 8378458789d72ae8
-  zh: c973593b65ee81cd
+  en: 7647cd156c9ff01b
+  zh: bca63160091c288f
 /remote-deployment-record/safety-constraints:
   en: df99b7ecd143ca0f
   zh: 426108e5b73d913f
@@ -36,5 +36,5 @@
   en: 2808618981b15258
   zh: 41666b23cb3cc99f
 /remote-deployment-record/dev-note:
-  en: fd78990306c7b36e
-  zh: aa9e607de5f1b205
+  en: ec1cb7b79b602c87
+  zh: 10b9886579781c94
