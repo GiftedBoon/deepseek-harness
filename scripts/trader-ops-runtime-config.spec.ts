@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { load } from 'js-yaml'
+import { dump, load } from 'js-yaml'
 import { afterEach, describe, expect, it } from 'vitest'
 
 // @ts-expect-error Deployment automation intentionally runs as executable plain ESM.
@@ -12,8 +12,9 @@ import * as renderer from '../deployments/trader-ops/scripts/render-wecom-preset
 const { patchOpenVikingRecallOnce } = patcher as {
   patchOpenVikingRecallOnce: (packageDirectory: string) => Promise<boolean>
 }
-const { renderWeComPreset } = renderer as {
+const { renderWeComPreset, verifyWeComPreset } = renderer as {
   renderWeComPreset: (targetDirectory: string) => Promise<void>
+  verifyWeComPreset: (presetFile: string) => Promise<void>
 }
 
 const temporaryDirectories: string[] = []
@@ -52,6 +53,21 @@ describe('Trader Ops runtime configuration', () => {
         plugins: load(source),
       },
     }])
+    await expect(verifyWeComPreset(join(root, 'preset.cordis.yml'))).resolves.toBeUndefined()
+  })
+
+  it('rejects additional Agent plugins and missing preset declarations', async () => {
+    const root = await temporaryRoot()
+    await renderWeComPreset(root)
+    const file = join(root, 'preset.cordis.yml')
+    const declaration = load(await readFile(file, 'utf8')) as Array<{
+      config: { plugins: Array<{ id: string; name: string }> }
+    }>
+    declaration[0]!.config.plugins.push({ id: 'tool-bash', name: '@deepseek-ai/dsh-tool-bash' })
+    await writeFile(file, dump(declaration))
+    await expect(verifyWeComPreset(file)).rejects.toThrow('reviewed Agent plugins')
+    await writeFile(file, '[]\n')
+    await expect(verifyWeComPreset(file)).rejects.toThrow('reviewed Agent plugins')
   })
 
   it('patches pinned OpenViking recall once and is idempotent', async () => {

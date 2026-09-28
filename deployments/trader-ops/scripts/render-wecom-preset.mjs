@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
-import { mkdir, realpath, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { isDeepStrictEqual } from 'node:util'
+import { load } from 'js-yaml'
 
 const agent = `# Trader Ops WeCom deliberately exposes only the agent-plane features this
 # unattended channel uses. Host-plane MCP, Schedule, policy, and memory plugins
@@ -54,10 +56,30 @@ export async function renderWeComPreset(targetDirectory) {
   await writeFile(resolve(targetDirectory, 'preset.cordis.yml'), declaration, { mode: 0o600 })
 }
 
+/**
+ * Reject a declaration whose Agent plugins differ from the reviewed WeCom composition.
+ * @param {string} presetFile Path to the generated preset.cordis.yml.
+ * @returns {Promise<void>} Resolves when the declaration and Agent plugins match.
+ */
+export async function verifyWeComPreset(presetFile) {
+  const declaration = load(await readFile(presetFile, 'utf8'))
+  if (!Array.isArray(declaration) || declaration.length !== 1
+    || declaration[0]?.name !== '@deepseek-ai/dsh-agent-preset'
+    || declaration[0]?.config?.id !== 'trader-ops-wecom'
+    || !isDeepStrictEqual(declaration[0]?.config?.plugins, load(agent))) {
+    throw new Error(`Trader Ops WeCom preset does not contain the reviewed Agent plugins: ${presetFile}`)
+  }
+}
+
 if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === await realpath(process.argv[1])) {
-  const [targetDirectory] = process.argv.slice(2)
+  const [targetDirectory, presetFile] = process.argv.slice(2)
   if (targetDirectory === undefined) {
     throw new Error('Usage: render-wecom-preset.mjs <target-directory>')
   }
-  await renderWeComPreset(targetDirectory)
+  if (targetDirectory === '--verify') {
+    if (presetFile === undefined) throw new Error('Usage: render-wecom-preset.mjs --verify <preset-file>')
+    await verifyWeComPreset(presetFile)
+  } else {
+    await renderWeComPreset(targetDirectory)
+  }
 }

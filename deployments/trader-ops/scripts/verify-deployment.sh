@@ -82,16 +82,7 @@ grep -q 'targetArgument: plan_id' <<<"$dump_output"
 grep -Fq '我是CFI 股票交易组的 AI Agent 智能助手' "$wecom_preset"
 grep -q 'async ({ agent, messages, signal, step }, next)' "$openviking_plugin"
 grep -q 'if (step !== 1) return decision;' "$openviking_plugin"
-expected_preset_ids='persona
-tool-skill
-compaction
-compaction-basic
-tool-result-pruner'
-actual_preset_ids="$(sed -n 's/^ *- id: //p' "$wecom_preset")"
-if [[ "$actual_preset_ids" != "$expected_preset_ids" ]]; then
-  printf 'Trader Ops WeCom preset contains unexpected rows:\n%s\n' "$actual_preset_ids" >&2
-  exit 1
-fi
+node "$deployment_root/scripts/render-wecom-preset.mjs" --verify "$wecom_preset"
 if [[ "${TRADER_OPS_WECOM_ENABLED:-0}" == 1 ]]; then
   : "${WECOM_BOT_ID:?Set the enterprise WeCom bot id}"
   : "${WECOM_BOT_SECRET:?Set the enterprise WeCom bot secret}"

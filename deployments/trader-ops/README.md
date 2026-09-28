@@ -37,7 +37,7 @@ The current remote verification snapshot is in [remote-deployment/](remote-deplo
 
 ## Loading relationships
 
-`bootstrap-profile.sh` writes the reviewed WeCom composition as a `dsh-agent-preset` declaration in `preset.cordis.yml`; the WeCom patch includes that file. Schedule is loaded from the optional `schedule-bundle` patch, which delivers due prompts through the Host even when the target Session is not live.
+`bootstrap-profile.sh` writes the reviewed WeCom composition as a `dsh-agent-preset` declaration in `preset.cordis.yml`; the WeCom patch includes that file. `verify-deployment.sh` validates the declaration's `config.plugins` against the reviewed Agent composition, excluding the host preset registration. Schedule is loaded from the optional `schedule-bundle` patch, which delivers due prompts through the Host even when the target Session is not live.
 
 ```text
 knowledge/*.md  ----submit/sync---> OpenViking ----retrieved fragments---> Agent context

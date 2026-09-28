@@ -23,6 +23,7 @@ test('renders the minimal WeCom preset when launched through a release symlink',
       'persona', 'tool-skill', 'compaction', 'compaction-basic', 'tool-result-pruner',
     ])
     expect(source).toContain('我是CFI 股票交易组的 AI Agent 智能助手')
+    await execFileAsync(process.execPath, [join(current, 'render-wecom-preset.mjs'), '--verify', join(preset, 'preset.cordis.yml')])
   } finally {
     await rm(root, { recursive: true, force: true })
   }
