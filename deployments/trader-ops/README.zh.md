@@ -37,7 +37,7 @@ deployments/trader-ops/
 
 ## 加载关系
 
-`bootstrap-profile.sh` 将经审阅的企业微信组装写成 `preset.cordis.yml` 中的 `dsh-agent-preset` 声明，企业微信 patch 会包含该文件。`verify-deployment.sh` 将声明的 `config.plugins` 与经审阅的 Agent 组装比较，不计入 Host 侧的 preset 注册。Schedule 从可选的 `schedule-bundle` patch 加载；即使目标 Session 未处于 live 状态，也会通过 Host 投递到期 prompt。
+`bootstrap-profile.sh` 将经审阅的企业微信组装写成 `preset.cordis.yml` 中的 `dsh-agent-preset` 声明。部署 provider 会在 Host 依赖可用后验证并注册声明；企业微信渠道依赖该 provider 的就绪服务。移除 provider 会停止渠道。`verify-deployment.sh` 将声明的 `config.plugins` 与经审阅的 Agent 组装比较，不计入 Host 侧的 preset 注册。Schedule 从可选的 `schedule-bundle` patch 加载；即使目标 Session 未处于 live 状态，也会通过 Host 投递到期 prompt。
 
 ```text
 knowledge/*.md  ----submit/sync---> OpenViking ----retrieved fragments---> Agent context

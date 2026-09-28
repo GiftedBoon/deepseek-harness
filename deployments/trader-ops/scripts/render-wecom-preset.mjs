@@ -62,6 +62,15 @@ export async function renderWeComPreset(targetDirectory) {
  * @returns {Promise<void>} Resolves when the declaration and Agent plugins match.
  */
 export async function verifyWeComPreset(presetFile) {
+  await readWeComPreset(presetFile)
+}
+
+/**
+ * Read a reviewed declaration for registration without rereading the file.
+ * @param {string} presetFile Path to the generated preset.cordis.yml.
+ * @returns {Promise<object>} The validated preset definition.
+ */
+export async function readWeComPreset(presetFile) {
   const declaration = load(await readFile(presetFile, 'utf8'))
   if (!Array.isArray(declaration) || declaration.length !== 1
     || declaration[0]?.name !== '@deepseek-ai/dsh-agent-preset'
@@ -69,6 +78,7 @@ export async function verifyWeComPreset(presetFile) {
     || !isDeepStrictEqual(declaration[0]?.config?.plugins, load(agent))) {
     throw new Error(`Trader Ops WeCom preset does not contain the reviewed Agent plugins: ${presetFile}`)
   }
+  return declaration[0].config
 }
 
 if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === await realpath(process.argv[1])) {

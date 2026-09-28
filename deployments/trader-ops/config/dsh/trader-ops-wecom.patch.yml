@@ -26,12 +26,13 @@
 
 - insert:
     - id: trader-ops-wecom-preset
-      name: cordis:include
+      name: '../../../../deployments/trader-ops/scripts/wecom-preset-provider.mjs'
       config:
         path: !!js (process.env.DSH_HOME ?? '/var/lib/deepseek-harness') + '/profiles/' + (process.env.TRADER_OPS_PROFILE ?? 'web') + '/agent-presets/trader-ops-wecom/preset.cordis.yml'
 
     - id: trader-ops-wecom-channel
       name: '@deepseek-ai/dsh-channel-wecom'
+      inject: [traderOpsWeComPresetReady]
       disabled: !!js process.env.TRADER_OPS_WECOM_ENABLED !== '1'
       config:
         botId: !!js process.env.WECOM_BOT_ID
