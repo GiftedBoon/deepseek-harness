@@ -1,0 +1,50 @@
+- name: cordis:llm
+- name: cordis:session
+- name: cordis:projections
+- name: cordis:system-prompt
+- name: cordis:tools
+- name: cordis:agents
+- name: cordis:loop
+- name: cordis:persistence
+  config:
+    root: !!js ctx.fixtureRoot + '/sessions'
+    compression: none
+- name: cordis:storage
+- name: cordis:storage-json
+  config:
+    root: !!js ctx.fixtureRoot + '/storage'
+- name: cordis:storage-domain
+  config:
+    backend: json
+- name: cordis:workspace
+- name: cordis:archive-gate
+- name: cordis:subprocess
+- name: cordis:sandbox
+- name: cordis:sandbox-policy
+  config:
+    mode: workspace-write
+    workspaceRoot: !!js ctx.fixtureRoot
+- name: cordis:shell
+  config:
+    timeoutMs: 60000
+- name: cordis:approval
+  config:
+    policy: never
+- name: cordis:permissions
+  config:
+    presets:
+      unattended:
+        sandbox: workspace-write
+        approval: never
+- name: cordis:title
+  config:
+    fallbackMaxWords: 5
+    fallbackMaxBytes: 40
+    maxTitleBytes: 80
+- name: cordis:presets
+  config:
+    default: empty
+- name: cordis:preset
+  config:
+    id: empty
+    plugins: []

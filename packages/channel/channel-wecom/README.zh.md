@@ -90,7 +90,7 @@ kind: "package-reference"
 
 每条准入消息都会先在持久化中观察其映射的 Session，然后创建或恢复一个 Agent，在发布前挂载已配置的 agent preset，应用非交互权限 preset，把新 Session 附加到已配置 Workspace，并发送一条普通用户消息。如果映射的 Session 在渠道持续运行期间被删除，下一条消息会使用同一个稳定 id 创建新 Session，而不会尝试恢复已不存在的日志。渠道通过准确的 Agent、Session、消息、turn 和 attempt 关联 `agent/inbox/claimed`、`agent/assistant-stream` 和 `turn/end`。该区间静止后，渠道会 flush Session 并释放 Agent。
 
-第一次被动回复是 `messages.processing`；后续累计更新只包含 `text-delta` 输出，绝不包含 reasoning。被动最终回复失败时会退回到主动 Markdown 发送。两种传输都失败时，受限长度的最终文本会进入持久 outbox，并在认证后及每个已配置间隔重试。当某条记录达到 `maxOutboxAttempts` 后周期性重试停止，它转而等待所属会话写来消息，届时立即投递；一直无法投递的记录在 `outboxRetentionMs` 之后被删除。每次失败尝试都会记录尝试次数与提供方诊断，绝不记录目标或正文。
+第一次被动回复是 `messages.processing`；后续累计更新只包含 `text-delta` 输出，绝不包含 reasoning。被阻止的 Agent turn 会发送 `messages.failure`，并将交付记为失败而非完成；重试前应检查 Session 的归档状态和准入策略。被动最终回复失败时会退回到主动 Markdown 发送。两种传输都失败时，受限长度的最终文本会进入持久 outbox，并在认证后及每个已配置间隔重试。当某条记录达到 `maxOutboxAttempts` 后周期性重试停止，它转而等待所属会话写来消息，届时立即投递；一直无法投递的记录在 `outboxRetentionMs` 之后被删除。每次失败尝试都会记录尝试次数与提供方诊断，绝不记录目标或正文。
 
 当 `scheduledActions` 非空时，映射 Agent 会获得 `scheduled_action_create`、`scheduled_action_list` 与 `scheduled_action_delete`。显式 RFC 3339 `at` 值保留自身的偏移；仅含时间的 `HH:mm[:ss]` 值会按 `scheduledActionUtcOffset` 解析为下一次发生时点，因此模型不需要 shell 或时钟工具。创建操作会先持久保存任何已校验的动态输入，再提交白名单动作并启动计时器，因此释放按交付创建的 Agent 不会取消任务。到点时，渠道会解析当前白名单，要求其指纹与创建时的定义一致，并通过普通全局 policy 和 guard 流程调用已配置工具。结果会先进入持久 outbox，然后删除任务与输入。启动时会重新启用 pending 任务、删除孤立输入，并报告恢复出的 `running` 任务结果不确定；它不会再次执行该任务，因为此前的副作用可能已经发生。
 

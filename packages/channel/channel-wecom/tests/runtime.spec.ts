@@ -108,7 +108,7 @@ class Client implements WeComChannelClient {
 interface AgentBehavior {
   output?: string
   complete?: boolean
-  reason?: { kind: 'completed' } | { kind: 'error'; error: { message: string } }
+  reason?: { kind: 'completed' } | { kind: 'blocked' } | { kind: 'error'; error: { message: string } }
   requestHeader?: object
   activeConflict?: boolean
   emitAgentError?: boolean
@@ -385,6 +385,17 @@ describe('WeComChannelRuntime', () => {
     expect(test.calls).toContain('stat')
     expect(test.calls).toContain('create')
     expect(test.calls).not.toContain('resume')
+  })
+
+  it('reports a blocked turn as failed instead of a successful empty reply', async () => {
+    const test = harness({ persisted: true, behavior: { reason: { kind: 'blocked' } } })
+    await test.runtime.start()
+    test.client.emitText(frame())
+    const delivery = await waitForDelivery(test.domain, 'failed')
+    expect(delivery.reply).toBe('failure')
+    expect(test.client.replies.at(-1)).toMatchObject({ content: 'failure', finish: true })
+    expect(test.warnings).toHaveBeenCalledWith(expect.stringContaining('turn was blocked'))
+    expect(test.calls).toContain('resume')
   })
 
   it('replays completed and processing duplicates without another Agent', async () => {

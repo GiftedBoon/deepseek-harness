@@ -282,6 +282,9 @@ export class WeComChannelRuntime {
       }
       await handle.agent.whenIdle()
       if (reason.kind === 'error') throw new Error(reason.error.message)
+      if (reason.kind === 'blocked') {
+        throw new Error('WeCom Agent turn was blocked; check Session archive state and admission policy')
+      }
       return interval.output
     } finally {
       this.active.delete(sessionId)
