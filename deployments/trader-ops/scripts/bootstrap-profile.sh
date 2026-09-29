@@ -53,6 +53,8 @@ node "$dsh_cli" plugin --profile "$profile" add "@openviking/dsh-memory-plugin@$
 node "$dsh_cli" plugin --profile "$profile" add "$repo_root/packages/channel/channel-wecom"
 node "$deployment_root/scripts/patch-openviking-recall-once.mjs" \
   "$DSH_HOME/profiles/$profile/node_modules/@openviking/dsh-memory-plugin"
+node "$deployment_root/scripts/patch-openviking-message-sources.mjs" \
+  "$DSH_HOME/profiles/$profile/node_modules/@openviking/dsh-memory-plugin"
 node "$deployment_root/scripts/render-wecom-preset.mjs" "$wecom_preset"
 
 dump_output="$(node "$dsh_cli" --profile "$profile" \

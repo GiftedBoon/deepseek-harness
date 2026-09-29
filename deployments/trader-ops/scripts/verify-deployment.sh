@@ -82,6 +82,8 @@ grep -q 'targetArgument: plan_id' <<<"$dump_output"
 grep -Fq '我是CFI 股票交易组的 AI Agent 智能助手' "$wecom_preset"
 grep -q 'async ({ agent, messages, signal, step }, next)' "$openviking_plugin"
 grep -q 'if (step !== 1) return decision;' "$openviking_plugin"
+node "$deployment_root/scripts/patch-openviking-message-sources.mjs" --verify \
+  "$DSH_HOME/profiles/$profile/node_modules/@openviking/dsh-memory-plugin"
 node "$deployment_root/scripts/render-wecom-preset.mjs" --verify "$wecom_preset"
 if [[ "${TRADER_OPS_WECOM_ENABLED:-0}" == 1 ]]; then
   : "${WECOM_BOT_ID:?Set the enterprise WeCom bot id}"

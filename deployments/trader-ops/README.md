@@ -37,6 +37,8 @@ The current remote verification snapshot is in [remote-deployment/](remote-deplo
 
 ## Loading relationships
 
+Profile bootstrap applies reviewed compatibility patches to OpenViking `0.3.0`: memory messages use the same producer source kind as migrated history, profile and recall recognition use that kind, and capture accepts only human, model, or tool messages. Synthetic context is not saved as human input. Deployment verification refuses missing patches; a different package version or changed reviewed source stops bootstrap without rewriting Session history.
+
 `bootstrap-profile.sh` writes the reviewed WeCom composition as a `dsh-agent-preset` declaration in `preset.cordis.yml`. The deployment provider validates and registers it after its Host dependencies are available; the WeCom channel requires that provider's readiness service. Removing the provider stops the channel. `verify-deployment.sh` validates the declaration's `config.plugins` against the reviewed Agent composition, excluding the host preset registration. Schedule is loaded from the optional `schedule-bundle` patch, which delivers due prompts through the Host even when the target Session is not live.
 
 ```text
