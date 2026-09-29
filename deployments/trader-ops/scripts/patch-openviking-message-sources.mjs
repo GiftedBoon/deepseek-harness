@@ -8,6 +8,7 @@ const edits = {
   'runtime.mjs': [
     ['      kind: "plugin",\n      plugin: OPENVIKING_PLUGIN_SOURCE,', '      kind: `plugin:${OPENVIKING_PLUGIN_SOURCE}`,'],
     ['message?.source?.kind === "plugin"\n    && message.source.plugin === OPENVIKING_PLUGIN_SOURCE', 'message?.source?.kind === `plugin:${OPENVIKING_PLUGIN_SOURCE}`'],
+    ['  const ownEvents = (session?.events || []).slice(session?.header?.seedLength ?? 0);\n  const inHistory = ownEvents.some(event => (\n    event?.type === "user/message" && isStartupProfile(event.data)\n  ));', '  const inHistory = session.deriveMessages().some(isStartupProfile);'],
   ],
   'capture.mjs': [
     ['if (message.source?.kind === "plugin") return null;', 'if (!["user", "model", "tool"].includes(message.source?.kind)) return null;'],

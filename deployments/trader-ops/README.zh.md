@@ -39,6 +39,8 @@ deployments/trader-ops/
 
 Profile 引导为 OpenViking `0.3.0` 应用经过检查的兼容补丁：记忆消息使用与已迁移历史一致的生产者来源类型，画像和召回识别也使用该类型，采集仅接受用户、模型或工具消息。合成上下文不会作为用户输入保存。部署验证会拒绝缺少补丁的安装；包版本不同或检查过的源码发生变化时，引导停止且不会改写 Session 历史。
 
+画像识别读取当前派生的消息历史。画像仍在模型上下文中时，不会再次进行启动注入；被压缩移除的画像可以重新获取。
+
 `bootstrap-profile.sh` 将经审阅的企业微信组装写成 `preset.cordis.yml` 中的 `dsh-agent-preset` 声明。部署 provider 会在 Host 依赖可用后验证并注册声明；企业微信渠道依赖该 provider 的就绪服务。移除 provider 会停止渠道。`verify-deployment.sh` 将声明的 `config.plugins` 与经审阅的 Agent 组装比较，不计入 Host 侧的 preset 注册。Schedule 从可选的 `schedule-bundle` patch 加载；即使目标 Session 未处于 live 状态，也会通过 Host 投递到期 prompt。
 
 ```text

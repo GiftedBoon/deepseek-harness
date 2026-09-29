@@ -29,6 +29,14 @@ export function isStartupProfile(message) {
     && message.source.plugin === OPENVIKING_PLUGIN_SOURCE
     && message.source.form === "instructions";
 }
+export function hasStartupProfile(agent) {
+  const session = agent.session;
+  const ownEvents = (session?.events || []).slice(session?.header?.seedLength ?? 0);
+  const inHistory = ownEvents.some(event => (
+    event?.type === "user/message" && isStartupProfile(event.data)
+  ));
+  return inHistory;
+}
 `
 const capture = `const OPENVIKING_PLUGIN_SOURCE = "openviking-memory";
 export function capture(message) {
@@ -50,6 +58,7 @@ interface Message {
 interface WriterFixture {
   message(): Message
   isStartupProfile(message: Message): boolean
+  hasStartupProfile(agent: { session: { deriveMessages(): Message[] } }): boolean
 }
 
 interface CaptureFixture {
@@ -77,6 +86,8 @@ test('patches writing, profile recognition, prompt filtering, and synthetic-inpu
     const memory = writer.message()
     expect(memory.source).toEqual({ kind: 'plugin:openviking-memory', form: 'instructions' })
     expect(writer.isStartupProfile(memory)).toBe(true)
+    expect(writer.hasStartupProfile({ session: { deriveMessages: () => [memory] } })).toBe(true)
+    expect(writer.hasStartupProfile({ session: { deriveMessages: () => [] } })).toBe(false)
     expect(reader.promptText([memory, { source: { kind: 'user' } }])).toEqual([{ source: { kind: 'user' } }])
     for (const kind of ['plugin:openviking-memory', 'runtime-context', 'time-context', 'plugin', 'external-context']) {
       expect(reader.capture({ source: { kind } })).toBeNull()
