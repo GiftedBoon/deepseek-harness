@@ -31,7 +31,7 @@
 |---|---|
 | SSH 目标 | `dsh-server` |
 | 主机名 | `debian` |
-| 验证日期 | `2026-09-24` |
+| 验证日期 | `2026-09-30` |
 | 发布标记 | `/opt/deepseek-harness/current/.trader-ops-built` |
 | 发布入口 | `/opt/deepseek-harness/current` |
 | Harness 服务 | `dsh-trader-ops.service` |
@@ -70,17 +70,18 @@
 <a id="verification-evidence"></a>
 ## 验证证据
 
-配置后对远程主机执行了以下检查：
+2026-09-30 预开启 Skill 发布并重启服务后，对远程主机执行了以下检查：
 
 | 检查 | 结果 |
 |---|---|
 | systemd 状态 | `ActiveState=active`、`SubState=running` |
 | systemd 监管 | 当前激活周期 `NRestarts=0` |
-| 服务归属 | Harness 和 OpenViking MCP 代理以 `cfi:cfi` 运行；发布、profile 与工作区目录归 `cfi:cfi` 所有 |
+| 服务归属与发布版本 | Harness 以 `cfi` 运行；进程工作目录与发布标记指向同一版本 |
 | Harness 身份验证边界 | 未提供凭据时，回环和内网请求都返回 `401` |
 | OpenViking 健康与就绪 | 两个 endpoint 都返回 `200` |
-| 监听范围 | Harness 监听回环地址；socket proxy 暴露选定的内网地址 |
-| Profile 验证 | OpenViking 补丁、企业微信最小 preset、策略、Skill 和知识检查均通过 |
+| 内网代理 | socket 处于活动状态；内网请求返回 `401` |
+| Skill 工具策略 | 33 个引用工具在开发、预发和生产环境均解析为 `allow` |
+| 预开启 Skill | 当前发布包含交易日历窗口和估算日历处理规则 |
 
 这些状态检查证明服务及其依赖已就绪，但不能替代删除映射 Session 后发送真实企业微信消息的验收；该行为仍需要运维人员执行一次验收消息。
 

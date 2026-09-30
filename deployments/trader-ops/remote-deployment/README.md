@@ -31,7 +31,7 @@ The deployed channel checks whether a mapped persistent Session still exists bef
 |---|---|
 | SSH target | `dsh-server` |
 | Hostname | `debian` |
-| Verification date | `2026-09-24` |
+| Verification date | `2026-09-30` |
 | Release marker | `/opt/deepseek-harness/current/.trader-ops-built` |
 | Release entry | `/opt/deepseek-harness/current` |
 | Harness service | `dsh-trader-ops.service` |
@@ -70,17 +70,18 @@ The remote operator completed the runtime configuration and restart after the re
 <a id="verification-evidence"></a>
 ## Verification evidence
 
-The following checks were run against the remote host after configuration:
+The following checks were run against the remote host after the pre-open skill release and service restart on 2026-09-30:
 
 | Check | Result |
 |---|---|
 | systemd state | `ActiveState=active`, `SubState=running` |
 | systemd supervision | `NRestarts=0` for the current activation |
-| Service ownership | Harness and the OpenViking MCP proxy ran as `cfi:cfi`; release, profile, and workspace directories belonged to `cfi:cfi` |
+| Service ownership and release | Harness ran as `cfi`; its process working directory matched the release named by the marker |
 | Harness authentication boundary | Loopback and private-LAN requests returned `401` without credentials |
 | OpenViking health and readiness | Both endpoints returned `200` |
-| Listener scope | Harness listened on loopback; the socket proxy exposed the selected private-LAN address |
-| Profile verification | OpenViking patch, minimal WeCom preset, policy, skills, and knowledge checks passed |
+| Private-LAN proxy | The socket was active; the private-LAN request returned `401` |
+| Skill tool policy | All 33 referenced tools resolved to `allow` in development, staging, and production |
+| Pre-open skill | The active release contains the trading-calendar window and estimated-calendar handling |
 
 The status checks prove that the service and its dependent endpoints are ready. They do not replace a real WeCom message after deleting a mapped Session; that behavior still needs one operator-side acceptance message.
 
