@@ -91,6 +91,18 @@ rules:
     environments: [development, staging, production]
     decision: allow
 
+  - id: bssh-ops-file-and-calendar-read
+    tools:
+      - mcp__bssh-ops-remote__download_portfolio_from_colo
+      - mcp__bssh-ops-remote__precheck_scp_file
+      - mcp__bssh-ops-remote__read_colo_file_range
+      - mcp__bssh-ops-remote__search_colo_file
+      - mcp__bssh-ops-remote__shift_trading_day
+      - mcp__bssh-ops-remote__stat_colo_file
+    risk: read_only
+    environments: [development, staging, production]
+    decision: allow
+
   - id: bssh-ops-preview
     tools:
       - mcp__bssh-ops-remote__check_daily_preopen

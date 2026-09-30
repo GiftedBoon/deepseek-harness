@@ -17,6 +17,10 @@ description: Use the bssh_ops MCP server for audited quantitative-trading colo o
 - `mcp__bssh-ops-remote__list_colos_for_index`：按 Index 或产品分类解析全部产品和 colo。
 - `mcp__bssh-ops-remote__list_change_cfg_paras_runs`、`mcp__bssh-ops-remote__preview_change_cfg_paras`：查询改参审计记录或纯解析规则；preview 不连接远端、不生成或覆盖 cfg、不落审计。
 - `mcp__bssh-ops-remote__check_shell_syntax`：静态检查动作模板中的 shell 语法，不执行命令。
+- `mcp__bssh-ops-remote__get_trading_calendar`、`mcp__bssh-ops-remote__list_trading_days`、`mcp__bssh-ops-remote__shift_trading_day`：查询 A 股交易日历；结果 `estimated=true` 时仅为周末估算，不能据此确认节假日交易状态。
+- `mcp__bssh-ops-remote__check_daily_preopen`：只读检查最新实盘批次；预开启时间和结论按 [预开启状态检查](../pre-open-status-check/SKILL.md) 判断。
+- `mcp__bssh-ops-remote__download_portfolio_from_colo`、`mcp__bssh-ops-remote__get_strategy_start_errors`、`mcp__bssh-ops-remote__list_colo_file_resources`、`mcp__bssh-ops-remote__stat_colo_file`、`mcp__bssh-ops-remote__search_colo_file`、`mcp__bssh-ops-remote__read_colo_file_range`：经受控接口只读产品文件和启动报错；不要用快捷命令或产品动作代替文件读取。
+- `mcp__bssh-ops-remote__precheck_scp_file`：可选的下发前源文件检查，不改变远端文件。
 
 `mcp__bssh-ops-remote__prepare_quick_command` 只把快捷命令、目标和执行窗口写入 MCP 本地 SQLite，不连接远端。`mcp__bssh-ops-remote__check_process_status` 只执行固定的 `ps check`；它会连接远端并生成 `run_id`，但不改变远端状态。
 
@@ -31,6 +35,12 @@ description: Use the bssh_ops MCP server for audited quantitative-trading colo o
 未来执行快捷命令时，先按用户指定的目标和时间调用 `prepare_quick_command`，再用 `scheduled_action_create` 创建 `quick_command_plan` 动作：`target` 原样使用返回的 `plan_id`，`at` 使用用户指定的时间。未来固定进程检查使用 `ps_check` 动作和准确 colo。只有 `scheduled_action_create` 成功后才能说明已安排执行；不得为未来执行保存裸 command key 或 shell。
 
 不得提交任意 shell。自定义命令只能来自 `product_ops_actions.json` 中预先定义的动作模板，并走 `preview_product_action` → `execute_product_action`。白名单快捷命令和产品级动作都覆盖不到时，停止并说明缺少已评审的动作定义。
+
+## 单产品预开启异常排障
+
+仅在用户要求排查具体产品时，从 `check_daily_preopen` 的 `pending` 按 `NAME` 分组，记录对应 `Colo`。用 `check_process_status` → `get_run_status` 检查该产品策略进程；ps 结果是整机口径，不能把同机其他产品的进程当成该产品已启动。再用 `get_strategy_start_errors(product)` 取得启动报错和每台的 `total_matched` 基线。需要文件上下文时，先用 `list_colo_file_resources` 确认资源，再用 `search_colo_file` 定位行号、`read_colo_file_range` 读取附近行，或用 `stat_colo_file` 检查文件状态；查看 portfolio 参数则用 `download_portfolio_from_colo`。文件接口拒绝访问时停止，不换工具绕过。
+
+修复建议写根因、带 colo/文件/行号的证据、可选方案及各自影响范围。证据不足时说明还缺什么。用户选定方案后才走对应写通道；改参优先用 `preview_change_cfg_paras` → `deploy_change_cfg_paras`，白名单覆盖不到的产品动作走 `preview_product_action` → `execute_product_action`，文件下发遵守下文的 `run_scp` 规则。不得用整机级快捷命令 `start`/`stop` 补救单产品。修复后重新检查进程与预开启状态，并将日志新增的 `total_matched` 与基线比较；旧日志中的 failed 行不会自动消失。
 
 ## 产品级操作
 
@@ -67,6 +77,10 @@ description: Use the bssh_ops MCP server for audited quantitative-trading colo o
 5. 摘要不一致时重新 preview 并再次确认，不能绕过。deploy 成功后，用返回的 `exec_run_id` 调用 `get_run_status` 查询结果。
 
 只有部分 colo 失败时，才考虑用 `exec_change_cfg_paras` 重试，无需重新 preview 或 deploy。重试前先用 `list_change_cfg_paras_runs` 或 `get_run_status` 核实具体 deploy 和准确 colo 列表，向用户展示目标与影响并取得明确确认；不得自动扩大范围。人在 `/ops/bssh` 改参页面生成的 cfg 不属于 Agent 链路，不能代为下发。
+
+## 文件下发
+
+`run_scp` 的 `src_path`、`dst_path`、`colos` 由后端核对允许范围；被拒绝时向用户说明原因，不换路径写法绕过。执行前向用户展示源文件、目标路径与完整 colo 列表并取得明确确认。`precheck_scp_file` 可选；仅当用户依据它返回的文件信息确认时，才把该次的 `md5sum` 作为 `expected_md5` 传给 `run_scp`，防止确认后文件变化。下发后按返回的 `run_id` 核对每台结果，不能把派发成功当成所有机器写入成功。
 
 ## 失败与审计
 

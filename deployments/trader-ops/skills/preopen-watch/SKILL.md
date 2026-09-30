@@ -38,21 +38,23 @@ harness 在窗口内每分钟触发一次本 skill，每次是**独立的一次�
 延续（不要做成一个跑一小时的长任务：那样进程一崩整夜就没人看着了）。
 
 ```
-# 交易日前夜（周日到周四）23:40-23:59
-40-59 23 * * 0-4
-# 跨过午夜继续到 00:30
-0-30 0 * * 1-5
+# 每个自然日 23:40-23:59；进入流程前核验明天是否交易日
+40-59 23 * * *
+# 每个自然日 00:00-00:30；进入流程前核验今天是否交易日
+0-30 0 * * *
 ```
 
-**这个 cron 不认识节假日。** 它会在长假前夜也触发，但那种夜里写入进程不产出数据，
-warmup 阶段会静默退出，不会误告警 —— 代价是节前那几天窗口末尾会发一条"写入进程未
-产出"的提示。有交易日历就优先用日历门控。
+**这个 cron 不判断交易日。** 每次触发都要先用交易日历核验目标自然日，休市日不进入
+守护流程。这里的 23:40～00:30 是定时守护区间，属于直接查询所用的 23:30～次日 01:00
+有效判断窗口；定时守护可以只覆盖其中一段。
 
 ## 前置条件
 
 - MCP server `bssh-ops` 已挂载，能调 `check_daily_preopen`（在有些 harness 里名字是
   `mcp__bssh-ops-remote__check_daily_preopen`）。该工具**只读**、不连 colo，任何失败都可以
   安全重试。
+- 同一 MCP server 提供 `get_trading_calendar`，用于核验目标自然日。结果
+  `estimated=true` 时不能确认节假日交易状态，本次不进入守护流程。
 - 企业微信机器人 webhook 放在环境变量 `WECOM_WEBHOOK_PREOPEN` 里。
   **绝对不要把 webhook 或 key 写进本文件、状态文件、消息正文或日志。**
 - 状态文件目录可写（`STATE_DIR`）。
@@ -61,8 +63,8 @@ warmup 阶段会静默退出，不会误告警 —— 代价是节前那几天�
 
 | 常量 | 默认 | 说明 |
 |---|---|---|
-| `WINDOW_START` | `23:40` | 起跑时刻。**推荐 23:35**，理由见上面的时间线 |
-| `WINDOW_END` | `00:30` | 硬截止。到点仍未完成就发最终告警并收尾 |
+| `WINDOW_START` | `23:40` | 目标交易日前一自然日的起跑时刻。**推荐 23:35**，理由见上面的时间线 |
+| `WINDOW_END` | `00:30` | 目标交易日当天的硬截止。到点仍未完成就发最终告警并收尾 |
 | `STALL_REPEATS` | `3` | 同一个未开启集合连续出现这么多次就告警 |
 | `FRESH_MAX_AGE_SECONDS` | `180` | `age_seconds` 超过就认为写入进程没在产出 |
 | `WARMUP_QUIET_CHECKS` | `5` | warmup 阶段容忍这么多次陈旧检查，全程静默 |
@@ -128,14 +130,18 @@ warmup 阶段会静默退出，不会误告警 —— 代价是节前那几天�
 
 严格按顺序执行，每一步的"退出"都表示本次触发结束、不发任何消息。
 
-1. **算 session**，载入状态文件；不存在就按上面的模板初始化。
+1. **算 session**。用 `get_trading_calendar(at="{session}T12:00:00+08:00")`
+   核验：`date` 不等于 session、工具失败、`estimated=true` 或
+   `is_trading_day` 不为 true 时静默退出；不得按星期推断或改用
+   `next_trading_day` 延长前夜。确认交易日后载入状态文件；不存在就初始化。
 2. `done` 为 true → 退出（本夜已收尾）。
-3. 当前时间已过 `WINDOW_END` → 若 `phase == "tracking"` 且未完成，发**最终告警**
-   （模板 D，理由写"到达窗口截止仍未全部开启"）；置 `done=true`，保存，退出。
+3. 当前时间到达或超过 `WINDOW_END` → 若 `phase == "tracking"` 且未完成，发**最终告警**
+   （模板 D，理由写"到达窗口截止仍未确认完成"）；置 `done=true`，保存，退出。
 4. 调 `check_daily_preopen(max_detail_rows=200)`。`checks += 1`。
    - 工具抛错 → 不发消息、不改签名，只 `stale_checks += 1` 后退出（只读操作，下一分钟
      自然重试）。**连续 5 次抛错**才发一条模板 E 提示。
-5. **新鲜度门控**：`create_time` 为 null 或 `age_seconds > FRESH_MAX_AGE_SECONDS`
+5. **新鲜度门控**：`create_time` 为 null、`is_today=false` 或
+   `age_seconds > FRESH_MAX_AGE_SECONDS`
    → 写入进程没在产出：
    - `stale_checks += 1`。
    - 若 `phase == "warmup"`：当前时间过了 `WARMUP_DEADLINE` 且 `warmup_notified` 为
@@ -151,10 +157,10 @@ warmup 阶段会静默退出，不会误告警 —— 代价是节前那几天�
    那句），置 `done=true`，保存，退出。
 9. 算 `signature`。若 `baseline_pending_rows` 为 null → 记基线
    （`baseline_pending_rows = pending_rows`、`baseline_at = create_time`）。
-10. **完成判定**：`ready` 为 true →
-    - 发**模板 B（完成）**。置 `done=true`，保存，退出。
-    - 注意：即使这是本夜第一次检查（起跑晚了，扫描已经结束）也照样发，消息里注明
-      没观测到基线。
+10. **完成判定**：`ready=true` 时，若 `previous_batch_compared=false` 或
+    `missing_rows>0`，保存状态并退出，下一分钟复查；到截止仍未核验时按模板 D
+    报告原因。否则发**模板 B（完成）**，置 `done=true`，保存，退出。即使这是本夜
+    第一次检查（起跑晚了，扫描已经结束）也照样发，消息里注明没观测到基线。
 11. **未完成**，比较签名：
     - `signature != last_signature` → **有变化**：发**模板 A（进度）**；
       `last_signature = signature`、`repeat_count = 1`、`alerted_signature = null`。
@@ -220,8 +226,8 @@ warmup 阶段会静默退出，不会误告警 —— 代价是节前那几天�
 
 ### D. 最终告警（窗口截止 / 范围为空）
 
-同 C 的形式，标题写 `**预开启未完成** ❗`，并写明原因（到达 `WINDOW_END` 仍未全部
-开启，或范围内无可检查产品）。
+同 C 的形式，标题写 `**预开启未确认完成** ❗`，并写明原因（到达 `WINDOW_END` 仍未
+确认完成，或范围内无可检查产品）。
 
 ### E. 写入进程未产出
 

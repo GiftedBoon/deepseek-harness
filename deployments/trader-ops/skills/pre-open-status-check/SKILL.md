@@ -1,59 +1,57 @@
 ---
 name: pre-open-status-check
-description: Check whether the latest ProductionMonitorData snapshot has reset every product PnLratio to zero before market opening. Use for pre-open reset, pre-open completion, or abnormal product checks.
-whenToUse: Use when a user asks whether pre-open data reset has completed, whether every product PnLratio is zero, or which products block the pre-open check.
+description: 查询实盘产品预开启状态，核验交易日与判断窗口，并按企业微信 Markdown 固定格式报告待开启、缺失和排除记录。
+whenToUse: Use when a user asks for the current daily pre-open status, completion, or pending products.
 user-invocable: true
 ---
 
 # 预开启状态检查
 
-本 Skill 固定检查 ClickHouse `trade` 数据库中 `ProductionMonitorData` 的最新一批数据。它只判断最新已存储快照的重置状态，不把非零值擅自归因于“预开启未结束”或“未开启产品异常”。
+每次请求都调用 `mcp__bssh-ops-remote__check_daily_preopen`，传 `max_detail_rows=30`。它只读最新一批 `trade.ProductionMonitorData`，不连接 colo；`ready` 只表示检查范围内每行 `PnLratio` 为 0。`pending` 是此判据的异常行。行数与产品数不同，计数以工具汇总字段为准，明细可能截断。不要用 `TimeIsRight` 或 `All` 列替代工具判据，也不要仅凭 `ready` 判断当夜完成。
 
-## 检查步骤
+## 判断时间
 
-1. 调用 `mcp__bssh-ops-remote__db_run_query`，连接使用 `trade-clickhouse`，`max_rows` 使用 10，执行以下汇总 SQL：
+使用北京时间 `Asia/Shanghai`。有效判断窗口只属于**目标交易日的前一自然日 23:30:00 至目标日 01:00:00**，含两端：当前时刻为 23:30:00～23:59:59 时，候选目标日是明天；为 00:00:00～01:00:00 时，候选目标日是今天；其他时间不属于窗口。不要把“下一个交易日”的前一交易日晚上直接当作前夜，节假日会使两者相隔多天。
 
-```sql
-SELECT
-    max(CreateTime) AS latest_create_time,
-    count() AS total_rows,
-    countIf(PnLratio = 0) AS zero_rows,
-    countIf(PnLratio != 0) AS nonzero_rows,
-    countIf(isNull(PnLratio)) AS null_rows
-FROM ProductionMonitorData
-WHERE CreateTime = (
-    SELECT max(CreateTime)
-    FROM ProductionMonitorData
-)
+仅在上述时钟窗口内调用 `mcp__bssh-ops-remote__get_trading_calendar`，`at` 传候选目标日的 `YYYY-MM-DDT12:00:00+08:00`。返回的 `date` 必须等于候选目标日。`estimated=false` 且 `is_trading_day=true` 才是有效判断窗口；`estimated=false` 且 `is_trading_day=false` 为 `非预开启判断时段`。日历失败、字段缺失、日期不符或 `estimated=true` 时为 `交易日未核验`，不使用估算日历给出完成结论，并说明原因。不要按星期推断交易日，也不要单独用日历的 `is_preopen_night`：它不覆盖午夜后的半个窗口。
+
+时钟窗口外仍正常调用预开启工具，但结论为 `非预开启判断时段`，数据只作实时快照。日历查询不影响预开启工具的调用。
+
+## 数据判定与优先级
+
+1. 工具报错、必要汇总字段缺失、计数为负、`pending_rows > total_rows`、`pending_products > total_products`，或 `ready` 与 `pending_rows = 0` 且 `total_rows > 0` 的关系不符：`检查失败`。
+2. `create_time` 为空、`is_today=false`、`age_seconds` 为空或大于 180：`数据过期`。最新批次可能是残留状态，不能据此报告完成。
+3. `total_rows = 0`：`无法判断`，检查范围为空。
+4. 其余情况先看时间：时钟窗口外或确认为休市日是 `非预开启判断时段`；日历未核验是 `交易日未核验`。这两种结论仍展示数据快照。
+5. 有效窗口内，`pending_rows > 0` 为 `未完成`；`pending_rows = 0` 但 `missing_rows > 0` 或 `previous_batch_compared=false` 为 `无法确认完成`；其余为 `已完成 ✅`。
+
+第 1～3 项的结论优先于时间结论，并附一行时间说明。`missing_rows` 是上一批有、本批整行消失的记录；`previous_batch_compared=false` 表示没有完成比对，不能写“没有产品消失”。`no_data_file` 已整体排除在 `total_rows`、`total_products` 和 `pending` 外，不算异常。`not_reporting_rows` 有文件但上报卡住，也不计入 `pending`；若非零，必须提示其零值可能陈旧，`已完成` 仅表示工具判据通过。不要把这些情况自动转成重启或改参。
+
+## 固定输出
+
+只使用企业微信 `markdown` 可显示的加粗、引用和换行，不用管道表格、代码围栏或 HTML。按以下顺序输出，不加工具调用过程、字段清单或重复结论。仅第 5 项的 `已完成 ✅` 带 ✅。
+
+```markdown
+**结论：{结论}**
+目标交易日：{目标日期；时钟窗口外写“—”}
+批次：{create_time}（延迟 {age_seconds} 秒）
+范围：{total_rows} 行 / {total_products} 产品｜待开启：{pending_rows} 行 / {pending_products} 产品
 ```
 
-2. 按以下互斥规则判定：
-   - `total_rows = 0`：`无法判断`。表中没有可检查的最新批次，不能报告成功。
-   - `zero_rows = total_rows` 且 `nonzero_rows = 0` 且 `null_rows = 0`：`重置成功`。最新一批所有产品的 `PnLratio` 都精确等于 0。
-   - 其他情况：`未结束或异常`。最新一批存在非零或 NULL，不进一步猜测根因。
+非有效窗口紧接摘要用一行说明“当前不在预开启判断窗口，以上仅为实时快照”或“交易日未核验，以上仅为实时快照”；估算日历要明确写“交易日历为估算，未核验节假日”。数据失败、过期、范围为空或未能比对上一批时，用一行写明原因。`missing_rows > 0` 时单独列出：
 
-3. 只有判定为 `未结束或异常` 时，再调用一次 `mcp__bssh-ops-remote__db_run_query`，连接仍使用 `trade-clickhouse`，`max_rows` 使用 5000，执行以下明细 SQL：
-
-```sql
-SELECT
-    `NAME` AS product,
-    PnLratio,
-    CreateTime
-FROM ProductionMonitorData
-WHERE CreateTime = (
-    SELECT max(CreateTime)
-    FROM ProductionMonitorData
-)
-  AND (PnLratio != 0 OR isNull(PnLratio))
-ORDER BY `NAME`
+```markdown
+**缺失记录（{missing_rows} 行）**
+> {missing.NAME} · {missing.Index} · {missing.Colo} · {missing.Exchange}
 ```
 
-4. 明细结果 `truncated=true` 时，说明异常产品清单不完整，不要重复分页拉取全表。汇总判定仍以第一条查询的计数为准。
+`no_data_file_products > 0` 时，再单独列出被排除的产品：
 
-## 输出
+```markdown
+**无数据文件排除（{no_data_file_products} 产品）**
+> {no_data_file.NAME} · {no_data_file.Index} · {no_data_file.Colo}
+```
 
-回答必须包含：判定状态、`latest_create_time`、总产品行数、零值行数、非零行数、NULL 行数、两次查询各自的 `query_id`（未执行明细查询时只报告汇总查询 id），以及查询是否截断。
+两组各最多展示 20 行，按工具返回顺序排列；用 `missing_rows`、`no_data_file_rows` 作完整行数。计数大于展示行数或对应的 `*_truncated=true` 时，在组后写“仅展示前 {展示行数}/{完整行数} 行”。有计数但明细未返回时写“明细未返回”，不生成空组。缺字段写 `—`，将字段中的换行压成空格，绝不展示 `TraderAccount`。`not_reporting_rows > 0` 时在末尾用一行提示上报卡住的行数；其他实质性 `warnings` 只用一行概括。默认不重复报告 `pending_truncated`；用户明确要求待开启名单时才追加同样限长的 `pending` 分组并说明截断。
 
-判定为 `重置成功` 时使用“最新已存储批次的 PnLratio 已全部重置为 0”，不要仅写“预开启成功”。判定为 `未结束或异常` 时列出异常产品及其 `PnLratio`，并说明仅凭该表无法区分预开启仍在进行和未开启产品异常。始终展示最新批次时间；该时间是否足够新需要独立的业务时效阈值，本 Skill 不自行假设。
-
-数据库拒绝、超时、审计不可用、返回列缺失或计数关系不满足 `total_rows = zero_rows + nonzero_rows + null_rows` 时，报告 `检查失败`，不要给出业务成功结论。
+整条回复不超过 4096 UTF-8 字节。超限时只减少明细行数，在完整行边界写明截断；未知汇总值写 `—`。`已完成 ✅` 只表示本次检查范围内、当前批次的 `PnLratio` 判据通过。
