@@ -29,13 +29,24 @@ user-invocable: true
 
 ## 固定输出
 
-只使用企业微信 `markdown` 可显示的加粗、引用和换行，不用管道表格、代码围栏或 HTML。按以下顺序输出，不加工具调用过程、字段清单或重复结论。仅第 5 项的 `已完成 ✅` 带 ✅。
+只使用企业微信 `markdown` 可显示的加粗、引用和换行，不用管道表格、代码围栏或 HTML。按以下顺序输出，不加工具调用过程或重复结论。仅第 5 项的 `已完成 ✅` 带 ✅。
 
 ```markdown
 **结论：{结论}**
 目标交易日：{目标日期；时钟窗口外写“—”}
 批次：{create_time}（延迟 {age_seconds} 秒）
 范围：{total_rows} 行 / {total_products} 产品｜待开启：{pending_rows} 行 / {pending_products} 产品
+```
+
+结论为 `已完成 ✅` 时，紧接摘要追加以下分组判断，表示本批次检查范围内每行的该字段都为 0；依据工具的完整汇总判据，不把截断明细当作全量证据。其他结论不输出此成功清单。字段名保持工具原名，不翻译、不缩写；按模板分组排列，不逐项重复“为 0”。
+
+```markdown
+**归零检查：以下 13 项均为 0**
+> PnLratio、netMVRatio、Posratio、TradePnLratio、TradeFeeratio
+> MV_shortSell、MV_net
+> traderUnRealizedTradePnL、traderRealizedTradePnL
+> traderTradePnL、traderPositionPnL、traderTotalPnL
+> traderTradingCost
 ```
 
 非有效窗口紧接摘要用一行说明“当前不在预开启判断窗口，以上仅为实时快照”或“交易日未核验，以上仅为实时快照”；估算日历要明确写“交易日历为估算，未核验节假日”。数据失败、过期、范围为空或未能比对上一批时，用一行写明原因。上一批比对完成且 `missing_rows=0` 时不输出比对说明。`missing_rows > 0` 时单独列出：

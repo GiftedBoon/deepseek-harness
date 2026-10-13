@@ -13,20 +13,12 @@ exports[`pre-open scheduled reports > reports the first check, completes, and om
 检查时间：2026-10-12 23:41:00（北京时间）
 批次：2026-10-12 23:39:58（延迟 2 秒）
 范围：2 行 / 1 产品｜待开启：0 行 / 0 产品
-**字段是否全部为 0（本批次检查范围）**
-> PnLratio：是
-> MV_shortSell：是
-> MV_net：是
-> traderUnRealizedTradePnL：是
-> traderRealizedTradePnL：是
-> traderTradePnL：是
-> traderPositionPnL：是
-> traderTotalPnL：是
-> traderTradingCost：是
-> netMVRatio：是
-> Posratio：是
-> TradePnLratio：是
-> TradeFeeratio：是
+**归零检查：以下 13 项均为 0**
+> PnLratio、netMVRatio、Posratio、TradePnLratio、TradeFeeratio
+> MV_shortSell、MV_net
+> traderUnRealizedTradePnL、traderRealizedTradePnL
+> traderTradePnL、traderPositionPnL、traderTotalPnL
+> traderTradingCost
 共检查 2 次；本次检查范围内的预开启判据已通过，当夜守护结束。",
 ]
 `;

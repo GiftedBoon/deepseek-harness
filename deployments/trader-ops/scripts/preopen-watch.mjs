@@ -5,12 +5,13 @@ import { isAbsolute, join } from 'node:path'
 
 const DAY = 86_400_000
 const OFFSET = 8 * 60 * 60 * 1000
-const RESET_FIELDS = [
-  'PnLratio', 'MV_shortSell', 'MV_net',
-  'traderUnRealizedTradePnL', 'traderRealizedTradePnL', 'traderTradePnL',
-  'traderPositionPnL', 'traderTotalPnL', 'traderTradingCost',
-  'netMVRatio', 'Posratio', 'TradePnLratio',
-  'TradeFeeratio',
+const RESET_CHECK_LINES = [
+  '**归零检查：以下 13 项均为 0**',
+  '> PnLratio、netMVRatio、Posratio、TradePnLratio、TradeFeeratio',
+  '> MV_shortSell、MV_net',
+  '> traderUnRealizedTradePnL、traderRealizedTradePnL',
+  '> traderTradePnL、traderPositionPnL、traderTotalPnL',
+  '> traderTradingCost',
 ]
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 const count = value => Number.isSafeInteger(value) && value >= 0
@@ -104,7 +105,7 @@ function report(title, state, now, reason = '', details = []) {
     lines.push(`批次：${text(b.create_time)}（延迟 ${b.age_seconds ?? '—'} 秒）`,
       `范围：${b.total_rows} 行 / ${b.total_products} 产品｜待开启：${b.pending_rows} 行 / ${b.pending_products} 产品`)
     if (title === '结论：已完成 ✅') {
-      lines.push('**字段是否全部为 0（本批次检查范围）**', ...RESET_FIELDS.map(field => `> ${field}：是`))
+      lines.push(...RESET_CHECK_LINES)
     }
     if (b.missing_rows > 0) lines.push(`缺失记录：${b.missing_rows} 行，无法确认完成。`)
     if (!b.previous_batch_compared) lines.push('上一批比对未完成，无法确认完成。')

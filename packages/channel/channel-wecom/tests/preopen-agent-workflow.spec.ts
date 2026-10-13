@@ -16,7 +16,7 @@ const settings = {
   expectedExcluded: ['GSLS4', 'JPMLS2', 'MSLS2', 'SHORTMSBOXLS1', 'SHORTMSBOXLS2', 'UBSLS2'],
 }
 const firstReport = '**结论：未完成**\n目标交易日：2026-10-13\n检查时间：2026-10-12 23:40:00（北京时间）\n批次：2026-10-12 23:39:58（延迟 2 秒）\n范围：1107 行 / 571 产品｜待开启：80 行 / 66 产品\n已排除 6 个无数据文件产品，均在预期名单内。\n将每分钟复查，确认完成后播报。'
-const doneReport = '**结论：已完成 ✅**\n目标交易日：2026-10-13\n批次：2026-10-12 23:40:58（延迟 2 秒）\n范围：1107 行 / 571 产品｜待开启：0 行 / 0 产品\n**字段是否全部为 0（本批次检查范围）**\n> PnLratio：是\n> MV_shortSell：是\n> MV_net：是\n> traderUnRealizedTradePnL：是\n> traderRealizedTradePnL：是\n> traderTradePnL：是\n> traderPositionPnL：是\n> traderTotalPnL：是\n> traderTradingCost：是\n> netMVRatio：是\n> Posratio：是\n> TradePnLratio：是\n> TradeFeeratio：是\n待开启记录由 80 行降至 0 行，共检查 2 次。\n已排除 6 个无数据文件产品，均在预期名单内。\n本次检查范围内的预开启判据已通过，当夜守护结束。'
+const doneReport = '**结论：已完成 ✅**\n目标交易日：2026-10-13\n批次：2026-10-12 23:40:58（延迟 2 秒）\n范围：1107 行 / 571 产品｜待开启：0 行 / 0 产品\n**归零检查：以下 13 项均为 0**\n> PnLratio、netMVRatio、Posratio、TradePnLratio、TradeFeeratio\n> MV_shortSell、MV_net\n> traderUnRealizedTradePnL、traderRealizedTradePnL\n> traderTradePnL、traderPositionPnL、traderTotalPnL\n> traderTradingCost\n待开启记录由 80 行降至 0 行，共检查 2 次。\n已排除 6 个无数据文件产品，均在预期名单内。\n本次检查范围内的预开启判据已通过，当夜守护结束。'
 
 type Step = { tool: string; args: () => Record<string, unknown>; receive?: (value: unknown) => void } | { report: string }
 
