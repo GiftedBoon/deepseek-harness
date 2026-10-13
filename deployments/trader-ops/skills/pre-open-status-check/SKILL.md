@@ -7,7 +7,7 @@ user-invocable: true
 
 # 预开启状态检查
 
-每次请求都调用 `mcp__bssh-ops-remote__check_daily_preopen`，传 `max_detail_rows=30`。它只读最新一批 `trade.ProductionMonitorData`，不连接 colo；`ready` 只表示检查范围内每行 `PnLratio` 为 0。`pending` 是此判据的异常行。行数与产品数不同，计数以工具汇总字段为准，明细可能截断。不要用 `TimeIsRight` 或 `All` 列替代工具判据，也不要仅凭 `ready` 判断当夜完成。
+每次请求都调用 `mcp__bssh-ops-remote__check_daily_preopen`，传 `max_detail_rows=30`。它只读最新一批 `trade.ProductionMonitorData`，不连接 colo；`ready` 只表示检查范围内每行的预开启重置字段都为 0：`PnLratio`、`MV_shortSell`、`MV_net`、`traderUnRealizedTradePnL`、`traderRealizedTradePnL`、`traderTradePnL`、`traderPositionPnL`、`traderTotalPnL`、`traderTradingCost`、`netMVRatio`、`Posratio`、`TradePnLratio` 和 `TradeFeeratio`。任一字段非 0、NULL 或非有限值的行进入 `pending`，其 `nonzero_fields` 列出未归零的字段；只有 `PnLratio` 为 0 不能说明该行已重置。行数与产品数不同，计数以工具汇总字段为准，明细可能截断。不要用 `TimeIsRight` 或 `All` 列替代工具判据，也不要仅凭 `ready` 判断当夜完成。
 
 ## 判断时间
 
@@ -38,7 +38,7 @@ user-invocable: true
 范围：{total_rows} 行 / {total_products} 产品｜待开启：{pending_rows} 行 / {pending_products} 产品
 ```
 
-非有效窗口紧接摘要用一行说明“当前不在预开启判断窗口，以上仅为实时快照”或“交易日未核验，以上仅为实时快照”；估算日历要明确写“交易日历为估算，未核验节假日”。数据失败、过期、范围为空或未能比对上一批时，用一行写明原因。`missing_rows > 0` 时单独列出：
+非有效窗口紧接摘要用一行说明“当前不在预开启判断窗口，以上仅为实时快照”或“交易日未核验，以上仅为实时快照”；估算日历要明确写“交易日历为估算，未核验节假日”。数据失败、过期、范围为空或未能比对上一批时，用一行写明原因。上一批比对完成且 `missing_rows=0` 时不输出比对说明。`missing_rows > 0` 时单独列出：
 
 ```markdown
 **缺失记录（{missing_rows} 行）**
@@ -54,4 +54,4 @@ user-invocable: true
 
 两组各最多展示 20 行，按工具返回顺序排列；用 `missing_rows`、`no_data_file_rows` 作完整行数。计数大于展示行数或对应的 `*_truncated=true` 时，在组后写“仅展示前 {展示行数}/{完整行数} 行”。有计数但明细未返回时写“明细未返回”，不生成空组。缺字段写 `—`，将字段中的换行压成空格，绝不展示 `TraderAccount`。`not_reporting_rows > 0` 时在末尾用一行提示上报卡住的行数；其他实质性 `warnings` 只用一行概括。默认不重复报告 `pending_truncated`；用户明确要求待开启名单时才追加同样限长的 `pending` 分组并说明截断。
 
-整条回复不超过 4096 UTF-8 字节。超限时只减少明细行数，在完整行边界写明截断；未知汇总值写 `—`。`已完成 ✅` 只表示本次检查范围内、当前批次的 `PnLratio` 判据通过。
+整条回复不超过 4096 UTF-8 字节。超限时只减少明细行数，在完整行边界写明截断；未知汇总值写 `—`。`已完成 ✅` 只表示本次检查范围内、当前批次的重置字段判据通过。

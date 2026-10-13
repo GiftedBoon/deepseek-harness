@@ -1,0 +1,41 @@
+{
+  "report": [
+    {
+      "target": "user",
+      "content": "**预开启自动排查**\n目标交易日：2026-10-13\n仍待开启：2 行 / 1 产品\n> HJ1 · csc-sh-12：进程输出未确认该产品；failed 记录早于当夜窗口，原因未确认。\n> HJ1 · csc-sz-12：日志读取失败，保留队列，下一轮重试。\n已保存各台证据，继续复查。"
+    }
+  ],
+  "calls": [
+    {
+      "name": "check",
+      "args": {
+        "max_detail_rows": 200
+      }
+    },
+    {
+      "name": "get_run_status",
+      "args": {
+        "run_id": "readonly-retained-7"
+      }
+    },
+    {
+      "name": "get_strategy_start_errors",
+      "args": {
+        "product": "HJ1"
+      }
+    },
+    {
+      "name": "list_colo_file_resources",
+      "args": {
+        "product": "HJ1"
+      }
+    },
+    {
+      "name": "stat_colo_file",
+      "args": {
+        "product": "HJ1",
+        "resource_id": "strategy_log"
+      }
+    }
+  ]
+}

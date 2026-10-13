@@ -11,6 +11,7 @@
     { "path": "../../../vendor/cordis" },
     { "path": "../../llm/llm" },
     { "path": "../../core/session" },
+    { "path": "../../schedule/schedule" },
     { "path": "../../core/agent" },
     { "path": "../../core/agent-default-model" },
     { "path": "../../preset/agent-preset-registry" },

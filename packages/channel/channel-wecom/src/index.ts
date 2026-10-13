@@ -13,6 +13,14 @@ import { weComScheduledActionInputDomainSpec } from './scheduled-action-input-do
 import { weComScheduledActionDomainSpec } from './scheduled-action-domain.ts'
 import { WeComChannelRuntime } from './runtime.ts'
 import { resolveScheduledActions } from './scheduled-actions.ts'
+import type { WeComNotifications } from './types.ts'
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /** Connected intelligent-bot notification queue for its configured exact group. */
+    weComNotifications: WeComNotifications
+  }
+}
 
 export { Config }
 export * from './types.ts'
@@ -31,6 +39,10 @@ export function apply(ctx: Context, config: Config): Promise<void> {
   return (async () => {
     const resolved = config as ResolvedConfig
     resolveScheduledActions(resolved.scheduledActions)
+    if (resolved.notificationChatId !== undefined
+      && (resolved.notificationChatId === '*' || !resolved.allowedChats.includes(resolved.notificationChatId))) {
+      throw new Error('channel-wecom: notificationChatId must name an exact allowedChats entry')
+    }
     if (!isAbsolute(resolved.workspacePath)) throw new Error('channel-wecom: workspacePath must be absolute')
     const permission = ctx.permissionPresets.resolve(resolved.permissionPreset)
     if (permission.approval !== 'never' || permission.sandbox === 'danger-full-access') {
@@ -77,6 +89,9 @@ export function apply(ctx: Context, config: Config): Promise<void> {
     const dispose = ctx.effect(() => () => runtime.close(), 'channel-wecom.lifecycle()')
     try {
       await runtime.start()
+      if (resolved.notificationChatId !== undefined) {
+        ctx.provide('weComNotifications', { enqueue: content => runtime.enqueueNotification(content) })
+      }
     } catch (error: unknown) {
       await dispose()
       throw error

@@ -1,0 +1,13 @@
+# Bilingual-pair consistency record for channel.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/subsystems/channel.md
+/enterprise-messaging-channels:
+  en: 61f5baf06310e723
+  zh: 589d8403aa31cf5b
+/enterprise-messaging-channels/host-notifications:
+  en: 75f5224c01538e44
+  zh: 1a57cd22f4da0509
+/enterprise-messaging-channels/scheduled-agent-execution:
+  en: 1ba7d964dadd744b
+  zh: 4316b79aa11c2c6a

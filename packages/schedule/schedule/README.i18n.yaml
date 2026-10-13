@@ -3,23 +3,23 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/schedule/schedule/README.md
 /:
-  en: 1fc7b2d7d5139f74
-  zh: 195be90460ef9e44
+  en: a46c01211a51613d
+  zh: f3366c9fc3ea718e
 /deepseek-ai-dsh-schedule:
   en: 83c1ed891080cce4
   zh: ac08407f9bb63531
 /deepseek-ai-dsh-schedule/summary:
-  en: 6cc0239faf70fdfc
-  zh: 65b6b974c0b30e8b
+  en: b19ef82dbc3d1265
+  zh: 13db57d7fd9e68c0
 /deepseek-ai-dsh-schedule/table-of-contents:
   en: 23386452a66b2fbd
   zh: 4a8d91b2f313fead
 /deepseek-ai-dsh-schedule/use-this-package:
-  en: 318cad8a73818a95
-  zh: 267b9c86cb9f06d1
+  en: dcde4d97bc2644b3
+  zh: 46bf3caee6378134
 /deepseek-ai-dsh-schedule/understand-the-implementation:
-  en: 676b7c508f37a1b7
-  zh: c5e8520b3350f0b0
+  en: 58b91998ac137c6d
+  zh: 156710790799e0e7
 /deepseek-ai-dsh-schedule/further-exploration:
   en: d4404aa2dd7b3a94
   zh: 2dcd3d98cf281c32
@@ -30,11 +30,11 @@
   en: c4c31a3f6826626d
   zh: 5aa01bfa311b2f4c
 /deepseek-ai-dsh-schedule/model-experience/tool-schemas-on-root-agents/what-the-model-sees:
-  en: fe159715b83e3058
-  zh: e86fa4871283720f
+  en: 5d767502a7a4acd6
+  zh: 4f1f798e4f237ba2
 /deepseek-ai-dsh-schedule/model-experience/tool-schemas-on-root-agents/token-effect:
-  en: ae0eb4d2609d4329
-  zh: 4fe0a26e37c272dc
+  en: ae7c1e2bae68ad30
+  zh: c370f2b733ac1040
 /deepseek-ai-dsh-schedule/model-experience/tool-schemas-on-root-agents/kv-cache-effect:
   en: 7bf33bbe17e1da03
   zh: 2af9a2f842b4f430
@@ -68,9 +68,21 @@
 /deepseek-ai-dsh-schedule/model-experience/due-reminders-in-the-original-session/kv-cache-effect:
   en: 1006325fa610366d
   zh: 476215d8a3c70fe4
+/deepseek-ai-dsh-schedule/model-experience/executable-tasks-in-the-original-session:
+  en: c1c5725c72ae4828
+  zh: 690a4c8eaa563c5a
+/deepseek-ai-dsh-schedule/model-experience/executable-tasks-in-the-original-session/what-the-model-sees:
+  en: ee74aaca59e9369e
+  zh: 8cc22005848e09a2
+/deepseek-ai-dsh-schedule/model-experience/executable-tasks-in-the-original-session/token-effect:
+  en: 31c37732010d081d
+  zh: cf917f12f1422a40
+/deepseek-ai-dsh-schedule/model-experience/executable-tasks-in-the-original-session/kv-cache-effect:
+  en: fe6606bf17c98e1c
+  zh: 0f54b1d106b4f34c
 /deepseek-ai-dsh-schedule/known-limitations-and-deferred-work:
-  en: fd511d607cbc7b8d
-  zh: f45a14991cfa47e6
+  en: 78b2584861b9e3a0
+  zh: cf9d1b2093672c7f
 /deepseek-ai-dsh-schedule/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 8ec3e73528ddb1a6

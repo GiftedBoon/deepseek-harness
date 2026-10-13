@@ -1,11 +1,5 @@
 /** Host timer over stored tasks; Session activation is a delivery operation. */
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { ContextFormed } from '@deepseek-ai/dsh-llm'
-declare module '@deepseek-ai/dsh-llm' {
-  interface MessageSourceMap {
-    'schedule': { kind: 'schedule' } & ContextFormed
-  }
-}
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-session-controller'
 import { isRecurringScheduleRecord, renderReminderFraming, renderRecurringReminderBatchFraming, resolveRecurringOccurrence } from './domain.ts'
@@ -35,6 +29,10 @@ export class ScheduleRuntime {
     private readonly transact: (work: () => Promise<void>) => Promise<void>,
     private readonly commit: (task: ScheduleTask) => Promise<void>,
     private readonly retention: DeliveryRetentionBounds,
+    private readonly isExecutable: (task: ScheduleTask) => boolean = () => false,
+    private readonly execute?: (task: ScheduleTask, scheduledAt: string) => Promise<void>,
+    private readonly expiry: (task: ScheduleTask) => number | undefined = () => undefined,
+    private readonly expire?: (task: ScheduleTask) => Promise<void>,
   ) {}
 
   /**
@@ -87,12 +85,33 @@ export class ScheduleRuntime {
     const failed = new Set<string>()
     const handled = new Set<string>()
     const scanNow = Date.now()
-    const due = this.tasks().filter(task => task.status === 'active' && Date.parse(task.record.scheduledAt) <= scanNow)
+    const due = this.tasks().filter(task => task.status === 'active' && Math.min(Date.parse(task.record.scheduledAt), this.expiry(task) ?? Infinity) <= scanNow)
     for (const task of due) {
       if (this.stopping) return
       if (handled.has(task.record.id)) continue
+      if (this.isExecutable(task)) {
+        try {
+          if ((this.expiry(task) ?? Infinity) <= Date.now()) {
+            if (this.expire === undefined) throw new Error('Executable Schedule lacks expiry handling')
+            await this.expire(task)
+            await this.commit({ ...task, status: 'inactive' })
+            continue
+          }
+          const occurrence = isRecurringScheduleRecord(task.record) ? resolveRecurringOccurrence(task.record, Date.now()) : undefined
+          if (this.execute === undefined) throw new Error('Executable Schedule lacks admission handling')
+          await this.execute(task, occurrence?.occurrenceAt ?? task.record.scheduledAt)
+          await this.commit({ ...task, record: { ...task.record,
+            scheduledAt: occurrence?.nextScheduledAt ?? occurrence?.occurrenceAt ?? task.record.scheduledAt },
+          status: occurrence?.nextScheduledAt === undefined ? 'inactive' : 'active' })
+        } catch (error: unknown) {
+          failed.add(task.record.id)
+          this.ctx.logger.warn(`schedule: task admission failed: ${String(error)}`)
+        }
+        continue
+      }
       const group = isRecurringScheduleRecord(task.record)
-        ? due.filter(candidate => candidate.sessionId === task.sessionId && isRecurringScheduleRecord(candidate.record))
+        ? due.filter(candidate => candidate.sessionId === task.sessionId
+          && !this.isExecutable(candidate) && isRecurringScheduleRecord(candidate.record))
         : [task]
       for (const member of group) handled.add(member.record.id)
       let admitted = group
@@ -154,7 +173,7 @@ export class ScheduleRuntime {
     if (this.stopping) return
     const next = this.tasks().filter(task => task.status === 'active' && !failed.has(task.record.id))
       .reduce<number | undefined>((at, task) => {
-        const target = Date.parse(task.record.scheduledAt)
+        const target = Math.min(Date.parse(task.record.scheduledAt), this.expiry(task) ?? Infinity)
         return at === undefined ? target : Math.min(at, target)
       }, undefined)
     if (next !== undefined) {

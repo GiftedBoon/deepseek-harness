@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { ScheduleTaskExecutor } from '@deepseek-ai/dsh-schedule'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ResolvedConfig } from '../src/config.ts'
 import { conversationIdentity, deliveryIdentity } from '../src/identity.ts'
@@ -125,11 +126,35 @@ interface RuntimeHarness {
   readonly modelResults: unknown[]
   readonly persistedSessions: Set<string>
   readonly warnings: ReturnType<typeof vi.fn>
+  readonly taskExecutor: () => ScheduleTaskExecutor | undefined
+  readonly taskReports: Table<{ state: string; sessionId: string; createdAt: number }>
   readonly registeredTools: Map<string, { readonly description: string; readonly parameters: unknown }>
   emit(name: string, ...args: unknown[]): void
 }
 
 const runtimes: WeComChannelRuntime[] = []
+
+describe('Host-generated notifications on the existing intelligent bot', () => {
+  it('queues a report durably and retries it on reconnect without an Agent turn', async () => {
+    const test = harness({ config: { notificationChatId: 'chat' } })
+    test.client.failSend = true
+    await test.runtime.start()
+    await test.runtime.enqueueNotification('**预开启完成**')
+    await vi.waitFor(() => { expect([...test.domain.outbox.records.values()][0]?.attempts).toBe(1) })
+    expect(test.calls).not.toContain('create')
+    test.client.failSend = false
+    for (const listener of test.client.authListeners) listener()
+    await vi.waitFor(() => { expect(test.client.sends).toContainEqual({ target: 'chat', content: '**预开启完成**' }) })
+    await vi.waitFor(() => { expect(test.domain.outbox.records.size).toBe(0) })
+    await test.runtime.close()
+    await expect(test.runtime.enqueueNotification('late')).rejects.toThrow('disposed')
+  })
+
+  it('rejects a wildcard or a group outside the exact allowlist before opening listeners', () => {
+    expect(() => harness({ config: { notificationChatId: '*' } })).toThrow('exact allowedChats')
+    expect(() => harness({ config: { notificationChatId: 'other' } })).toThrow('exact allowedChats')
+  })
+})
 
 afterEach(async () => {
   await Promise.allSettled(runtimes.splice(0).map(runtime => runtime.close()))
@@ -174,6 +199,7 @@ function harness(options: {
   persisted?: boolean
   client?: Client
   domain?: Domain
+  tasks?: boolean
 } = {}): RuntimeHarness {
   const behavior = options.behavior ?? {}
   const config = baseConfig(options.config)
@@ -181,6 +207,15 @@ function harness(options: {
   const domain = options.domain ?? new Domain()
   const scheduledActionDomain = new ScheduledActionDomain()
   const scheduledActionInputDomain = new ScheduledActionInputDomain()
+  let taskExecutor: ScheduleTaskExecutor | undefined
+  const taskReports = new Table<{ state: string; sessionId: string; createdAt: number }>()
+  const schedule = {
+    registerTaskExecutor: (executor: ScheduleTaskExecutor) => {
+      taskExecutor = executor
+      return () => { taskExecutor = undefined }
+    },
+    executions: async () => [],
+  }
   const calls: string[] = []
   const modelResults: unknown[] = []
   const persistedSessions = new Set<string>()
@@ -229,6 +264,7 @@ function harness(options: {
             emit('agent/assistant-stream', { agent, frame: { type: 'chunk', attemptId: 'attempt', revision: 5, index: 1, time: 3, chunk: { type: 'text-delta', text: behavior.output } } })
           }
           emit('agent/assistant-stream', { agent, frame: { type: 'end', attemptId: 'attempt', revision: 6, index: 2, outcome: { kind: 'abandoned' } } })
+          emit('session/event', session, { type: 'assistant/message', data: { turn: 1, message: { id: 'committed', content: [{ type: 'text', text: behavior.output ?? '' }] } } })
           emit('session/event', session, { type: 'turn/end', data: { turn: 1, reason: behavior.reason ?? { kind: 'completed' } } })
         })
       },
@@ -258,6 +294,8 @@ function harness(options: {
 
   const ctx = {
     logger: { warn: warnings },
+    get: (name: string) => options.tasks && name === 'schedule' ? schedule : undefined,
+    storageDomain: { open: async () => ({ table: () => taskReports, close: async () => { calls.push('close-task-reports') } }) },
     on,
     agents: {
       get: () => behavior.activeConflict ? {} : undefined,
@@ -275,7 +313,7 @@ function harness(options: {
       },
     },
     sessionTitle: { rename: () => { calls.push('title') } },
-    sessions: { flush: async (session: { id: string }) => { calls.push('flush'); persistedSessions.add(session.id) } },
+    sessions: { flush: async (session: { id: string }) => { calls.push('flush'); persistedSessions.add(session.id); return true } },
     tools: { execute: async () => ({ content: [{ type: 'text', text: 'run-1' }] }) },
   }
   const workspace = {
@@ -299,7 +337,7 @@ function harness(options: {
   runtimes.push(runtime)
   return {
     runtime, client, domain, scheduledActionDomain, scheduledActionInputDomain, config, calls, modelResults, persistedSessions,
-    warnings, registeredTools, emit,
+    warnings, registeredTools, emit, taskExecutor: () => taskExecutor, taskReports,
   }
 }
 

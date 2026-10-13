@@ -41,6 +41,8 @@ kind: "package-reference"
 
 提供方与资源控制项均可配置：首次认证超时、流式刷新间隔、UTF-8 输入／回复上限、Agent turn 超时、交付保留时间／数量、outbox 重试间隔、周期性最大重试次数、未投递 outbox 的保留时间、定时动作数量／时间范围、后台执行超时，以及解析仅含时间的请求时使用的固定 UTC 偏移。`maxReplyBytes` 不能超过企业微信的 20,480 字节流式上限。`workspacePath` 必须是现存的绝对目录。
 
+`notificationChatId` 为 Host 主动报告选择一个精确的 `allowedChats` 成员；启用时拒绝 `*` 和未列入白名单的群。配置后，已连接插件提供 `ctx.weComNotifications.enqueue(content)`，持久化入队后返回；发送复用现有智能机器人连接及重试限制，不启动 Agent 回合，也不使用 webhook。卸载移除服务并拒绝后续入队。入队确认不代表消息已送达企业微信。
+
 `scheduledActions` 默认为空。每个配置项把一个稳定动作 id 映射到准确的已注册工具、静态无损 JSON 参数、一个接收请求目标的顶层参数，以及一个带首尾锚点的目标校验表达式。`targetArgumentFormat` 默认为 `scalar`；下游工具要求单元素目标数组时使用 `singleton-array`。可选的 `input` 会把模型可见的 `scheduled_action_create.input` 字符串映射到另一个顶层工具参数，应用必填的 UTF-8 字节上限与可选的首尾锚点表达式，并把原值持久保存到实际调度时。模型不能替换已配置的工具或静态参数。
 
 ```yaml
@@ -94,6 +96,8 @@ kind: "package-reference"
 
 当 `scheduledActions` 非空时，映射 Agent 会获得 `scheduled_action_create`、`scheduled_action_list` 与 `scheduled_action_delete`。显式 RFC 3339 `at` 值保留自身的偏移；仅含时间的 `HH:mm[:ss]` 值会按 `scheduledActionUtcOffset` 解析为下一次发生时点，因此模型不需要 shell 或时钟工具。创建操作会先持久保存任何已校验的动态输入，再提交白名单动作并启动计时器，因此释放按交付创建的 Agent 不会取消任务。到点时，渠道会解析当前白名单，要求其指纹与创建时的定义一致，并通过普通全局 policy 和 guard 流程调用已配置工具。结果会先进入持久 outbox，然后删除任务与输入。启动时会重新启用 pending 任务、删除孤立输入，并报告恢复出的 `running` 任务结果不确定；它不会再次执行该任务，因为此前的副作用可能已经发生。
 
+可执行的 [Schedule 任务](../../schedule/schedule/README.zh.md)绑定到映射 Session 的 `wecom` 执行器。任务与人工消息串行排队，使用相同的 Agent 预设和受约束的权限预设创建或恢复 Agent，在结算前持久化准确的输入和已提交的助手输出。报告通过原始会话路由及机器人连接发送，不受 `notificationChatId` 影响；任务执行及每次报告重试都要求用户或群仍在明确的白名单内。成功但没有输出的任务，以及尚未执行便取消或过期的任务保持静默。独立的 `channel_wecom_task_reports` 域记录发件箱入队和送达状态，使重启能够重试未发送结果而不重新运行 Agent。报告及回执按 `outboxRetentionMs` 过期；启动时以每次最多 100 条记录分页恢复每个会话的所有保留执行。如果提供方已接收消息，但进程在提交回执前丢失，由于提供方没有幂等发送确认，报告可能重复。
+
 <a id="security"></a>
 ## 安全
 
@@ -106,7 +110,7 @@ kind: "package-reference"
 
 #### What the model sees
 
-模型会把准入的企业微信文本看作一条 `source.kind: "user"` 的普通 user-role 消息。传输 id、BotID、白名单数据、占位文本和重试状态对模型不可见。现有 Session 历史提供此前对话上下文。
+模型会把准入的企业微信文本看作一条 `source.kind: "user"` 的普通 user-role 消息。传输 id、BotID、白名单数据、占位文本和重试状态对模型不可见。现有 Session 历史提供此前对话上下文。可执行任务以已记录的用户角色消息进入，`source.kind: "schedule"`，包含标题、执行标识、时间和配置的指令。
 
 #### Token effect
 
@@ -125,7 +129,7 @@ kind: "package-reference"
 - **凭据重载需要重新连接** — 机器人 secret 与 Session 身份密钥在插件激活时解析；轮换后请重新加载插件。
 - **回复投影有长度限制** — 超过 `maxReplyBytes` 的回复会用省略号截断；工具与 reasoning 不会渲染到企业微信。
 - **准入前没有入站持久队列** — 官方 SDK 负责重连，而从未到达本进程的提供方回调无法由 DSH 重放。
-- **定时结果是渠道通知** — 后台结果会发送到企业微信并由被调用工具审计，但不会作为模型生成的会话历史插入 Session。
+- **定时动作结果是渠道通知** — 白名单内的直接动作由其工具审计；可执行 Agent 任务在 Session 中保留普通的模型和工具历史。
 - **未投递的通知会等待所属会话** — 提供方在会话空闲时拒收的通知，会在该会话下一次写来消息时投递；若在 `outboxRetentionMs` 内始终未能投递，该记录会被删除。
 
 <a id="dev-note"></a>

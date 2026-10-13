@@ -158,7 +158,17 @@ sudo bash /opt/deepseek-harness/current/deployments/trader-ops/scripts/configure
 
 启用后，工具会以 `mcp__bssh-ops-remote__` 为前缀出现。`policies/tool-access.yaml` 对 `bssh-ops` Skill 和定时动作引用的每个工具做了分类并全部解析为 `allow`，不经过 Harness 审批；`scripts/verify-skill-tool-policy.mjs` 会拒绝策略判定为拒绝的引用工具。Skill 仍要求预览和用户明确确认，MCP 服务负责下游授权与审计。不要把 API key 写入 patch、Skill、命令参数或工单。
 
-企业微信 patch 暴露两个持久 bssh_ops 动作：`ps_check` 对一台 colo 执行固定的只读进程检查，`quick_command_plan` 接受 `prepare_quick_command` 返回的准确 `plan_id`。生成计划会在定时前冻结目标、渲染后的命令和执行窗口；到点时渠道只把 `plan_id` 传给 `execute_quick_command_plan`。系统不暴露任意 shell 命令。`15:01` 这样的仅时间请求按 `+08:00` 解析为下一次发生时点。到期通知会附上 bssh_ops 结果；需要最终远端输出时，通过 `get_run_status` 查询返回的 `run_id`。通用 Schedule 仍只提供提醒，不会执行这些操作。
+企业微信 patch 暴露两个持久 bssh_ops 动作：`ps_check` 对一台 colo 执行固定的只读进程检查，`quick_command_plan` 接受 `prepare_quick_command` 返回的准确 `plan_id`。生成计划会在定时前冻结目标、渲染后的命令和执行窗口；到点时渠道只把 `plan_id` 传给 `execute_quick_command_plan`。系统不暴露任意 shell 命令。`15:01` 这样的仅时间请求按 `+08:00` 解析为下一次发生时点。到期通知会附上 bssh_ops 结果；需要最终远端输出时，通过 `get_run_status` 查询返回的 `run_id`。Schedule 提醒工具保持提醒语义；独立的 `schedule_task_*` 工具执行 Agent 指令，并把结果回传创建任务的企业微信会话。
+
+### 预开启 Agent 任务切换
+
+候选发布中的通用任务执行、流程状态恢复和现有机器人路由通过验收前，保留旧守护。部署源码本身不会创建周期任务。在目标获准会话中用 Agent 创建临时无害任务，验证真实执行、重启恢复和机器人投递；验证后删除临时任务。
+
+1. 备份受保护部署配置和当前守护状态。通过 `sudoedit` 将 `/etc/deepseek-harness/trader-ops.env` 的 `TRADER_OPS_PREOPEN_WATCH_ENABLED` 设为 `0`，再按已有步骤重启。创建生产 Agent 任务前确认旧守护已停止；保留旧状态供回滚。
+2. 在接收报告的企业微信群中要求 Agent：“加载 preopen-watch；旧部署守护已关闭。在当前会话创建每天北京时间 23:40 的预开启任务，用日历核验明天这一自然日，需要时创建每 60 秒复查及 00:30 截止任务，回读实际任务编号及下次执行时间。”Agent 必须使用 `schedule_task_create` 和有界流程状态，不使用提醒工具或文件写入。
+3. 通过 `schedule_task_list` 核验返回的每日任务编号，通过 `schedule_task_executions` 查看首次真实执行，确认当夜复查和截止编号已保存。核验报告字段及真实机器人投递。夜晚完成后必须取消两个当夜任务；已排队的迟到执行必须保持静默。
+4. 生产验收前，在无需密钥的 Agent 流程验收中覆盖休市跳过、旧监控数据、零缺失省略、进程 `run_id` 恢复、各 colo 部分失败和整夜错过窗口。真实日历、MCP 和企业微信投递需要远程证据。确认没有重复旧守护报告。
+5. 回滚时，在创建任务的会话停止 Agent 流程，确认全部任务编号已删除且完成标志已保存，再启用旧守护并重启。旧守护运行时不要恢复状态文件。更换接收群时在旧会话停止、在新群创建；修改旧守护的通知群不会迁移 Agent 任务。
 
 ### 企业微信日常运维
 

@@ -17,6 +17,13 @@ rules:
       - schedule_create
       - schedule_list
       - schedule_delete
+      - schedule_task_create
+      - schedule_task_list
+      - schedule_task_update
+      - schedule_task_delete
+      - schedule_task_executions
+      - schedule_state_read
+      - schedule_state_write
       - scheduled_action_create
       - scheduled_action_list
       - scheduled_action_delete

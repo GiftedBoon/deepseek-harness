@@ -458,6 +458,8 @@ export interface Config {
   allowedUsers: string[]
   /** Exact admitted group ids, with `*` as an explicit wildcard. */
   allowedChats: string[]
+  /** Exact allowlisted group receiving Host-generated notifications; omission disables the notification service. */
+  notificationChatId?: string
   /** Prefix used for newly created Session titles. */
   sessionTitlePrefix?: string
   /** Maximum wait for the first successful SDK authentication. */
@@ -2649,11 +2651,19 @@ export interface Config {
 ## `@deepseek-ai/dsh-schedule`
 
 - `inject`: `agents` · `sessions` · `tools` · `storageDomain` · `sessionController` · `sessionPersistence`
-- `source`: [`packages/schedule/schedule/src/index.ts:73`](../packages/schedule/schedule/src/index.ts)
+- `source`: [`packages/schedule/schedule/src/index.ts:81`](../packages/schedule/schedule/src/index.ts)
 
 ```ts config-catalog
 /** Configuration for the Host Schedule domain. */
 export interface Config {
+  /** Complete workflow record bytes; defaults to 65536. */
+  taskStateBytes?: number
+  /** Retained workflow keys per Session, including cleared revisions; defaults to 100. */
+  taskWorkflowLimit?: number
+  /** Complete execution record bytes; defaults to 131072. */
+  taskExecutionBytes?: number
+  /** Retained settled executions per task; defaults to 200. */
+  taskExecutionRecords?: number
   /**
    * Delivery-history window retained per task, in days; omission defaults to 30.
    * Pruning happens when an acknowledgment is appended, and `lastDelivery` is always retained.

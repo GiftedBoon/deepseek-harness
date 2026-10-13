@@ -77,3 +77,15 @@ knowledge:
 以上知识同步配置是待实现的入库约定，不代表 Harness 或 OpenViking 当前内置的配置字段。OpenViking DSH 插件不会自动扫描 Git 目录；实际接入器应把 `knowledge` 当作可检索资料，把 `skills` 和 `policies` 排除在知识索引之外。
 
 `tool-access.yaml` 已由 DSH patch 中的实验策略插件加载，并对未匹配工具失败关闭。`risk-levels.yaml` 和 `approvals.yaml` 仍是设计约定；可信身份、资源授权、持久审批与完整审计必须在业务 MCP 服务边界实现。
+
+## 预开启自动守护
+
+Agent 在接收报告的企业微信会话中按 [preopen-watch](skills/preopen-watch/SKILL.md) 创建执行型 Schedule 任务。加载 Skill 不会自动安排任务。`schedule_task_create` 执行保存的指令；`schedule_create` 仍是提醒。现有智能机器人通过原会话的持久发送队列回传定时结果，不需要 webhook 或另一个机器人。任务路由使用创建任务的会话，不使用 `TRADER_OPS_PREOPEN_CHAT_ID`。
+
+每日入口按 `Asia/Shanghai` 的 23:40 执行，通过交易日历核验下一自然日。星期日晚上可检查星期一；星期五晚上不会跳到星期一。估算日历或日历查询失败不能授权生产检测。Agent 创建每 60 秒、目标日 00:30 过期的当夜复查，以及不设过期时间的独立截止任务，记录真实任务编号并回读配置。每次执行先核验持久完成标志，已排队的迟到 tick 不会重新开启已结束夜晚。服务中断或 Agent 繁忙可能延迟执行；服务必须保持运行。
+
+Skill 负责完成判据、停滞只读排查、输出限制与证据处理。上一批比对成功且缺失为零时省略说明。连续三次新鲜、完整且待开启集合不变的有效检查触发排查；旧批次或重复读取同一批次不增加次数。保存进程检查 `run_id` 后继续轮询，不重新派发，每台 colo 分别保存证据。缺日期或时区不明确的日志不能证实当夜启动故障。截止时未完成夜晚均报告，即使整夜没有有效批次；全部自动业务操作保持只读。
+
+流程状态通过当前会话有界的 `schedule_state_read` 与比较后写入（compare-and-swap）的 `schedule_state_write` 工具保存，包含配置、当前目标日、任务编号、完成标志、监控汇总及最小取证摘要，不包含原始日志或凭据。Schedule 执行记录与机器人发送记录分别保存：Agent 完成不能证明企业微信已送达。无需播报的检查不产生最终文本；渠道不会为定时执行发送空回复提示。
+
+[bssh MCP patch](config/dsh/trader-ops-bssh-ops-mcp.patch.yml) 在 `TRADER_OPS_PREOPEN_WATCH_ENABLED=1` 时仍保留[旧守护](scripts/preopen-watch-plugin.mjs)，供受控切换使用；验收前保留其已有状态和通知路由。不得与 Agent 预开启任务同时运行。按[切换步骤](DEPLOYMENT.md)验证真实任务编号和投递证据，不能以 Skill 已安装代替验收。更换接收群时，在原会话停止流程，在新的获准群会话重新创建。

@@ -1,272 +1,76 @@
 ---
 name: preopen-watch
-description: 交易日前夜守护实盘产品预开启。每分钟调用 check_daily_preopen，检查结果有变化就经企业微信机器人播报一次进度，全部开启成功后收尾；连续 3 次检查无变化则把仍未开启的产品作为异常告警。用于每个交易日前一天 23:40 起的定时触发。
+description: 由 Agent 创建并执行交易日前夜预开启任务，23:40 首轮报告、每分钟复查、停滞只读取证和 00:30 收尾；通过原企业微信会话回传。
+whenToUse: Use when a user asks to schedule, inspect, stop, or execute the nightly pre-open watch in the current conversation.
+user-invocable: true
 ---
 
 # 预开启守护（preopen-watch）
 
-## 这个流程是什么
+## 入口与任务归属
 
-每个交易日的前一天晚上，所有实盘产品会把第二天正式交易的配置更新好、重置各种交易
-数据，然后尝试启动。本 skill 负责在那个窗口里守着，确认所有产品都重启成功了，并把
-进度和异常发到企业微信。
+本流程由 Agent 通过 `schedule_task_create` 创建执行任务，使用当前会话已有智能机器人的路由。Skill Loader 加载本文件不会创建任务；`schedule_create` 是提醒工具，不适用于本流程。先确认部署中的旧守护 `TRADER_OPS_PREOPEN_WATCH_ENABLED` 已关闭；没有确认时只说明迁移条件，不建立并行守护。旧守护关闭事实须来自用户明确确认或受控部署验证，不把本 Skill 的文字当作运行状态。部署及切换见[部署说明](../../README.zh.md#预开启自动守护)。
 
-判据来自 `check_daily_preopen`：重启成功的产品交易数据被重置，`PnLratio` 为 0；还没
-重启的产品仍带着上一交易日收盘的 `PnLratio`（非 0），落在返回的 `pending` 里。所以
-**`pending_rows` 就是"还没开启的行数"，它归零即全部开启成功**。
+在接收报告的获准企业微信群会话中创建任务。任务和状态只属于当前 Session，不能读取另一群的状态或用通知配置改写任务路由。换群时在原会话删除本流程任务，在新群重新创建；不要改变 BotID 或会话密钥。
 
-### 实测时间线（2026-09-21 夜，务必按这个设置窗口）
+## 创建、查询与停止
 
-| 时刻 | 未开启行数 |
-|---|---|
-| 23:38 | 1078 |
-| 23:39 | 712 |
-| 23:40 | 80 |
-| 23:41 | **0**（完成） |
+1. 用户要求启用时，调用 `schedule_state_read`，`workflow="preopen-watch"`。已有状态只接受 `version=1`；未知版本或损坏字段报告原因，不覆盖。首次创建前明确验证 settings 的正整数、时间格式、排除名单及 night 字段；字段损坏时保留原记录和已发现任务编号，停止创建，报告恢复所需信息。用 `schedule_task_list` 查找已保存编号及标题相同的任务，保留一个入口，发现冲突先报告，不自动建立副本。
+2. 无入口时调用 `schedule_task_create`：`title="预开启守护：每日入口"`，`daily={"time":"23:40:00","time_zone":"Asia/Shanghai"}`，`prompt="加载 preopen-watch Skill 并执行每日入口。使用当前执行时间核验下一自然日；恢复未收尾夜晚；无需播报时不要产生最终正文。"`。只有工具成功返回才保存真实 `id`，不得凭空生成任务编号。
+3. 用 `schedule_state_write` 保存配置和入口编号，再通过 `schedule_task_list` 回读 `id`、时区、时间和 `scheduledAt`，回复已实际创建的编号及下次执行时间。不能只答应以后执行；写状态失败时保留返回编号，回读并重试，避免重复创建。
+4. 查询时回读任务、状态及 `schedule_task_executions`（传所需 `id` 与有界 `limit`），分别说明定时配置、Agent 执行结果和发送结果；执行完成不能证明企业微信已送达。
+5. 用户要求停止时，先把状态中的活动夜晚置为 `done=true`、`reason="user_stopped"` 并保存，再调用 `schedule_task_delete` 删除入口、复查和截止任务。回读确认；删除不能撤回已排队执行，迟到执行仍要读 `done`。
 
-两件事直接决定配置：
+## 有界状态
 
-1. **整个重启扫描只要约 3 分钟**（23:38 → 23:41）。23:40 起跑只能抓到尾巴，正常夜里
-   大概只会发出一条"完成"消息。想看到完整进度就把 `WINDOW_START` 提前到 **23:35**
-   （推荐）。本 skill 默认按需求写的 23:40。
-2. **写入进程在 23:38 前不产出数据**。所以 23:35~23:38 的检查会看到陈旧批次 —— 这
-   不是故障，必须静默等待（见下面的 warmup 阶段），绝不能因此告警。
+全部状态通过 `schedule_state_read` / `schedule_state_write` 保存，不使用 shell、文件读写工具或聊天记忆替代。每次写入必须传上次读取的 `expected_revision`；返回 `state_conflict` 时重新读取、合并自己已取得的证据，不覆盖其他执行的收尾标志或重新派发已有进程检查。`value=null` 表示清理，但活动夜晚及迟到执行可能引用的完成标志必须保留。
 
-## 触发方式
+使用一个 `workflow="preopen-watch"` JSON 记录：`version`、`entryTaskId`、`settings`、`night`。`settings` 保存明确业务配置：`freshSeconds=180`、`stallRepeats=3`、`productsPerCheck=2`、`retries=3`、`processWaitSeconds=180`、`maxDetailRows=200`、`evidenceStart="23:30:00"`，以及预期排除产品 `["GSLS4","JPMLS2","MSLS2","SHORTMSBOXLS1","SHORTMSBOXLS2","UBSLS2"]`。用户要求改变配置时明确回读保存的值，不私自放宽检测口径。
 
-harness 在窗口内每分钟触发一次本 skill，每次是**独立的一次执行**，状态靠状态文件
-延续（不要做成一个跑一小时的长任务：那样进程一崩整夜就没人看着了）。
+`night` 保存目标自然日、带时区的开始/截止时间、`done`、结束原因、复查/截止任务编号、是否已首报、最后有效批次摘要、上一有效待开启集合、连续次数、已告警集合、排查队列及各 colo 的证据。队列项记录产品、colo、`run_id`、派发时间、阶段及失败次数。只保存监控汇总和最小证据摘要，最多 200 个待开启明细身份，最多 20 个产品的近期已结束证据，每条摘要不超过 160 字符；活动排查编号及状态另外保留，超出时保存完整计数及截断标志，不丢弃活动 `run_id` 或完成标志。状态超出工具限制时先缩短已结束证据，仍失败则报告无法保存并停止派发新取证。
 
-```
-# 每个自然日 23:40-23:59；进入流程前核验明天是否交易日
-40-59 23 * * *
-# 每个自然日 00:00-00:30；进入流程前核验今天是否交易日
-0-30 0 * * *
-```
+## 每日入口与跨午夜恢复
 
-**这个 cron 不判断交易日。** 每次触发都要先用交易日历核验目标自然日，休市日不进入
-守护流程。这里的 23:40～00:30 是定时守护区间，属于直接查询所用的 23:30～次日 01:00
-有效判断窗口；定时守护可以只覆盖其中一段。
+使用执行消息提供的实际当前时间和 `Asia/Shanghai`，不得把计划触发时间当作当前时间。先读取状态；存在未结束夜晚时先恢复它，超过截止则收尾。新夜晚的目标由本次入口的 `scheduledAt` 在北京时间的自然日期加一天确定；这个日期只用于归属，不作为当前执行时间。星期日晚上检查星期一，星期五晚上不跳到星期一。日历调用 `mcp__bssh-ops-remote__get_trading_calendar`，`at="{目标日}T12:00:00+08:00"`。只有返回 `date` 等于目标日、`estimated=false` 且 `is_trading_day=true` 才确认交易日。休市静默结束；日历失败、估算或字段不符则报告未核验，不按星期或 `next_trading_day` 推断。
 
-## 前置条件
+在每日入口中先保存目标日和截止（目标日 `00:30:00+08:00`）。如果实际执行时刻已到截止，核验日历后直接收尾，不创建过去的任务或以当前批次追认完成。对于仍在窗口内的待核验日历或已核验交易日，先通过 `schedule_task_create` 创建截止任务，`title="预开启守护：{目标日}截止"`，`at={"date":"{目标日}","time":"00:30:00","time_zone":"Asia/Shanghai"}`；再创建 `every_seconds=60`、`expires_at="{目标日}T00:30:00+08:00"` 的复查任务，`title="预开启守护：{目标日}复查"`。距截止不足或等于 60 秒时，仅创建截止任务并执行本轮检查，不创建首个时点已越过截止的复查。截止任务不设置 `expires_at`，以便服务停机后仍可补执行；复查任务到期后不再开始新检查。两者的 prompt 均要求加载本 Skill、使用固定目标日、先读取 `night.done` 和实际时刻，截止任务执行收尾，复查任务执行下述检测；无需播报时不产生最终正文。每创建一个任务立即保存返回编号并回读；失败报告缺少哪个保障，保留已创建任务，不伪称完整启用。
 
-- MCP server `bssh-ops` 已挂载，能调 `check_daily_preopen`（在有些 harness 里名字是
-  `mcp__bssh-ops-remote__check_daily_preopen`）。该工具**只读**、不连 colo，任何失败都可以
-  安全重试。
-- 同一 MCP server 提供 `get_trading_calendar`，用于核验目标自然日。结果
-  `estimated=true` 时不能确认节假日交易状态，本次不进入守护流程。
-- 企业微信机器人 webhook 放在环境变量 `WECOM_WEBHOOK_PREOPEN` 里。
-  **绝对不要把 webhook 或 key 写进本文件、状态文件、消息正文或日志。**
-- 状态文件目录可写（`STATE_DIR`）。
+任务创建和状态保存不是原子操作。恢复时先按目标日标题从 `schedule_task_list` 找回已有任务，再补缺失编号；不得因状态缺编号就创建第二个相同任务。每次执行先检查 `done` 和目标日一致；已结束或旧目标的迟到 tick 不查询业务工具、不输出正文。超截止只收尾，不把截止后的当前批次当作当夜完成。
 
-## 配置常量
+日历未核验时每分钟继续核验但不调用生产检测；成功核验休市则保存结束标志并删除当夜任务。整夜未核验同样在截止报告原因。新夜开始时清理上一夜任务，再替换上一夜摘要，保留入口。重新启动后由持久 Schedule 恢复到期执行；整夜错过窗口时先核验对应自然日，再报告未取得当夜有效数据，不追认完成。
 
-| 常量 | 默认 | 说明 |
-|---|---|---|
-| `WINDOW_START` | `23:40` | 目标交易日前一自然日的起跑时刻。**推荐 23:35**，理由见上面的时间线 |
-| `WINDOW_END` | `00:30` | 目标交易日当天的硬截止。到点仍未完成就发最终告警并收尾 |
-| `STALL_REPEATS` | `3` | 同一个未开启集合连续出现这么多次就告警 |
-| `FRESH_MAX_AGE_SECONDS` | `180` | `age_seconds` 超过就认为写入进程没在产出 |
-| `WARMUP_QUIET_CHECKS` | `5` | warmup 阶段容忍这么多次陈旧检查，全程静默 |
-| `WARMUP_DEADLINE` | `23:50` | 过了这个点还是陈旧，就发一条"写入进程未产出" |
-| `MAX_DETAIL_ROWS` | `200` | 传给工具的明细上限 |
-| `LIST_THRESHOLD` | `30` | 未开启行数不超过这个数就逐条列出，否则只给汇总 |
-| `EXPECTED_EXCLUDED` | 见下 | 允许被排除的产品名单 |
+## 检查与报告
 
-`EXPECTED_EXCLUDED`（2026-09-22 实测的 6 个，全是 `Index=LS`）：
-`GSLS4`、`JPMLS2`、`MSLS2`、`SHORTMSBOXLS1`、`SHORTMSBOXLS2`、`UBSLS2`
+23:40 入口安排好续查后立即调用 `mcp__bssh-ops-remote__check_daily_preopen`，`max_detail_rows` 使用保存的配置，首轮直接报告。以后每分钟检查；无需报告的未变化结果不生成最终正文，由渠道保持静默，不调用额外发送工具。
 
-## 工具返回里要用到的字段
+沿用[预开启状态检查](../pre-open-status-check/SKILL.md)的必要字段验证、完成优先级与 Markdown 汇总格式，添加检查时间；完成报告保留其中全部 13 个字段是否为 0 的逐项判断。`pending_rows`、`pending_products` 为完整计数，行数不等于产品数。确认完成要求范围非空、`pending_rows=0`（每行全部预开启重置字段为 0，字段见预开启状态检查）、批次为当天数据且延迟不超过 `freshSeconds`、上一批比对完成、无缺失记录且排除名单已核验。非预期排除或排除明细截断阻止确认；上报卡住单独提示零值可能陈旧，不代表实际就绪。
 
-`check_daily_preopen(max_detail_rows=200)` 返回：
+上一批比对完成且缺失为 0 时省略比对说明。存在缺失或未能比对时才说明原因。工具失败、旧数据、空范围不得报告完成；监控恢复继续检查。首次、进度变化、异常首次出现或恢复、停滞告警、取证新结果和收尾时输出；相同异常不每分钟重复。完成时先保存 `done=true` 与完成摘要，再删除复查和截止任务，最后输出完成报告；状态保存失败不能宣布守护结束。
 
-- `pending_rows` / `pending_products` / `pending` —— **还没开启的**，这是本流程唯一的
-  异常类别。
-- `ready` —— `pending_rows == 0` 且范围非空，即全部开启成功。
-- `total_rows` / `total_products` —— 检查范围（已排除无数据文件的行）。
-  `batch_rows` 是排除前的原始行数。
-- `no_data_file` / `no_data_file_products` —— **被自动排除的那几个 LS 产品**。
-  需求里"除了几个过滤的 LS 产品"由工具自己做掉了，本 skill 只负责核对名单没变。
-- `not_reporting` / `not_reporting_rows` —— 有文件但上报卡住（`Time` 落后超过 1 小时）。
-  **按约定不算预开启异常**，只在消息里附一句。
-- `create_time` / `age_seconds` / `is_today` —— 批次时效。
-- `missing_rows` / `previous_batch_compared` —— 与上一批比对出的整行消失。
-- `warnings` —— 中文告警文案，可以直接摘进消息。
+## 停滞后的只读排查
 
-## 状态文件
+只有日历已核验、字段有效、数据新鲜且范围非空的检查参与停滞计数。待开启集合用排序后的完整行身份 `(NAME, Index, Colo, Exchange)` 比较，不能只比较数量或产品名；同一批数据重复读取不增加次数。`pending_truncated=true` 或明细不完整时无法确认集合相同，重置连续次数并说明排查仅覆盖返回产品。无效检查打断连续有效检查。
 
-`{STATE_DIR}/preopen-watch-{session}.json`。
+同一集合连续 `stallRepeats` 次不变时告警，按 `NAME` 去重建队列；下一轮开始，每轮最多推进 `productsPerCheck` 个产品。同一已告警集合不重复建队列。集合变化时保存证据、停止推进旧队列，但保留正在运行的 `run_id` 直到终态，不把旧结果播报为当前原因。
 
-`session` 取**目标交易日**（本地时间 12:00 之后取次日日期，之前取当日日期），这样
-跨午夜前后同一夜用的是同一个键。
+每个产品先从 `pending` 确认全部 colo，遵循[单产品排障](../bssh-ops/SKILL.md#单产品预开启异常排障)。首次调用 `mcp__bssh-ops-remote__check_process_status` 后立即保存 `run_id` 和派发时间；后续只用 `mcp__bssh-ops-remote__get_run_status` 查询该编号。仍在运行等待下一轮；轮询失败保留编号重试；等待超过 `processWaitSeconds` 记录未完成，不重新派发。若工具返回编号后保存失败，保留该编号并重试保存，停止进一步派发；不能声称重启安全或推测已执行的调用没有执行。
 
-```json
-{
-  "session": "2026-09-22",
-  "phase": "warmup",
-  "checks": 0,
-  "stale_checks": 0,
-  "warmup_notified": false,
-  "baseline_pending_rows": null,
-  "baseline_at": null,
-  "last_signature": null,
-  "repeat_count": 0,
-  "alerted_signature": null,
-  "excluded_alerted": false,
-  "done": false
-}
-```
+进程检查为整机口径，其他产品的进程不能证明本产品启动。只用产品专属日志或 portfolio 文件名的明确线索识别；未识别写“进程输出未确认该产品”，不能据此宣称未启动。进程存在也不能替代监控判据。
 
-`phase`：`warmup`（等写入进程产出）→ `tracking`（盯进度）→ `done`（已收尾）。
+对每台 colo 用 `mcp__bssh-ops-remote__get_strategy_start_errors` 取报错匹配数，先用 `mcp__bssh-ops-remote__list_colo_file_resources` 确认 `strategy_log`，再用 `mcp__bssh-ops-remote__stat_colo_file` 保存大小、修改时间及行数。每台分别记录成功、失败和仍缺证据；部分机器成功不能把整个产品记为成功。读取被拒绝时停止该文件取证，不换工具或路径绕过。
 
-**变化签名** `signature = "{pending_rows}|{pending_products}|{sha1(逐行 NAME|Colo|Exchange 拼接)}"`，
-行取工具返回的 `pending` 列表（已按 `Index, NAME, Colo, Exchange` 排序）。
+仅日期、时间和明确时区完整且落在前夜 `evidenceStart` 至取证时刻的日志行属于当夜报错；早于窗口为历史报错；缺日期、缺时区或晚于取证时刻为时间未确认。匹配数只是辅助证据；数量、大小或行数减少、文件替换或截断时标记基线不可比并重新记录，不能把轮转或旧 `failed` 当成当夜故障。只保存摘要和实际文件/行号，证据不足写“原因未确认”。
 
-> 已知边界：`pending` 超过 `MAX_DETAIL_ROWS` 时列表被截断，签名只覆盖前 200 行。此时
-> 仍有 `pending_rows`/`pending_products` 参与签名，所以唯一漏判的情形是"第 200 行之后
-> 恰好一个开启、另一个关闭、两个计数都不变" —— 这种下一分钟就会暴露，可以接受。
+只读取证失败保留队列，到 `retries` 次后报告“自动排查未完成”及尚缺证据并结束该项；正在运行不是失败。排查结束不等于预开启完成，继续监控。进一步定位可调用 `mcp__bssh-ops-remote__search_colo_file`、`mcp__bssh-ops-remote__read_colo_file_range` 或 `mcp__bssh-ops-remote__download_portfolio_from_colo` 读取允许的最小片段，不把示例报错当作真实结论。
 
-## 每次触发的判定流程
+## 00:30 收尾和输出恢复
 
-严格按顺序执行，每一步的"退出"都表示本次触发结束、不发任何消息。
+截止任务和任意迟到复查都先检查结束标志。未结束时无论是否进入有效数据跟踪都收尾：整夜无有效批次、监控中断、仍待开启、缺失或比对未完成分别说明原因，保留最后有效时间、待排查数量和各 colo 最近证据。已完成夜晚不重复收尾；先持久保存 `done=true` 和最终摘要，再删除当夜任务，再输出一条最终报告。
 
-1. **算 session**。用 `get_trading_calendar(at="{session}T12:00:00+08:00")`
-   核验：`date` 不等于 session、工具失败、`estimated=true` 或
-   `is_trading_day` 不为 true 时静默退出；不得按星期推断或改用
-   `next_trading_day` 延长前夜。确认交易日后载入状态文件；不存在就初始化。
-2. `done` 为 true → 退出（本夜已收尾）。
-3. 当前时间到达或超过 `WINDOW_END` → 若 `phase == "tracking"` 且未完成，发**最终告警**
-   （模板 D，理由写"到达窗口截止仍未确认完成"）；置 `done=true`，保存，退出。
-4. 调 `check_daily_preopen(max_detail_rows=200)`。`checks += 1`。
-   - 工具抛错 → 不发消息、不改签名，只 `stale_checks += 1` 后退出（只读操作，下一分钟
-     自然重试）。**连续 5 次抛错**才发一条模板 E 提示。
-5. **新鲜度门控**：`create_time` 为 null、`is_today=false` 或
-   `age_seconds > FRESH_MAX_AGE_SECONDS`
-   → 写入进程没在产出：
-   - `stale_checks += 1`。
-   - 若 `phase == "warmup"`：当前时间过了 `WARMUP_DEADLINE` 且 `warmup_notified` 为
-     false → 发模板 E，置 `warmup_notified=true`。保存，退出。
-   - 若 `phase == "tracking"`：说明产出中途断了 → 发模板 E（写明"守护过程中写入进程
-     停止产出"），置 `warmup_notified=true`。保存，退出。
-6. 数据新鲜。`stale_checks = 0`，`phase = "tracking"`。
-7. **核对排除名单**：`no_data_file` 里出现了不在 `EXPECTED_EXCLUDED` 里的产品名，
-   且 `excluded_alerted` 为 false → 发模板 F，置 `excluded_alerted=true`。
-   （这一步不能省：一个真产品的 portfolio 文件消失时，它会被静默排除出检查范围，
-   于是"全部开启成功"里根本不包含它。）继续往下走。
-8. `total_rows == 0` → 范围内没有任何可检查的产品 → 发模板 D（理由写 `warnings` 里
-   那句），置 `done=true`，保存，退出。
-9. 算 `signature`。若 `baseline_pending_rows` 为 null → 记基线
-   （`baseline_pending_rows = pending_rows`、`baseline_at = create_time`）。
-10. **完成判定**：`ready=true` 时，若 `previous_batch_compared=false` 或
-    `missing_rows>0`，保存状态并退出，下一分钟复查；到截止仍未核验时按模板 D
-    报告原因。否则发**模板 B（完成）**，置 `done=true`，保存，退出。即使这是本夜
-    第一次检查（起跑晚了，扫描已经结束）也照样发，消息里注明没观测到基线。
-11. **未完成**，比较签名：
-    - `signature != last_signature` → **有变化**：发**模板 A（进度）**；
-      `last_signature = signature`、`repeat_count = 1`、`alerted_signature = null`。
-    - `signature == last_signature` → **无变化**：`repeat_count += 1`。
-      - `repeat_count >= STALL_REPEATS` 且 `alerted_signature != signature`
-        → 发**模板 C（停滞告警）**，置 `alerted_signature = signature`。
-      - 否则不发消息。
-    - 说明：`repeat_count` 从 1 起算（第一次看到这个集合算 1 次），所以"连续 3 次检查
-      结果相同"在第 3 次触发告警。告警对同一个集合**只发一次**，避免每分钟重复刷屏；
-      集合一变就恢复正常播报，再停滞会对新集合重新告警。
-12. 保存状态，结束。
+定时执行结果通过原智能机器人的渠道发送队列回到创建任务的会话；不需要 webhook 或新机器人。渠道负责持久发送与重试，取证失败、Agent 执行失败和消息发送失败分别记录，不能因发送失败重复取证。任务状态写入与最终回复、渠道入队不是同一事务；异常退出可能留下已结束状态但报告尚未送出。查询 `schedule_task_executions` 与渠道投递证据核验，不能仅凭 `done=true` 宣称群消息送达，也不能自动重复已回传报告。
 
-第 9 步先记基线、第 11 步才比签名，所以**本夜第一次检查不会发进度消息**——第一条
-进度消息恰好对应"第一批产品开启"之后的那次变化，符合"从开始有产品开启后才输出"。
-反过来，如果整夜一个产品都没开启，签名从不变化，第 3 次检查就会按第 11 步告警。
+## 输出与安全约束
 
-## 企业微信消息模板
-
-`POST $WECOM_WEBHOOK_PREOPEN`，body `{"msgtype":"markdown","markdown":{"content":"…"}}`。
-
-**正文上限 4096 字节**，务必按 `LIST_THRESHOLD` 截断：`pending_rows <= 30` 就逐条列，
-否则只给汇总 + 按 `Index` 分组的前若干项，并注明"仅列部分"。工具侧
-`pending_truncated` 为 true 时也要在消息里说明明细不全、计数才是完整的。
-
-> **明细里不要带 `TraderAccount`。** 企业微信群的消息会长期留存、可被转发，账户号放
-> 进去没有必要 —— `NAME` + `Colo` + `Index` + `Exchange` 已经足够定位到要处理的对象。
-> 这与本部署不外发敏感运行配置的约束一致。确有需要
-> 时再单独去查，不要默认外发。
-
-### A. 进度
-
-```markdown
-**预开启进度** · 09-22 交易日
-已开启 **1027** / 1107 行（505 / 571 产品）
-未开启 **80** 行 / 66 产品
-批次 23:40:12（3 秒前）
-```
-
-### B. 完成
-
-```markdown
-**预开启完成** ✅ · 09-22 交易日
-571 个产品 / 1107 行全部开启成功
-基线 23:40:12（80 行未开启）→ 完成 23:41:05，共 2 次检查
-已排除 6 个无数据文件产品（LS，在预期名单内）
-> ⚠️ HSDC1 上报卡住：Time 073000，落后约 16.5 小时，其 PnLratio=0 是陈旧值，不代表已就绪
-```
-
-`not_reporting_rows`、`missing_rows` 为 0 时对应的行就别写了。
-
-### C. 停滞告警
-
-```markdown
-**预开启异常** ❗ · 09-22 交易日
-连续 3 次检查（23:42 / 23:43 / 23:44）结果无任何变化，以下产品仍未开启：
-> MIX3 · HJ1 · csc-sz-12 (SZ)
-> MIX3 · HJ1 · csc-sh-12 (SH)
-> HS300 · DC51B · cicc-sz-3 (SZ)
-共 **12** 行 / 8 个产品 · 批次 23:44:05
-**不要用快捷命令 start/stop 处理**（那是整机级的，会影响同一台 colo 上的其他产品）。
-按 bssh-ops skill 的产品级操作或盘中改参流程走 preview → 确认 → execute。
-```
-
-### D. 最终告警（窗口截止 / 范围为空）
-
-同 C 的形式，标题写 `**预开启未确认完成** ❗`，并写明原因（到达 `WINDOW_END` 仍未
-确认完成，或范围内无可检查产品）。
-
-### E. 写入进程未产出
-
-```markdown
-**预开启守护：拿不到数据** ⚠️ · 09-22 交易日
-最新批次 2026-09-21 15:00:58（已过 30500 秒），写入进程没在产出监控数据。
-如果今晚不是交易日前夜，可以忽略；否则请检查 stock_production_monitor 的写入链路。
-本夜守护已停止。
-```
-
-### F. 排除名单异常
-
-```markdown
-**预开启守护：排除名单变了** ⚠️ · 09-22 交易日
-以下产品因为没有 portfolio 文件被排除出检查范围，但不在预期名单里：
-> LS · XXLS9 · cf-sh-2
-它们不会被计入"全部开启成功"，请确认是否应该纳入检查。
-```
-
-## 约束
-
-- **不得自动补救。** 本 skill 只观测和播报。发现未开启产品后要重启/改参，一律走
-  `preview_change_cfg_paras` → `deploy_change_cfg_paras`（规则 9）或
-  `preview_product_action` → `execute_product_action`（规则 2），保留人工确认。
-  **尤其不要**因为"很多产品都没起来"就去用白名单快捷命令的 `start`/`stop` —— 它们
-  不带产品参数、作用于整台 colo 上的全部产品（规则 5）。
-- 消息里不放 webhook、API key、账户密码、账户配置。
-- 一次触发最多发**一条**企业微信消息；上面的流程已经保证了这一点（每个分支都以
-  发一条或不发结束）。
-
-## 已知边界
-
-- `PnLratio == 0` 也是"产品没在上报"的样子（写入侧 `.fillna(0)` + 名册 `how='right'`
-  合并）。工具把无文件的行整行排除、把上报卡住的行放进 `not_reporting`，但按约定这两
-  类都不影响 `ready`。所以"全部开启成功"严格的含义是**检查范围内**全部开启成功，
-  播报时带上 `total_products` 而不要说"全部产品"。
-- 真实收益小于约 0.05bp 会被四舍五入成 `0.0`，即一个已经在跑并有微小盈亏的产品可能
-  被当成"已重置"。这个假阴性无法从这张表消除。
-- 整行从批次里消失的产品，`pending` 判据看不见；`missing_rows` 会报出来，但它在扫描
-  期间偶发（写入侧读到正在改写的文件），所以只附在消息里、不单独告警。
-- 状态文件是单机的。多实例同时跑会各自发一份消息 —— harness 侧要保证同一 session
-  只有一个执行者。
+- 每次执行最多输出一条业务报告，正文不超过 4096 UTF-8 字节，只使用企业微信 Markdown 的加粗、引用和换行。减少明细时注明截断，保留完整计数。
+- `TraderAccount`、账户配置、密钥、webhook、原始完整日志不进入状态或消息。
+- 自动流程只观察、取证和播报，不执行改参、下发、产品动作或重启。修复由用户选择方案，按 bssh-ops 的预览与显式确认执行；不得用整机 `start`/`stop` 补救单产品。

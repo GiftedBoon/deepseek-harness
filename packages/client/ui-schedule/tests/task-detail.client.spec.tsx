@@ -125,6 +125,7 @@ function mount(
       ok: true, value: { id: expected.id, updated: false, record: expected },
     })),
     onOpenSession: vi.fn(),
+    loadExecutions: vi.fn().mockResolvedValue({ ok: true, value: [] }),
     loadHistory: vi.fn<TaskManagerPageProps['loadHistory']>(async ({ id }) => ({
       ok: true, value: {
         id, records: [], earlierRecordsUnavailable: false,

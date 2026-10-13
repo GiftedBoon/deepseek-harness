@@ -1,5 +1,5 @@
 ---
-description: "Host-wide durable reminders and shared Session-bound task management."
+description: "Durable reminders, Agent-owned scheduled execution, and Session workflow state."
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Schedule delivers one-shot, fixed-rate, daily, weekly, and cron wall-clock reminders as follow-up messages in their original Session. Tasks remain available after Host restart, and each recurring task contributes only its latest missed occurrence. The Host restores a cold Session when delivery is due. Active and inactive tasks remain inspectable until explicit deletion, and deletion removes the task row together with its saved delivery records.
+Schedule executes user-requested tasks or delivers reminders in their original Session. Agents can retain bounded workflow state, arrange follow-up checks, and inspect durable execution results. One-shot, fixed-rate, daily, weekly, and cron wall-clock rules support both purposes. Tasks remain available after Host restart, and each recurring task contributes only its latest missed occurrence. The Host restores a cold Session when delivery is due. Active and inactive tasks remain inspectable until explicit deletion, and deletion removes the task row together with its saved delivery records.
 
 ## Table of Contents
 
@@ -35,6 +35,10 @@ The Agent receives `schedule_create`, `schedule_list`, `schedule_delete`, and `s
 | `daily` | `{"prompt":"Review today's tasks","title":"Daily review","daily":{"time":"23:00:00","time_zone":"Asia/Shanghai"}}` | Local wall-clock time in an explicit IANA zone. |
 | `weekly` | `{"prompt":"Review the week","title":"Weekly review","weekly":{"time":"09:00:00","time_zone":"Asia/Shanghai","weekdays":[1,3]}}` | Local wall-clock time on an explicit ISO weekday set in an explicit IANA zone. |
 | `cron` | `{"prompt":"Check the deploy","title":"Deploy check","cron":{"expression":"*/15 9-17 * * 1-5","time_zone":"Asia/Shanghai"}}` | Five-field Vixie cron expression evaluated in an explicit IANA zone. |
+
+Use `schedule_task_create` for automatic work; it accepts the same timing selectors as reminders and optional `expires_at`, an offset-bearing RFC 3339 cutoff strictly after the first target. The cutoff is fixed at creation, appears as normalized UTC `expiresAt` in task results, and suppresses new work at or after that instant without cancelling an already running turn. `schedule_task_list`, `schedule_task_update`, and `schedule_task_delete` manage executable tasks separately, and `schedule_task_executions` reads their bounded execution history. Each page accepts an explicit `limit` of 1 through 100 and an optional exclusive `before` execution-id cursor; pass the last returned id with the same task filter for the next page. Unknown, foreign, or pruned cursors reject with `invalid_rule`. The task retains the adapter selected at creation: the default Host adapter restores the original Session, while channel adapters retain their preset, permissions, and reply route. A missing saved adapter leaves work queued; Schedule never substitutes another adapter. Deletion cancels unstarted execution without retracting an already running turn.
+
+`schedule_state_read` and `schedule_state_write` retain JSON by Session and workflow key. Read returns revision zero and null for an absent key. Write requires the observed `expected_revision`; a conflict returns the current value for recomputation. Null clears the value but preserves the revision. `taskStateBytes` limits complete stored state records (default 65536 bytes), `taskWorkflowLimit` limits retained keys per Session including cleared keys (default 100), `taskExecutionBytes` limits complete execution records (default 131072 bytes), and `taskExecutionRecords` retains settled executions per task (default 200). Oversized results settle as failure rather than silently truncating output.
 
 Every creation must supply `title`, which names the task in the model views, the task list, the detail heading, and the reminder catalog. The title is trimmed and must remain non-empty and at most 120 characters; a missing, blank, or over-long title returns `invalid_prompt`. Creation never derives a title from the instruction. Decoding requires the stored title too: a record whose `title` is missing, blank after trimming, untrimmed, or over-long is rejected, so records written before titles existed are not read.
 
@@ -63,6 +67,8 @@ Every update is a complete-record compare-and-set inside the same FIFO as creati
 `ScheduleService` owns one version-1 `schedule` domain with globally unique task ids and one Host timer. Every task stores its Session binding, record, and `active` or `inactive` status together; only active tasks drive the timer. Stored records without a status normalize to `active`, without scanning or recreating historical Sessions. Management and dispatch writes share one FIFO. Updates compare the complete expected record and sample `Date.now()` inside that queue; one task put changes the rule, name, or instruction without replacing the binding or delivery history. Creation, deletion, and update recheck supplied cancellation after queueing, before persistence; once a write begins, cancellation does not roll it back. The timer rechecks the wall clock, including due members after Session restoration if the clock rolls backward, and segments delays beyond the platform timer limit. Due Every, Daily, Weekly, and Cron tasks for the same Session share one message; each task advances independently after the delivery decision. Successfully advanced tasks remain eligible for the next Host timer even if another batch member fails to persist.
 
 Delivery resolves the original Session through `sessionController.resolveAgent`. A plugin-sourced `followup()` synchronously appends the message to the Session inbox; successful Session flush acknowledges durable delivery. One task-row put then updates `lastDelivery`, appends the actual receipt and sent prompt snapshot to `deliveryHistory.records`, and stores the one-shot's `inactive` status or the recurring task's next target. Receipts contain the occurrence's `scheduledAt`, acknowledgment time `deliveredAt`, and `messageId`; they acknowledge inbox delivery, not model execution. Failed flush or task put publishes no new saved record. Session persistence and the task put are separate durable writes; a crash or task-write failure after Session flush can leave a delivered message unrecorded and deliver the same reminder again.
+
+Executable ownership, execution records, and workflow revisions live in the independent version-1 `schedule_execution` domain. Ownership commits before the timer row, fixing the named adapter for later recovery. Management writes and execution claims share the FIFO, while provider callbacks run outside it so an executing Agent can arrange follow-ups and save state. Each Session runs one scheduled execution at a time; repeated occurrences retain at most one queued execution per task, whose original execution and input ids survive coalescing. Expiry deactivates the timer and marks queued work interrupted with `interruptionReason: 'expired'`; deletion uses `'cancelled'`. These unstarted outcomes are distinct from uncertain work interrupted by unloading or a Host crash. Settlement prunes older execution history; failed and interrupted input ids remain in a separate durable table for the Session lifetime, so history pruning cannot make pending input executable again. Cold open rejects mismatched execution keys, duplicate input ids, inconsistent Session or adapter ownership, and invalid workflow revisions.
 
 The optional version-1 `deliveryHistory` stays in the task row so its oldest-first `records` and `earlierRecordsUnavailable` flag share the status and target commit. New tasks start with empty records and a false flag. Reading a task without history exposes only its existing `lastDelivery`, if any, with no prompt snapshot and a true flag; it neither rewrites the task nor reconstructs missing deliveries or prompts from Session logs or the current prompt. Future appends preserve that true flag and retain the existing receipt. Stored history rejects duplicate message ids or a latest receipt that differs from `lastDelivery`.
 
@@ -94,11 +100,11 @@ The `schedule.archiveAdmission()` effect answers the Workspace registry's archiv
 
 #### What the model sees
 
-The [generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-schedule) contains the descriptions and schemas for `schedule_create`, `schedule_list`, `schedule_delete`, and `schedule_update`, registered in live root Agent scopes while Schedule is loaded.
+The [generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-schedule) contains the descriptions and schemas for `schedule_create`, `schedule_list`, `schedule_delete`, and `schedule_update`, and the seven executable-task and workflow-state tools, registered in live root Agent scopes while Schedule is loaded.
 
 #### Token effect
 
-The four schemas contribute fixed request-context tokens while available. Stored tasks and browser catalog queries add no schema tokens.
+The eleven reminder, execution, and workflow-state schemas contribute fixed request-context tokens while available. Stored tasks and browser catalog queries add no schema tokens.
 
 #### KV Cache effect
 
@@ -146,6 +152,20 @@ Each delivery adds fixed framing and content-dependent payload tokens. A recurri
 
 Reminder messages append to the original Session's history and preserve earlier message content; they do not replace the existing request prefix.
 
+### Executable tasks in the original Session
+
+#### What the model sees
+
+Executable tasks enter as user-role messages with source kind `schedule`. Their framing includes the title, durable execution id, scheduled time, current time, and the instruction `Execute the following user-requested task with the current Session's tools and permissions.` The instruction remains user-level; existing tool guards and approval rules still apply.
+
+#### Token effect
+
+Each execution adds its framing and task instruction. Workflow state enters model context only through explicit tool reads and writes. Recurring work retains one running execution and at most one queued occurrence per task; newer due occurrences replace an unstarted queued occurrence.
+
+#### KV Cache effect
+
+Task messages and tool results append to Session history. Execution records and workflow state do not replace earlier model-visible content.
+
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -154,10 +174,11 @@ Reminder messages append to the original Session's history and preserve earlier 
 - Enqueue and task writes are not atomic, so crash recovery does not guarantee exactly-once delivery. A shutdown can repeat a delivery for the same reason: sibling fibers dispose concurrently, so the storage facility can close before the delivery drain writes its acknowledgment.
 - Deletion removes the task row together with its saved delivery records: future delivery stops, the task leaves `list` and `catalog`, and `history` no longer resolves it.
 - Old Session-log reminders require explicit recreation. Previously physically deleted tasks are not restored or fabricated.
-- Management edits are limited to active tasks. Pause, execution status, delivery outside the original Session, and a new Session for each run are not supported. Name, instruction, and timing updates are available to the model through `schedule_update` for its own Session, and to the Web detail for the selected task; a cross-Session relay workflow is not supported, product permission policy remains undecided, and the Session-binding check is not caller authorization.
+- Management edits are limited to active tasks. Pause, delivery outside the original Session, and a new Session for each run are not supported. Name, instruction, and timing updates are available to the model through `schedule_update` for its own Session, and to the Web detail for the selected task; a cross-Session relay workflow is not supported, product permission policy remains undecided, and the Session-binding check is not caller authorization.
 - Cron uses the five-field Vixie dialect, so the smallest interval is one minute and sub-minute scheduling is unsupported. Secondary expressions are not accepted: `L`, `W`, `#`, month or weekday names, `@daily`-style macros, and a seconds field are rejected. The stored record keeps only the canonical expression, so the exact spelling supplied at creation is not retained.
 - Daily, weekly, and cron future targets use the Host's current IANA data; decoding and restarting never recompute an already committed target. Only UTC target years 0001–9999 are supported; exhaustion retains the task as inactive after delivery.
 - Saved delivery records are pruned on append to the configured `deliveryHistoryDays` window, measured back from each receipt's `deliveredAt`, and to the `deliveryHistoryRecords` cap; the appended latest receipt always survives, and a pruned window marks the task's earlier records unavailable. The JSON backend stores the Schedule domain in one `schedule.json` document, so every task mutation rewrites all retained tasks and their histories, and the Host loads all retained history into memory. History pagination bounds returned record count, not storage growth, retained memory, prompt bytes, or write cost.
+- A restart marks uncertain running executions interrupted and refuses their saved inbox input before model entry. It never automatically repeats their side effects. The Host adapter reports committed outputs from the whole claimed turn, which can include injected or steering input; those outputs are not causally attributed to only the task. Interrupted work needs explicit inspection before creating a retry.
 - Tasks without saved history expose only their existing latest receipt until new deliveries append records. Unsaved earlier deliveries and prompt snapshots cannot be recovered; saved records do not establish model execution results.
 
 <a id="dev-note"></a>

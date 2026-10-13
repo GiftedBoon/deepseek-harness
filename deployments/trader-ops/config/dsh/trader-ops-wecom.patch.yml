@@ -31,7 +31,7 @@
         path: !!js (process.env.DSH_HOME ?? '/var/lib/deepseek-harness') + '/profiles/' + (process.env.TRADER_OPS_PROFILE ?? 'web') + '/agent-presets/trader-ops-wecom/preset.cordis.yml'
 
     - id: trader-ops-wecom-channel
-      name: '@deepseek-ai/dsh-channel-wecom'
+      name: '../../../../packages/channel/channel-wecom/lib/index.js'
       inject: [traderOpsWeComPresetReady]
       disabled: !!js process.env.TRADER_OPS_WECOM_ENABLED !== '1'
       config:
@@ -43,6 +43,7 @@
         permissionPreset: trader-ops-wecom
         allowedUsers: !!js (process.env.WECOM_ALLOWED_USERS ?? '').split(',').map(value => value.trim()).filter(Boolean)
         allowedChats: !!js (process.env.WECOM_ALLOWED_CHATS ?? '').split(',').map(value => value.trim()).filter(Boolean)
+        notificationChatId: !!js (() => { const chats = (process.env.WECOM_ALLOWED_CHATS ?? '').split(',').map(value => value.trim()).filter(Boolean); return process.env.TRADER_OPS_PREOPEN_CHAT_ID ?? (chats.length === 1 ? chats[0] : undefined); })()
         groupConversationMode: !!js process.env.WECOM_GROUP_CONVERSATION_MODE ?? 'shared'
         scheduledActionUtcOffset: '+08:00'
         # Targets are not restricted to a colo list. The pattern rejects only

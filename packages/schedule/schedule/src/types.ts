@@ -5,10 +5,17 @@
 
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type {} from '@deepseek-ai/dsh-session/types'
 // Type-only: the Workspace registry's archive-admission family map this plugin merges `schedule` into.
 import type {} from '@deepseek-ai/dsh-workspace/types'
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'schedule': { kind: 'schedule' } & ContextFormed
+  }
+}
 
 /** Stable globally unique reminder identity. */
 export type ScheduleId = Branded<'ScheduleId'>
@@ -211,6 +218,10 @@ export interface ScheduleDeliveryRecord extends ScheduleDeliveryReceipt {
 
 /** Browser-safe retained reminder with its original Session binding. */
 export type ScheduleCatalogEntry = ScheduleRecord & {
+  /** Executable tasks use the stored Session executor; absence denotes a reminder. */
+  readonly purpose?: 'task'
+  /** Executable task expiry; no new execution begins at or after this UTC instant. */
+  readonly expiresAt?: string | undefined
   /** Session receiving this reminder when it becomes due. */
   readonly sessionId: SessionId
   /** Inactive reminders remain visible but never schedule another delivery. */
@@ -469,5 +480,85 @@ declare module '@deepseek-ai/cordis' {
      * @mode emit
      */
     'schedule/changed'(): void
+  }
+}
+
+/** Stable identity of one admitted scheduled execution. */
+export type ScheduleExecutionId = Branded<'ScheduleExecutionId'>
+
+/** Bounded JSON value retained for an Agent workflow. */
+export type ScheduleJson = null | boolean | number | string | ScheduleJson[] | { [key: string]: ScheduleJson }
+
+/** One revision of state scoped to a Session and workflow name. */
+export interface ScheduleWorkflowState {
+  readonly workflow: string
+  readonly revision: number
+  readonly value: ScheduleJson
+}
+
+/** Durable execution facts; output belongs to the executor's documented interval. */
+export interface ScheduleExecution {
+  readonly providerId: string
+  readonly id: ScheduleExecutionId
+  readonly scheduleId: ScheduleId
+  readonly sessionId: SessionId
+  readonly title: string
+  readonly prompt: string
+  readonly scheduledAt: string
+  /** No new work begins at or after this UTC instant; already started work may settle. */
+  readonly expiresAt?: string | undefined
+  readonly createdAt: string
+  readonly status: 'queued' | 'running' | 'completed' | 'failed' | 'interrupted'
+  /** Distinguishes suppressed unstarted work from uncertain started work. */
+  readonly interruptionReason?: 'cancelled' | 'expired' | 'unloaded' | 'crash' | undefined
+  readonly inputMessageId: MessageId
+  readonly messageIds?: MessageId[] | undefined
+  readonly output?: string | undefined
+  readonly error?: string | undefined
+}
+
+/** Executable creation with an optional absolute cutoff independent of its recurrence. */
+export interface ScheduleTaskCreateRequest extends ScheduleCreateRequest {
+  /** Offset-bearing RFC 3339 cutoff, strictly later than creation and the first target. */
+  readonly expires_at?: string
+}
+
+/** Executable timing and optional fixed cutoff returned to its owner. */
+export type ScheduleTaskRecord = ScheduleRecord & { readonly expiresAt?: string }
+
+/** Settlement supplied by the Session's execution provider. */
+export interface ScheduleExecutionOutcome {
+  readonly status: 'completed' | 'failed' | 'interrupted'
+  readonly interruptionReason?: 'cancelled' | 'expired' | 'unloaded' | 'crash' | undefined
+  readonly inputMessageId?: MessageId | undefined
+  readonly messageIds?: MessageId[] | undefined
+  readonly output?: string | undefined
+  readonly error?: string | undefined
+}
+
+/** Channel or application adapter retaining its Session's preset, authority, and result routing. */
+export interface ScheduleTaskExecutor {
+  /** Stable adapter identity; persisted tasks never fall back to another adapter. */
+  readonly id: string
+  /**
+   * @param sessionId - Original owner.
+   * @returns Whether this adapter owns execution for the Session.
+   */
+  accepts(sessionId: SessionId): boolean
+  /**
+   * @param execution - Persisted admission.
+   * @param signal - Cancellation on unloading.
+   * @returns Settlement after owned work is quiescent.
+   */
+  execute(execution: ScheduleExecution, signal: AbortSignal): Promise<ScheduleExecutionOutcome>
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    /**
+     * Execution admission or settlement committed. Listener failures do not affect execution. @mode emit
+     * @param execution - Complete persisted execution.
+     */
+    'schedule/execution'(execution: ScheduleExecution): void
   }
 }

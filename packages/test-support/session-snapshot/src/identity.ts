@@ -2,10 +2,10 @@
 
 const UUID_FRAGMENT_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
 const LEGACY_TOKEN_RE = /^\{\{(?:sessionId|messageId)\}\}$/
-const CANONICAL_TOKEN_RE = /^\{\{(session|message|approval|workflow|command|rpc|retry|id):([1-9]\d*)\}\}$/
+const CANONICAL_TOKEN_RE = /^\{\{(session|message|approval|workflow|command|rpc|retry|schedule|execution|id):([1-9]\d*)\}\}$/
 const ID_KEY_RE = /(?:^id$|Id$|Ids$)/
 
-type IdentityKind = 'session' | 'message' | 'approval' | 'workflow' | 'command' | 'rpc' | 'retry' | 'id'
+type IdentityKind = 'session' | 'message' | 'approval' | 'workflow' | 'command' | 'rpc' | 'retry' | 'schedule' | 'execution' | 'id'
 
 interface ParsedLog {
   readonly records: Record<string, unknown>[]
@@ -69,6 +69,27 @@ export function redactSessionSnapshotIds(logs: readonly string[]): string[] {
     if (header?.type === 'session') claim(header.id, 'session', true)
   }
 
+  const scheduleCalls = new Set<string>()
+  for (const log of parsed) {
+    for (const record of log.records) {
+      if (record.type === 'tool/call' && isRecord(record.data)
+        && typeof record.data.name === 'string' && record.data.name.startsWith('schedule_task_')
+        && typeof record.data.callId === 'string') scheduleCalls.add(record.data.callId)
+    }
+  }
+
+  const collectSchedule = (value: unknown): void => {
+    if (Array.isArray(value)) { for (const item of value) collectSchedule(item); return }
+    if (!isRecord(value)) return
+    for (const [key, item] of Object.entries(value)) {
+      if (typeof item === 'string') {
+        if ((key === 'id' || key === 'scheduleId') && item.startsWith('schedule-')) claim(item, 'schedule')
+        if (key === 'id' && item.startsWith('execution-')) claim(item, 'execution')
+      }
+      collectSchedule(item)
+    }
+  }
+
   const collect = (value: unknown, recordType?: unknown): void => {
     if (typeof value === 'string') {
       for (const match of value.matchAll(/\bas message ([0-9a-f-]{36})\b/gi)) claim(match[1], 'message')
@@ -83,6 +104,23 @@ export function redactSessionSnapshotIds(logs: readonly string[]): string[] {
 
     const identifiedMessage = messageId(value)
     if (identifiedMessage !== undefined) claim(identifiedMessage, 'message')
+    if (isRecord(value.source) && value.source.kind === 'schedule' && Array.isArray(value.content)) {
+      for (const block of value.content) {
+        if (!isRecord(block) || block.type !== 'text' || typeof block.text !== 'string') continue
+        const execution = /^Execution: (execution-[0-9a-f-]{36})$/mu.exec(block.text)?.[1]
+        if (execution !== undefined) claim(execution, 'execution')
+      }
+    }
+    if (recordType === 'tool/result' && typeof value.toolCallId === 'string'
+      && scheduleCalls.has(value.toolCallId) && Array.isArray(value.content)) {
+      for (const block of value.content) {
+        if (!isRecord(block) || block.type !== 'text' || typeof block.text !== 'string') continue
+        try { collectSchedule(JSON.parse(block.text)) } catch (error: unknown) {
+          // Non-JSON tool errors contain no declared task identifiers.
+          if (!(error instanceof SyntaxError)) throw error
+        }
+      }
+    }
     for (const [childKey, item] of Object.entries(value)) {
       if (recordType === 'approval/asked' || recordType === 'approval/decided') {
         if (childKey === 'id') claim(item, 'approval')

@@ -79,6 +79,8 @@ export interface Config {
   allowedUsers: string[]
   /** Exact admitted group ids, with `*` as an explicit wildcard. */
   allowedChats: string[]
+  /** Exact allowlisted group receiving Host-generated notifications; omission disables the notification service. */
+  notificationChatId?: string
   /** Prefix used for newly created Session titles. */
   sessionTitlePrefix?: string
   /** Maximum wait for the first successful SDK authentication. */
@@ -126,6 +128,7 @@ export const Config: z<Config> = z.object({
   groupConversationMode: z.union(['shared', 'per-user']).default('shared'),
   allowedUsers: z.array(z.string()).required(),
   allowedChats: z.array(z.string()).required(),
+  notificationChatId: z.string(),
   sessionTitlePrefix: z.string().default('WeCom'),
   connectTimeoutMs: z.number().min(1).default(15_000),
   streamFlushIntervalMs: z.number().min(1).default(250),
@@ -174,4 +177,4 @@ export const Config: z<Config> = z.object({
 })
 
 /** Config after Schemastery defaults have been applied. */
-export type ResolvedConfig = Required<Config>
+export type ResolvedConfig = Required<Omit<Config, 'notificationChatId'>> & Pick<Config, 'notificationChatId'>

@@ -1,0 +1,18 @@
+{
+  "replies": [
+    "用户回复",
+    "用户回复"
+  ],
+  "notifications": [
+    {
+      "target": "user",
+      "content": "定时检测完成"
+    }
+  ],
+  "provider": "wecom",
+  "status": "completed",
+  "output": "定时检测完成",
+  "inputRecorded": true,
+  "outputRecorded": true,
+  "taskEnded": true
+}

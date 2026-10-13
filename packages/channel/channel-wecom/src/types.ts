@@ -1,5 +1,16 @@
 /** Internal enterprise WeCom message and transport values. */
 
+
+/** Host-generated Markdown notifications using the channel's existing connection and durable outbox. */
+export interface WeComNotifications {
+  /**
+   * Persist a report for the configured exact allowlisted group.
+   * @param content - Markdown bounded by the channel's reply byte limit.
+   * @returns Resolves after durable queue admission, not provider receipt; rejects on storage failure or disposal.
+   */
+  enqueue(content: string): Promise<void>
+}
+
 /** Supported conversation ownership for group messages. */
 export type GroupConversationMode = 'shared' | 'per-user'
 

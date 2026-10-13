@@ -41,6 +41,8 @@ Declare the configured Agent preset through `dsh-agent-preset` in the Host compo
 
 Provider and resource controls are configurable: initial authentication timeout, stream flush interval, UTF-8 input/reply limits, Agent-turn timeout, delivery retention/count, outbox retry interval, maximum periodic retry attempts, undelivered-outbox retention, scheduled-action count and horizon, background execution timeout, and the fixed UTC offset for time-only requests. `maxReplyBytes` cannot exceed WeCom's 20,480-byte stream limit. `workspacePath` must be an existing absolute directory.
 
+`notificationChatId` selects one exact `allowedChats` entry for Host-generated reports and rejects `*` or an unlisted group at activation. When configured, the connected plugin publishes `ctx.weComNotifications.enqueue(content)`, which resolves after durable outbox admission; delivery uses the existing intelligent-bot connection and retry limits, without an Agent turn or webhook. Disposal removes the service and rejects further admissions. Queue admission does not acknowledge provider delivery.
+
 `scheduledActions` is empty by default. Each configured entry maps one stable action id to an exact registered tool, static lossless-JSON arguments, one top-level argument that receives the requested target, and an anchored target-validation expression. `targetArgumentFormat` defaults to `scalar`; use `singleton-array` when the downstream tool expects a one-element target array. An optional `input` maps the model-facing `scheduled_action_create.input` string to one additional top-level tool argument, applies a required UTF-8 byte limit and optional anchored pattern, and persists the exact value until dispatch. The model cannot replace the configured tool or static arguments.
 
 ```yaml
@@ -94,6 +96,8 @@ The first passive reply is `messages.processing`; later cumulative updates conta
 
 When `scheduledActions` is non-empty, mapped Agents receive `scheduled_action_create`, `scheduled_action_list`, and `scheduled_action_delete`. An explicit RFC 3339 `at` value keeps its own offset; a time-only `HH:mm[:ss]` value resolves to its next occurrence under `scheduledActionUtcOffset`, so the model does not need a shell or clock tool. Creation durably records any validated dynamic input and then commits the allowlisted action before arming a timer, so disposing the per-delivery Agent does not cancel it. At the due time the channel resolves the current allowlist, requires its fingerprint to match the creation-time definition, and invokes the configured tool through the ordinary global policy and guard pipeline. The result enters the durable outbox before the task and input are removed. Startup rearms pending tasks, removes orphan inputs, and reports a recovered `running` task as uncertain without executing it again because the prior side effect may already have happened.
 
+Executable [Schedule tasks](../../schedule/schedule/README.md) bind to the mapped Session's `wecom` executor. They queue behind human messages, create or resume the same Agent preset and confined permission preset, and persist their exact input and committed assistant output before settlement. Reports use the original conversation route and bot connection, independently of `notificationChatId`; execution and each report retry require that user or group to remain explicitly allowlisted. Successful empty output and cancelled or expired unstarted tasks remain silent. The independent `channel_wecom_task_reports` domain records outbox admission and delivery so restart retries unsent results without rerunning the Agent. Reports and receipts expire under `outboxRetentionMs`; startup pages through all retained executions per conversation in requests of at most 100 records. A provider acceptance followed by process loss before its receipt commits can duplicate a report because the provider has no idempotent-send acknowledgment.
+
 <a id="security"></a>
 ## Security
 
@@ -106,7 +110,7 @@ Use explicit user and group allowlists in production. Keep `sessionKeyEnv` disti
 
 #### What the model sees
 
-The model sees the admitted WeCom text as one ordinary user-role message with `source.kind: "user"`. Transport ids, BotID, allowlist data, placeholders, and retry state are not model-visible. Existing Session history supplies prior conversation context.
+The model sees the admitted WeCom text as one ordinary user-role message with `source.kind: "user"`. Transport ids, BotID, allowlist data, placeholders, and retry state are not model-visible. Existing Session history supplies prior conversation context. Executable tasks enter a logged user-role message with `source.kind: "schedule"` containing their title, execution identifier, timing, and configured instruction.
 
 #### Token effect
 
@@ -125,7 +129,7 @@ Resuming the same mapped Session preserves its reusable conversation prefix. Cha
 - **Credential reload requires reconnection** — bot secret and Session identity key are resolved at plugin activation; rotate them by reloading the plugin.
 - **Bounded reply projection** — replies longer than `maxReplyBytes` are truncated with an ellipsis; tools and reasoning are not rendered into WeCom.
 - **No inbound durable queue before admission** — the official SDK owns reconnect behavior, while provider callbacks that never reach this process cannot be replayed by DSH.
-- **Scheduled results are channel notifications** — background results are sent to WeCom and audited by the invoked tool, but are not inserted into the Session as model-authored conversation history.
+- **Scheduled action results are channel notifications** — allowlisted direct actions are audited by their tools; executable Agent tasks retain ordinary model and tool history in their Session.
 - **An undelivered notification waits for its conversation** — a notification the provider refuses while the conversation is idle is delivered when that conversation next writes in, and is removed once `outboxRetentionMs` passes without a delivery.
 
 <a id="dev-note"></a>

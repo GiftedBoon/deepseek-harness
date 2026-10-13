@@ -18,11 +18,11 @@
   en: 7c2fbf94426d22e2
   zh: d604d0d6bb121875
 /deepseek-ai-dsh-channel-wecom/configuration:
-  en: bac908cdef285e71
-  zh: 17ea7c84b5d4ae6d
+  en: ec4b3b3f75790616
+  zh: bb062d176d288a8a
 /deepseek-ai-dsh-channel-wecom/conversation-and-delivery-lifecycle:
-  en: a43d8448e079e672
-  zh: 4e8a8773196a4e94
+  en: c9a999f2b29381e3
+  zh: 3b3f2cc90311b55e
 /deepseek-ai-dsh-channel-wecom/security:
   en: 9f3655fa3a6acc21
   zh: 9de3551fe8fb061b
@@ -33,8 +33,8 @@
   en: 661fc8ef3ecc106e
   zh: d8c11cf2c8ed60b8
 /deepseek-ai-dsh-channel-wecom/model-experience/wecom-user-message/what-the-model-sees:
-  en: 5f63f49548b0b3e2
-  zh: b361d0cdc9083f05
+  en: 5e47b6811e9df56b
+  zh: 89310540993cd2c9
 /deepseek-ai-dsh-channel-wecom/model-experience/wecom-user-message/token-effect:
   en: 6652f72a37447ba8
   zh: d064589e62d37db1
@@ -42,8 +42,8 @@
   en: 634bb0d136c94561
   zh: d506a8e5cb3934cd
 /deepseek-ai-dsh-channel-wecom/known-limitations-and-deferred-work:
-  en: 3097477110a800cf
-  zh: 952c7c39e6bcae0e
+  en: 8b8ffa3c7066f6b9
+  zh: 96fa80947f1e0173
 /deepseek-ai-dsh-channel-wecom/known-limitations-and-deferred-work/dev-note:
   en: bea05bdca14fd8a7
   zh: 3862aa4c7301104e

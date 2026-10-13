@@ -8,5 +8,11 @@
     "completed"
   ],
   "modelRequests": 1,
-  "archived": false
+  "archived": false,
+  "notifications": [
+    {
+      "target": "chat",
+      "content": "**预开启完成**"
+    }
+  ]
 }

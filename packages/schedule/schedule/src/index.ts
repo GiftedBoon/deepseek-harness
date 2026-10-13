@@ -1,6 +1,7 @@
 /** Host-wide durable reminders and shared human/model management. */
 import { randomUUID } from 'node:crypto'
 import z from '@deepseek-ai/schemastery'
+import { z as jsonSchema } from 'zod'
 import { Context, Service } from '@deepseek-ai/cordis'
 import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
@@ -9,6 +10,11 @@ import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionActivity } from '@deepseek-ai/dsh-workspace'
 import { ScheduleRuntime } from './runtime.ts'
 import { registerScheduleTools } from './tools.ts'
+import { ScheduleTaskRuntime } from './task-runtime.ts'
+import { hostTaskExecutor } from './task-executor.ts'
+import { scheduleExecutionDomain } from './task-storage.ts'
+import { registerTaskTools } from './task-tools.ts'
+import type { ScheduleTaskExecutor, ScheduleExecution, ScheduleJson, ScheduleWorkflowState, ScheduleTaskCreateRequest, ScheduleTaskRecord } from './types.ts'
 import { scheduleDomain } from './storage.ts'
 import { deliveryHistoryPage } from './delivery-history.ts'
 import { resolveScheduleUpdate } from './update.ts'
@@ -23,6 +29,8 @@ import type {
   ScheduleUpdateRequest, ScheduleUpdateResult,
 } from './types.ts'
 
+export { renderTaskFraming } from './task-runtime.ts'
+export { scheduleExecutionDomain } from './task-storage.ts'
 export type * from './types.ts'
 export { registerScheduleTools } from './tools.ts'
 export { scheduleDomain } from './storage.ts'
@@ -71,6 +79,14 @@ declare module '@deepseek-ai/cordis' {
 
 /** Configuration for the Host Schedule domain. */
 export interface Config {
+  /** Complete workflow record bytes; defaults to 65536. */
+  taskStateBytes?: number
+  /** Retained workflow keys per Session, including cleared revisions; defaults to 100. */
+  taskWorkflowLimit?: number
+  /** Complete execution record bytes; defaults to 131072. */
+  taskExecutionBytes?: number
+  /** Retained settled executions per task; defaults to 200. */
+  taskExecutionRecords?: number
   /**
    * Delivery-history window retained per task, in days; omission defaults to 30.
    * Pruning happens when an acknowledgment is appended, and `lastDelivery` is always retained.
@@ -101,6 +117,10 @@ export class ScheduleService extends TypertRemoteService {
   static inject = ['agents', 'sessions', 'tools', 'storageDomain', 'sessionController', 'sessionPersistence']
 
   static Config: z<Config> = z.object({
+    taskStateBytes: z.number().step(1).min(256).max(1048576).default(65536),
+    taskWorkflowLimit: z.number().step(1).min(1).max(10000).default(100),
+    taskExecutionBytes: z.number().step(1).min(4096).max(1048576).default(131072),
+    taskExecutionRecords: z.number().step(1).min(1).max(10000).default(200),
     deliveryHistoryDays: z.number().step(1).min(1).max(3650).default(DEFAULT_DELIVERY_HISTORY_DAYS),
     deliveryHistoryRecords: z.number().step(1).min(1).max(10_000).default(DEFAULT_DELIVERY_HISTORY_RECORDS),
   })
@@ -108,6 +128,8 @@ export class ScheduleService extends TypertRemoteService {
   /** Resolved retention bounds shared with the runtime that appends acknowledgments. */
   private readonly retention: DeliveryRetentionBounds
   private readonly ready: Promise<Domain<typeof scheduleDomain>>
+  private readonly taskReady: Promise<Domain<typeof scheduleExecutionDomain>>
+  private taskRuntime: ScheduleTaskRuntime | undefined
   private readonly initialized: PromiseLike<unknown>
   private chain: Promise<unknown> = Promise.resolve()
   private runtime: ScheduleRuntime | undefined
@@ -137,19 +159,57 @@ export class ScheduleService extends TypertRemoteService {
       }
       return domain
     })
+    this.taskReady = this.ready.then(async (domain) => {
+      let taskDomain: Domain<typeof scheduleExecutionDomain> | undefined
+      try {
+        taskDomain = await ctx.storageDomain.open(scheduleExecutionDomain)
+        const inputs = new Set<import('@deepseek-ai/dsh-llm').MessageId>()
+        for (const [id, execution] of taskDomain.table('executions').entries()) {
+          if (id !== execution.id) throw new Error('schedule: execution key differs from its stored id')
+          if (inputs.has(execution.inputMessageId)) throw new Error('schedule: execution input identity is shared by multiple executions')
+          inputs.add(execution.inputMessageId)
+          const blockedOwner = taskDomain.table('blocked_inputs').get(execution.inputMessageId)
+          if (blockedOwner !== undefined && blockedOwner !== execution.sessionId) throw new Error('schedule: blocked input owner differs from its execution Session')
+          const owner = taskDomain.table('owners').get(execution.scheduleId)
+          if (owner !== undefined && (owner.sessionId !== execution.sessionId || owner.providerId !== execution.providerId)) throw new Error('schedule: execution owner differs from its task adapter and Session')
+        }
+        for (const [key, state] of taskDomain.table('states').entries()) {
+          if (key !== JSON.stringify([state.sessionId, state.workflow])) throw new Error('schedule: workflow key differs from its stored Session and workflow')
+        }
+        for (const [id, owner] of taskDomain.table('owners').entries()) {
+          const task = domain.table('tasks').get(id)
+          if (task !== undefined && task.sessionId !== owner.sessionId) throw new Error('schedule: executable owner differs from its task Session')
+        }
+        return taskDomain
+      } catch (error: unknown) {
+        await taskDomain?.close()
+        await domain.close()
+        throw error
+      }
+    })
     this.initialized = ctx.effect(async () => {
-      const domain = await this.ready
+      const [domain, taskDomain] = await Promise.all([this.ready, this.taskReady])
       let cleanup: () => Promise<void>
       try {
         cleanup = ctx.effect(() => async () => {
           this.stopping = true
           await this.runtime?.dispose()
+          await this.taskRuntime?.dispose()
           await this.chain // The chain contains failures after returning them to their callers.
           await domain.close()
+          await taskDomain.close()
         })
+        this.taskRuntime = new ScheduleTaskRuntime(ctx, taskDomain, work => this.serialize(work), {
+          stateBytes: config.taskStateBytes ?? 65536, workflows: config.taskWorkflowLimit ?? 100,
+          executionBytes: config.taskExecutionBytes ?? 131072, executionRecords: config.taskExecutionRecords ?? 200,
+        })
+        await this.taskRuntime.recover()
+        this.taskRuntime.register(hostTaskExecutor(ctx))
       } catch (error) {
         this.stopping = true
+        await this.taskRuntime?.dispose()
         await domain.close()
+        await taskDomain.close()
         throw error
       }
       const tasks = domain.table('tasks')
@@ -160,7 +220,18 @@ export class ScheduleService extends TypertRemoteService {
           await tasks.put(task.record.id, task)
           this.emitChanged()
         },
-        this.retention)
+        this.retention,
+        task => taskDomain.table('owners').get(task.record.id) !== undefined,
+        async (task, scheduledAt) => {
+          const owner = taskDomain.table('owners').get(task.record.id)
+          if (owner === undefined) throw new Error('Executable schedule lacks its persisted owner')
+          await this.executionRuntime.admit({
+            scheduleId: task.record.id, providerId: owner.providerId, sessionId: task.sessionId,
+            title: task.record.title, prompt: task.record.prompt, scheduledAt,
+            ...(owner.expiresAt === undefined ? {} : { expiresAt: owner.expiresAt }) })
+        },
+        (task) => { const expiry = taskDomain.table('owners').get(task.record.id)?.expiresAt; return expiry === undefined ? undefined : Date.parse(expiry) },
+        task => this.executionRuntime.cancelQueued(task.record.id, 'expired'))
       this.runtime.requestDrive()
       return cleanup
     })
@@ -172,7 +243,11 @@ export class ScheduleService extends TypertRemoteService {
       // The plugin-scope effect is what tears the Agent-scoped registration down when this
       // plugin unloads, so it must also be disposed when the Agent itself is released.
       attached.set(agent, ctx.effect(
-        () => agent.ctx.effect(() => registerScheduleTools(ctx, agent.ctx, agent)),
+        () => agent.ctx.effect(() => {
+          const reminder = registerScheduleTools(ctx, agent.ctx, agent)
+          const tasks = registerTaskTools(ctx, agent.ctx, agent)
+          return () => { tasks(); reminder() }
+        }),
       ))
     }
     ctx.on('agent/created', ({ agent }) => { attach(agent) })
@@ -209,7 +284,7 @@ export class ScheduleService extends TypertRemoteService {
     // rows instead of letting them deliver into a closed Session.
     ctx.effect(() => {
       const activity = ctx.on('workspace/session-activity', async ({ sessionId }, next) => {
-        const active = await this.list({ sessionId })
+        const active = [...await this.list({ sessionId }), ...await this.listTasks({ sessionId })]
         const rest = await next()
         if (active.length === 0) return rest
         const own: SessionActivity = {
@@ -247,6 +322,22 @@ export class ScheduleService extends TypertRemoteService {
    * @returns The durably stored schedule. Cancellation does not roll back an in-flight write.
    */
   async create(sessionId: SessionId, request: ScheduleCreateRequest, signal?: AbortSignal): Promise<ScheduleRecord> {
+    return this.createRecord(sessionId, request, signal, false)
+  }
+
+  /**
+   * Create executable user-requested work with its adapter fixed before arming the timer.
+   * @param sessionId - Owner.
+   * @param request - Instruction and timing.
+   * @param signal - Optional write cancellation.
+   * @returns Durable task record.
+   */
+  async createTask(sessionId: SessionId, request: ScheduleTaskCreateRequest, signal?: AbortSignal): Promise<ScheduleTaskRecord> {
+    return this.createRecord(sessionId, request, signal, true)
+  }
+
+  private async createRecord(sessionId: SessionId, request: ScheduleTaskCreateRequest,
+    signal: AbortSignal | undefined, executable: boolean): Promise<ScheduleTaskRecord> {
     if (Number(request.at !== undefined) + Number(request.after_seconds !== undefined)
       + Number(request.every_seconds !== undefined) + Number(request.daily !== undefined)
       + Number(request.weekly !== undefined) + Number(request.cron !== undefined) > 1) {
@@ -269,15 +360,22 @@ export class ScheduleService extends TypertRemoteService {
     else if (request.weekly !== undefined) record = createWeeklyScheduleRecord(id, request.prompt, request.weekly, now, title)
     else if (request.cron !== undefined) record = createCronScheduleRecord(id, request.prompt, request.cron, now, title)
     else throw new ScheduleInputError('invalid_selector', 'Exactly one reminder selector is required.')
+    let expiresAt: string | undefined
+    if (executable && request.expires_at !== undefined) {
+      const expiry = jsonSchema.iso.datetime({ offset: true }).safeParse(request.expires_at)
+      if (!expiry.success || Date.parse(expiry.data) <= Math.max(now, Date.parse(record.scheduledAt))) throw new ScheduleInputError('invalid_rule', 'expires_at must be an offset-bearing RFC 3339 instant after the first scheduled target.')
+      expiresAt = new Date(expiry.data).toISOString()
+    }
     return this.serialize(async () => {
       const domain = await this.getDomain()
       signal?.throwIfAborted()
+      if (executable) await (await this.taskReady).table('owners').put(id, { sessionId, providerId: this.executionRuntime.providerId(sessionId), ...(expiresAt === undefined ? {} : { expiresAt }) })
       await domain.table('tasks').put(id, {
         sessionId, record, status: 'active', deliveryHistory: { records: [], earlierRecordsUnavailable: false },
       })
       this.emitChanged()
       this.runtime?.requestDrive()
-      return record
+      return { ...record, ...(expiresAt === undefined ? {} : { expiresAt }) }
     })
   }
 
@@ -290,7 +388,7 @@ export class ScheduleService extends TypertRemoteService {
   async list(request: ScheduleListRequest): Promise<ScheduleRecord[]> {
     const domain = await this.getDomain()
     return [...domain.table('tasks').entries()]
-      .filter(([, task]) => task.sessionId === request.sessionId && task.status === 'active')
+      .filter(([, task]) => task.sessionId === request.sessionId && task.status === 'active' && this.executionRuntime.domain.table('owners').get(task.record.id) === undefined)
       .map(([, task]) => task.record)
   }
 
@@ -304,10 +402,14 @@ export class ScheduleService extends TypertRemoteService {
   async catalog(): Promise<ScheduleCatalogEntry[]> {
     const domain = await this.getDomain()
     return [...domain.table('tasks').entries()]
-      .map(([, task]) => ({
-        ...task.record, sessionId: task.sessionId, status: task.status,
-        ...(task.lastDelivery === undefined ? {} : { lastDelivery: task.lastDelivery }),
-      }))
+      .map(([, task]) => {
+        const owner = this.executionRuntime.domain.table('owners').get(task.record.id)
+        return {
+          ...task.record, sessionId: task.sessionId, status: task.status,
+          ...(owner === undefined ? {} : { purpose: 'task' as const, ...(owner.expiresAt === undefined ? {} : { expiresAt: owner.expiresAt }) }),
+          ...(task.lastDelivery === undefined ? {} : { lastDelivery: task.lastDelivery }),
+        }
+      })
       .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt) || a.id.localeCompare(b.id))
   }
 
@@ -348,7 +450,9 @@ export class ScheduleService extends TypertRemoteService {
       if (current === undefined || current.sessionId !== request.sessionId) {
         return { id: request.id, deleted: false, code: 'schedule_not_found' }
       }
+      await this.executionRuntime.cancelQueued(request.id)
       await tasks.delete(request.id)
+      await (await this.taskReady).table('owners').delete(request.id)
       this.emitChanged()
       this.runtime?.requestDrive()
       return { id: request.id, deleted: true }
@@ -383,6 +487,76 @@ export class ScheduleService extends TypertRemoteService {
       this.runtime?.requestDrive()
       return result
     })
+  }
+
+  /**
+   * Register a named Session executor.
+   * @param provider - Adapter retaining preset, permissions, and route.
+   * @returns Idempotent disposer.
+   */
+  registerTaskExecutor(provider: ScheduleTaskExecutor): () => void {
+    if (this.taskRuntime === undefined) throw new Error('Schedule service is not initialized')
+    return this.taskRuntime.register(provider)
+  }
+
+  /**
+   * Read executable schedules.
+   * @param request - Session owner.
+   * @returns Active task records, excluding reminders.
+   */
+  async listTasks(request: ScheduleListRequest): Promise<ScheduleTaskRecord[]> {
+    const domain = await this.getDomain()
+    const owners = (await this.taskReady).table('owners')
+    return [...domain.table('tasks').entries()].flatMap(([id, task]) => {
+      const owner = owners.get(id)
+      if (task.sessionId !== request.sessionId || task.status !== 'active' || owner === undefined) return []
+      return [{ ...task.record, ...(owner.expiresAt === undefined ? {} : { expiresAt: owner.expiresAt }) }]
+    })
+  }
+
+  /**
+   * Read retained execution facts.
+   * @param request - Owner, optional task, page limit, and optional exclusive execution cursor.
+   * @returns Newest-first bounded executions; an unknown or pruned cursor rejects with invalid_rule.
+   */
+  @Remote('executions')
+  async executions(request: ScheduleListRequest & {
+    id?: import('./types.ts').ScheduleId
+    before?: import('./types.ts').ScheduleExecutionId
+    limit: number
+  }): Promise<ScheduleExecution[]> {
+    await this.getDomain()
+    if (!Number.isSafeInteger(request.limit) || request.limit < 1 || request.limit > 100) throw new ScheduleInputError('invalid_rule', 'Execution limit must be from 1 through 100.')
+    const executions = [...(await this.taskReady).table('executions').entries()].map(([, value]) => value)
+      .filter(value => value.sessionId === request.sessionId && (request.id === undefined || value.scheduleId === request.id))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
+    const cursor = request.before === undefined ? -1 : executions.findIndex(value => value.id === request.before)
+    if (request.before !== undefined && cursor === -1) throw new ScheduleInputError('invalid_rule', 'Execution cursor is missing or no longer retained for this Session and task.')
+    return executions.slice(cursor + 1, cursor + 1 + request.limit)
+  }
+
+  /**
+   * Read one Session workflow revision.
+   * @param sessionId - Owner.
+   * @param workflow - Key.
+   * @returns Value and revision.
+   */
+  async readState(sessionId: SessionId, workflow: string): Promise<ScheduleWorkflowState> {
+    await this.getDomain()
+    return this.executionRuntime.readState(sessionId, workflow)
+  }
+
+  /**
+   * Replace one workflow with compare-and-set.
+   * @param sessionId - Owner.
+   * @param workflow - Key.
+   * @param revision - Observed revision.
+   * @param value - Bounded JSON replacement.
+   * @returns Revision or current conflicting state.
+   */
+  async writeState(sessionId: SessionId, workflow: string, revision: number, value: ScheduleJson): Promise<ScheduleWorkflowState | { code: 'state_conflict'; current: ScheduleWorkflowState }> {
+    await this.getDomain()
+    return this.executionRuntime.writeState(sessionId, workflow, revision, value)
   }
 
   /**
@@ -433,7 +607,9 @@ export class ScheduleService extends TypertRemoteService {
       let failure: Error | undefined
       for (const id of active) {
         try {
+          await this.executionRuntime.cancelQueued(id)
           await tasks.delete(id)
+          await (await this.taskReady).table('owners').delete(id)
           removed = true
         } catch (error: unknown) {
           // Every row is attempted: the archive has already landed, so a row this
@@ -449,6 +625,11 @@ export class ScheduleService extends TypertRemoteService {
       }
       if (failure !== undefined) throw failure
     })
+  }
+
+  private get executionRuntime(): ScheduleTaskRuntime {
+    if (this.taskRuntime === undefined) throw new Error('Schedule service is not initialized')
+    return this.taskRuntime
   }
 
   private serialize<T>(work: () => Promise<T>): Promise<T> {

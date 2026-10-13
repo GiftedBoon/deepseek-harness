@@ -218,8 +218,12 @@ function invalidInterval(everySeconds: number | undefined): ScheduleToolError | 
   return undefined
 }
 
-/** Validate selector constraints that the open parameter root cannot express. */
-function validateCreateArgs(args: {
+/**
+ * Validate selector constraints that the open parameter root cannot express.
+ * @param args - Reminder content and timing selectors received by the tool.
+ * @returns Input failure or undefined when the selectors and content are valid.
+ */
+export function validateCreateArgs(args: {
   prompt: string
   title: string
   after_seconds?: number
@@ -265,8 +269,12 @@ function validateCreateArgs(args: {
   return invalidInterval(args.every_seconds)
 }
 
-/** Validate the in-place update's selector count, id, and any supplied name, instruction, or interval. */
-function validateUpdateArgs(args: {
+/**
+ * Validate the in-place update's selector count, id, and any supplied name, instruction, or interval.
+ * @param args - Identity and optional replacement fields received by the tool.
+ * @returns Input failure or undefined when the replacement fields are valid.
+ */
+export function validateUpdateArgs(args: {
   id: string
   title?: string
   prompt?: string
@@ -318,8 +326,12 @@ function validateUpdateArgs(args: {
   return invalidInterval(args.every_seconds)
 }
 
-/** The one timing replacement the update carries, or undefined when the request keeps the committed target. */
-function timingChangeFrom(args: {
+/**
+ * The one timing replacement the update carries, or undefined when the request keeps the committed target.
+ * @param args - Validated optional timing selectors.
+ * @returns Timing replacement or undefined to retain the current target.
+ */
+export function timingChangeFrom(args: {
   at?: AtInput
   every_seconds?: number
   daily?: DailyInput
@@ -338,7 +350,7 @@ function timingChangeFrom(args: {
  * Selector parameters shared by `schedule_create` and `schedule_update`, in the order the
  * generated tool catalog states them.
  */
-const SELECTOR_PARAMETERS = {
+export const SELECTOR_PARAMETERS = {
   every_seconds: {
     type: 'number',
     description: `Fixed-rate interval in whole seconds, at least ${MIN_EVERY_INTERVAL_SECONDS}, aligned to the creation time; changing it with schedule_update re-aligns it to the save time.`,

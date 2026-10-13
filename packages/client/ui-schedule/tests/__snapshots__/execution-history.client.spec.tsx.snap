@@ -1,0 +1,23 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Agent execution records > shows persisted states and escaped output without treating delivery as completion 1`] = `
+[
+  "Oct 13, 3:40 PMQueued",
+  "Oct 13, 3:40 PMRunning",
+  "Oct 13, 3:40 PMCompletedExecution output<img src=x>
+All checked.",
+  "Oct 13, 3:40 PMFailed",
+  "Oct 13, 3:40 PMInterruptedInterrupted by a restart",
+]
+`;
+
+exports[`Agent execution records > shows persisted states and escaped output without treating delivery as completion 2`] = `
+[
+  "10月13日 15:40排队中",
+  "10月13日 15:40执行中",
+  "10月13日 15:40已完成执行输出<img src=x>
+All checked.",
+  "10月13日 15:40失败",
+  "10月13日 15:40已中断重启导致执行中断",
+]
+`;

@@ -10,6 +10,29 @@ const otherId = '66666666-6666-4666-8666-666666666666'
 const proseUuid = '77777777-7777-4777-8777-777777777777'
 
 describe('session snapshot identity redaction', () => {
+  it('preserves scheduled task relationships without treating arbitrary tool JSON as task identities', () => {
+    const schedule = `schedule-${otherId}`
+    const execution = `execution-${runId}`
+    const unrelated = `schedule-${proseUuid}`
+    const source = [
+      { type: 'session', id: parentId },
+      { type: 'tool/call', data: { callId: 'create-task', name: 'schedule_task_create' } },
+      { type: 'tool/result', data: { message: { toolCallId: 'create-task', content: [{ type: 'text', text: JSON.stringify({ id: schedule }) }] } } },
+      { type: 'user/message', data: { role: 'user', id: messageId, source: { kind: 'schedule' }, content: [{ type: 'text', text: `Scheduled task: check\nExecution: ${execution}\nUser prose ${unrelated}` }] } },
+      { type: 'tool/call', data: { callId: 'list-runs', name: 'schedule_task_executions' } },
+      { type: 'tool/result', data: { message: { toolCallId: 'list-runs', content: [{ type: 'text', text: JSON.stringify([{ id: execution, scheduleId: schedule }]) }] } } },
+      { type: 'tool/result', data: { message: { toolCallId: 'other-tool', content: [{ type: 'text', text: JSON.stringify({ id: unrelated }) }] } } },
+      { type: 'tool/result', data: { message: { toolCallId: 'create-task', content: [{ type: 'text', text: 'Error: unavailable' }] } } },
+    ].map(record => JSON.stringify(record)).join('\n') + '\n'
+    const [output] = redactSessionSnapshotIds([source])
+    expect(output).toContain('{{schedule:1}}')
+    expect(output).toContain('{{execution:1}}')
+    expect(output).not.toContain(schedule)
+    expect(output).not.toContain(execution)
+    expect(output).toContain(unrelated)
+    expect(redactSessionSnapshotIds([output!])).toEqual([output])
+  })
+
   it('preserves feedback versions and target relationships without redacting unrelated prose', () => {
     const source = [
       { type: 'session', id: parentId },

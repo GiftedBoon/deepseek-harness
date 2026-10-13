@@ -8,7 +8,8 @@ import { load } from 'js-yaml'
 
 const agent = `# Trader Ops WeCom deliberately exposes only the agent-plane features this
 # unattended channel uses. Host-plane MCP, Schedule, policy, and memory plugins
-# remain available through the enclosing deployment composition.
+# remain available through the enclosing deployment composition. Schedule
+# registers reminder, executable task, and workflow-state tools for each Agent.
 
 - id: persona
   name: '@deepseek-ai/dsh-persona'

@@ -4,6 +4,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentHandle, AssistantStreamFrame, ModelSelection } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import { createUserMessage, errorChain, type LlmCallConfig, type UserMessage } from '@deepseek-ai/dsh-llm'
+import { renderTaskFraming, type ScheduleExecution, type ScheduleExecutionId, type ScheduleExecutionOutcome } from '@deepseek-ai/dsh-schedule'
+import type { MessageId } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId, TurnEndReason } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-permission-presets'
 import type {} from '@deepseek-ai/dsh-session-persistence'
@@ -17,17 +19,22 @@ import { WeComScheduledActions } from './scheduled-actions.ts'
 import { conversationIdentity, deliveryIdentity } from './identity.ts'
 import { WeComReplyStream, boundUtf8 } from './stream.ts'
 import type { WeComChannelClient, WeComTextDelivery } from './types.ts'
+import { weComTaskReportDomainSpec, type WeComTaskReportDomain } from './task-report-domain.ts'
 import { admitTextFrame } from './validation.ts'
+
+class ScheduledTaskExpired extends Error {}
 
 interface PromptInterval {
   readonly agent: Agent
   readonly messageId: string
-  readonly stream: WeComReplyStream
+  readonly stream?: WeComReplyStream
   readonly turnDone: Promise<TurnEndReason>
   readonly settleTurn: (reason: TurnEndReason) => void
   attemptId?: AssistantStreamFrame['attemptId']
   turn?: number
   output: string
+  committedOutput: string
+  readonly messageIds: MessageId[]
 }
 
 interface RuntimeOptions {
@@ -63,13 +70,13 @@ function installInitialModelSelection(agentCtx: Context, agent: Agent, selection
 /** Await one promise with a channel-owned timeout and disposal signal. */
 function withTimeout<T>(promise: Promise<T>, milliseconds: number, signal: AbortSignal): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { reject(new Error('channel-wecom: Agent turn timed out')) }, milliseconds)
-    const abort = (): void => { reject(signal.reason instanceof Error ? signal.reason : new Error('channel-wecom disposed')) }
+    const cleanup = (): void => { clearTimeout(timer); signal.removeEventListener('abort', abort) }
+    const fail = (error: unknown): void => { cleanup(); reject(error instanceof Error ? error : new Error(String(error))) }
+    const abort = (): void => { fail(signal.reason instanceof Error ? signal.reason : new Error('channel-wecom disposed')) }
+    const timer = setTimeout(() => { fail(new Error('channel-wecom: Agent turn timed out')) }, milliseconds)
     signal.addEventListener('abort', abort, { once: true })
-    promise.then(resolve, reject).finally(() => {
-      clearTimeout(timer)
-      signal.removeEventListener('abort', abort)
-    }).catch(() => {})
+    promise.then((value) => { cleanup(); resolve(value) }, fail)
+    if (signal.aborted) abort()
   })
 }
 
@@ -83,10 +90,15 @@ export class WeComChannelRuntime {
   private outboxTail = Promise.resolve()
   private retryTimer: ReturnType<typeof setInterval> | undefined
   private closing: Promise<void> | undefined
+  private taskReports: WeComTaskReportDomain | undefined
   private readonly scheduledActions: WeComScheduledActions
 
   /** @param ctx - host services; @param options - validated and pre-resolved runtime inputs. */
   constructor(private readonly ctx: Context, private readonly options: RuntimeOptions) {
+    if (options.config.notificationChatId !== undefined
+      && (options.config.notificationChatId === '*' || !options.config.allowedChats.includes(options.config.notificationChatId))) {
+      throw new Error('channel-wecom: notificationChatId must name an exact allowedChats entry')
+    }
     this.scheduledActions = new WeComScheduledActions(ctx, {
       config: options.config,
       conversations: options.domain,
@@ -113,6 +125,35 @@ export class WeComChannelRuntime {
   async start(): Promise<void> {
     this.disposers.push(this.options.client.onText((frame) => { this.receive(frame) }))
     this.disposers.push(this.options.client.onAuthenticated(() => { this.queueOutboxDrain() }))
+    const schedule = this.ctx.get('schedule')
+    if (schedule !== undefined) {
+      this.taskReports = await this.ctx.storageDomain.open(weComTaskReportDomainSpec)
+      this.disposers.push(this.ctx.on('schedule/execution', (execution) => {
+        if (execution.status === 'queued' || execution.status === 'running') return
+        this.queueTaskReport(execution)
+      }))
+      for (const [, conversation] of this.options.domain.table('conversations').entries()) {
+        let before: ScheduleExecutionId | undefined
+        for (;;) {
+          const executions = await schedule.executions({
+            sessionId: conversation.sessionId as SessionId, limit: 100,
+            ...(before === undefined ? {} : { before }),
+          })
+          for (const execution of executions) {
+            if (execution.status !== 'queued' && execution.status !== 'running') this.queueTaskReport(execution)
+          }
+          const last = executions.at(-1)
+          if (last === undefined || executions.length < 100) break
+          before = last.id
+        }
+      }
+      // Executions can prune recovery cursors, so admission starts after paging finishes.
+      this.disposers.push(schedule.registerTaskExecutor({
+        id: 'wecom',
+        accepts: sessionId => this.conversationForSession(sessionId) !== undefined,
+        execute: (execution, signal) => this.executeScheduledTask(execution, signal),
+      }))
+    }
     await this.options.client.connect(this.controller.signal)
     await this.scheduledActions.start()
     this.retryTimer = setInterval(() => { this.queueOutboxDrain({ retryExhausted: false }) }, this.options.config.outboxRetryIntervalMs)
@@ -134,9 +175,90 @@ export class WeComChannelRuntime {
       await this.outboxTail
       await this.options.scheduledActionInputDomain.close()
       await this.options.scheduledActionDomain.close()
+      await this.taskReports?.close()
       await this.options.domain.close()
     })()
     return this.closing
+  }
+
+  /**
+   * Admit one Host report to the existing durable outbox for the configured group.
+   * @param content - Markdown bounded by maxReplyBytes.
+   * @returns Resolves after persistence; sending and retries continue independently on the existing connection.
+   */
+  enqueueNotification(content: string): Promise<void> {
+    const target = this.options.config.notificationChatId
+    if (target === undefined) return Promise.reject(new Error('channel-wecom: notificationChatId is not configured'))
+    const admitted = this.outboxTail.then(async () => {
+      this.controller.signal.throwIfAborted()
+      await this.enqueueOutbox(target, boundUtf8(content, this.options.config.maxReplyBytes))
+    })
+    this.outboxTail = admitted.catch(() => {})
+    this.queueOutboxDrain({ target })
+    return admitted
+  }
+
+  private conversationForSession(sessionId: SessionId) {
+    return [...this.options.domain.table('conversations').entries()]
+      .find(([, record]) => record.sessionId === sessionId)
+  }
+
+  private routeAllowed(conversation: { target: string; chatType: 'single' | 'group' }): boolean {
+    const allowed = conversation.chatType === 'group' ? this.options.config.allowedChats : this.options.config.allowedUsers
+    return conversation.target !== '*' && allowed.includes(conversation.target)
+  }
+
+  private executeScheduledTask(execution: ScheduleExecution, signal: AbortSignal): Promise<ScheduleExecutionOutcome> {
+    const mapped = this.conversationForSession(execution.sessionId)
+    if (mapped === undefined) return Promise.reject(new Error('channel-wecom: scheduled Session has no conversation route'))
+    return this.serializeConversation(mapped[0], async () => {
+      const route = this.options.domain.table('conversations').get(mapped[0])
+      if (route === undefined || !this.routeAllowed(route)) {
+        return { status: 'failed', error: 'The original WeCom conversation is no longer explicitly allowed.' }
+      }
+      const combined = AbortSignal.any([signal, this.controller.signal])
+      try {
+        combined.throwIfAborted()
+        const result = await this.runAgent(
+          mapped[0], execution.sessionId, renderTaskFraming(execution), route.chatType, undefined,
+          combined, execution.inputMessageId, execution.expiresAt,
+        )
+        return { status: result.reason.kind === 'completed' ? 'completed' : 'interrupted', inputMessageId: result.inputMessageId, messageIds: result.messageIds, output: result.committedOutput,
+          ...(result.reason.kind === 'completed' ? {} : { error: `Agent turn ended: ${result.reason.kind}` }),
+        }
+      } catch (error: unknown) {
+        this.ctx.logger.warn(`channel-wecom: scheduled Agent execution failed: ${errorChain(error)}`)
+        return { status: combined.aborted || error instanceof ScheduledTaskExpired ? 'interrupted' : 'failed',
+          ...(error instanceof ScheduledTaskExpired ? { interruptionReason: 'expired' as const } : combined.aborted ? { interruptionReason: 'unloaded' as const } : {}),
+          error: error instanceof Error ? error.message : 'Agent execution failed',
+        }
+      }
+    })
+  }
+
+  private queueTaskReport(execution: ScheduleExecution): void {
+    if (execution.providerId !== 'wecom' || execution.interruptionReason === 'cancelled' || execution.interruptionReason === 'expired') return
+    const mapped = this.conversationForSession(execution.sessionId)
+    if (mapped === undefined || !this.routeAllowed(mapped[1])) return
+    const content = execution.status === 'completed' ? execution.output ?? ''
+      : execution.status === 'interrupted' ? this.options.config.messages.scheduledActionUncertain : this.options.config.messages.failure
+    if (content.trim() === '' || Date.parse(execution.createdAt) < Date.now() - this.options.config.outboxRetentionMs) return
+    const key = `task:${execution.id}`
+    this.outboxTail = this.outboxTail.then(async () => {
+      this.controller.signal.throwIfAborted()
+      const receipts = this.taskReports?.table('reports')
+      if (receipts === undefined || receipts.get(key) !== undefined) return
+      const now = Date.now()
+      const bounded = boundUtf8(content, this.options.config.maxReplyBytes)
+      if (bounded === '') return
+      await this.options.domain.table('outbox').put(key, {
+        target: mapped[1].target, content: bounded, attempts: 0, createdAt: now, updatedAt: now,
+      })
+      await receipts.put(key, { state: 'queued', sessionId: execution.sessionId, createdAt: now })
+    }).catch((error: unknown) => {
+      this.ctx.logger.warn(`channel-wecom: scheduled report admission failed: ${errorChain(error)}`)
+    })
+    this.queueOutboxDrain({ target: mapped[1].target })
   }
 
   private receive(frame: unknown): void {
@@ -162,15 +284,21 @@ export class WeComChannelRuntime {
       this.options.config.groupConversationMode,
       delivery,
     )
-    const previous = this.conversations.get(identity.key) ?? Promise.resolve()
-    const current = previous.then(() => this.process(identity.key, identity.sessionId, delivery))
+    void this.serializeConversation(identity.key, () => this.process(identity.key, identity.sessionId, delivery)).catch(() => {})
+  }
+
+  private serializeConversation<T>(key: string, operation: () => Promise<T>): Promise<T> {
+    const previous = this.conversations.get(key) ?? Promise.resolve()
+    const result = previous.then(operation)
+    const current = result.then(() => {})
       .catch((error: unknown) => {
         this.ctx.logger.warn(`channel-wecom: delivery failed: ${errorChain(error)}`)
       })
       .finally(() => {
-        if (this.conversations.get(identity.key) === current) this.conversations.delete(identity.key)
+        if (this.conversations.get(key) === current) this.conversations.delete(key)
       })
-    this.conversations.set(identity.key, current)
+    this.conversations.set(key, current)
+    return result
   }
 
   private async process(conversationKey: string, sessionId: SessionId, delivery: WeComTextDelivery): Promise<void> {
@@ -209,8 +337,8 @@ export class WeComChannelRuntime {
     let finalReply = this.options.config.messages.failure
     try {
       await stream.start(this.options.config.messages.processing)
-      const result = await this.runAgent(conversationKey, sessionId, delivery, stream)
-      finalReply = result.trim() === '' ? this.options.config.messages.emptyReply : result
+      const result = await this.runAgent(conversationKey, sessionId, delivery.text, delivery.chatType, stream)
+      finalReply = result.output.trim() === '' ? this.options.config.messages.emptyReply : result.output
       await this.deliverFinal(stream, delivery.target, finalReply)
       await deliveries.put(deliveryKey, { conversationKey, state: 'completed', reply: finalReply, updatedAt: Date.now() })
     } catch (error: unknown) {
@@ -230,9 +358,13 @@ export class WeComChannelRuntime {
   private async runAgent(
     conversationKey: string,
     sessionId: SessionId,
-    delivery: WeComTextDelivery,
-    stream: WeComReplyStream,
-  ): Promise<string> {
+    text: string,
+    chatType: string,
+    stream?: WeComReplyStream,
+    signal: AbortSignal = this.controller.signal,
+    inputMessageId?: MessageId,
+    expiresAt?: string,
+  ): Promise<{ output: string; committedOutput: string; inputMessageId: MessageId; messageIds: MessageId[]; reason: TurnEndReason }> {
     if (this.ctx.agents.get(sessionId) !== undefined) throw new Error(`channel-wecom: Session is already active: ${sessionId}`)
     const existing = await this.ctx.sessionPersistence.stat(sessionId, { signal: this.controller.signal }) !== undefined
     const setup = async (agentCtx: Context, agent: Agent): Promise<void> => {
@@ -245,12 +377,12 @@ export class WeComChannelRuntime {
       ? await this.ctx.agents.resume({
         resumeSessionId: sessionId,
         agentOptions,
-        signal: this.controller.signal,
+        signal,
         setup,
       })
       : await this.ctx.agents.create({
         sessionId,
-        signal: this.controller.signal,
+        signal,
         meta: { cwd: this.options.workspace.path, agentPreset: this.options.config.agentPreset },
         agentOptions,
         setup,
@@ -259,22 +391,28 @@ export class WeComChannelRuntime {
     try {
       await this.options.workspace.attachSession(sessionId)
       this.ctx.permissionPresets.set(handle.agent.session, this.options.config.permissionPreset)
-      if (!existing) this.ctx.sessionTitle.rename(handle.agent.session, `${this.options.config.sessionTitlePrefix} ${delivery.chatType}`)
-      const message = createUserMessage({ content: [{ type: 'text', text: delivery.text }], source: { kind: 'user' } })
+      if (!existing) this.ctx.sessionTitle.rename(handle.agent.session, `${this.options.config.sessionTitlePrefix} ${chatType}`)
+      const generated = createUserMessage({ content: [{ type: 'text', text }], source: inputMessageId === undefined ? { kind: 'user' } : { kind: 'schedule' } })
+      const message = inputMessageId === undefined ? generated : Object.freeze({ ...generated, id: inputMessageId })
       const completion = Promise.withResolvers<TurnEndReason>()
       const interval: PromptInterval = {
         agent: handle.agent,
         messageId: message.id,
-        stream,
+        ...stream === undefined ? {} : { stream },
         turnDone: completion.promise,
         settleTurn: completion.resolve,
         output: '',
+        committedOutput: '',
+        messageIds: [],
       }
       this.active.set(sessionId, interval)
+      signal.throwIfAborted()
+      if (expiresAt !== undefined && Date.now() >= Date.parse(expiresAt)) throw new ScheduledTaskExpired('Scheduled task expired before input delivery')
       handle.agent.followup(message)
       let reason: TurnEndReason
       try {
-        reason = await withTimeout(interval.turnDone, this.options.config.turnTimeoutMs, this.controller.signal)
+        if (!await this.ctx.sessions.flush(handle.agent.session)) throw new Error('Session persistence did not acknowledge channel input')
+        reason = await withTimeout(interval.turnDone, this.options.config.turnTimeoutMs, signal)
       } catch (error: unknown) {
         handle.agent.cancel({ kind: 'user' })
         await handle.agent.whenIdle()
@@ -285,11 +423,13 @@ export class WeComChannelRuntime {
       if (reason.kind === 'blocked') {
         throw new Error('WeCom Agent turn was blocked; check Session archive state and admission policy')
       }
-      return interval.output
+      return { output: interval.output, committedOutput: interval.committedOutput,
+        inputMessageId: message.id, messageIds: interval.messageIds, reason,
+      }
     } finally {
       this.active.delete(sessionId)
       try {
-        await this.ctx.sessions.flush(handle.agent.session)
+        if (!await this.ctx.sessions.flush(handle.agent.session)) throw new Error('Session persistence did not acknowledge channel output')
       } finally {
         await handle.dispose()
         this.handles.delete(handle)
@@ -305,6 +445,11 @@ export class WeComChannelRuntime {
   private onSessionEvent(session: Session, event: SessionEvent): void {
     const interval = this.active.get(session.id)
     if (interval === undefined || interval.agent.session !== session || interval.turn === undefined) return
+    if (event.type === 'assistant/message' && event.data.turn === interval.turn && event.data.interrupted !== true) {
+      interval.messageIds.push(event.data.message.id)
+      const text = event.data.message.content.filter(item => item.type === 'text').map(item => item.text).join('')
+      interval.committedOutput = boundUtf8(interval.committedOutput + text, this.options.config.maxReplyBytes)
+    }
     if (event.type === 'turn/end' && event.data.turn === interval.turn) {
       interval.settleTurn(event.data.reason)
     }
@@ -322,7 +467,7 @@ export class WeComChannelRuntime {
       delete interval.attemptId
     } else if (frame.chunk.type === 'text-delta') {
       interval.output += frame.chunk.text
-      interval.stream.append(frame.chunk.text)
+      interval.stream?.append(frame.chunk.text)
     }
   }
 
@@ -363,16 +508,32 @@ export class WeComChannelRuntime {
     if (this.controller.signal.aborted) return
     const table = this.options.domain.table('outbox')
     const expiredBefore = Date.now() - this.options.config.outboxRetentionMs
+    const receipts = this.taskReports?.table('reports')
+    for (const [key, receipt] of receipts?.entries() ?? []) {
+      if (receipt.createdAt < expiredBefore && receipt.state !== 'queued') await receipts?.delete(key)
+    }
     for (const [key, item] of [...table.entries()]) {
+      const receipt = receipts?.get(key)
+      if (receipt !== undefined) {
+        const conversation = this.conversationForSession(receipt.sessionId)
+        if (receipt.state !== 'queued' || conversation === undefined || !this.routeAllowed(conversation[1]) || conversation[1].target !== item.target) {
+          await table.delete(key)
+          if (receipt.state === 'queued') await receipts?.put(key, { ...receipt, state: 'expired' })
+          continue
+        }
+      }
       if (item.createdAt < expiredBefore) {
+        if (receipt !== undefined) await receipts?.put(key, { ...receipt, state: 'expired' })
         await table.delete(key)
         this.ctx.logger.warn('channel-wecom: outbox item expired before delivery')
         continue
       }
+      if (key.startsWith('task:') && receipt === undefined) continue
       if (options.target !== undefined && item.target !== options.target) continue
       if (options.retryExhausted === false && item.attempts >= this.options.config.maxOutboxAttempts) continue
       try {
         await this.options.client.sendMarkdown(item.target, item.content)
+        if (receipt !== undefined) await receipts?.put(key, { ...receipt, state: 'delivered' })
         await table.delete(key)
       } catch (error: unknown) {
         const attempts = item.attempts + 1

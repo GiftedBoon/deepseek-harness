@@ -38,7 +38,7 @@ description: Use the bssh_ops MCP server for audited quantitative-trading colo o
 
 ## 单产品预开启异常排障
 
-仅在用户要求排查具体产品时，从 `check_daily_preopen` 的 `pending` 按 `NAME` 分组，记录对应 `Colo`。用 `check_process_status` → `get_run_status` 检查该产品策略进程；ps 结果是整机口径，不能把同机其他产品的进程当成该产品已启动。再用 `get_strategy_start_errors(product)` 取得启动报错和每台的 `total_matched` 基线。需要文件上下文时，先用 `list_colo_file_resources` 确认资源，再用 `search_colo_file` 定位行号、`read_colo_file_range` 读取附近行，或用 `stat_colo_file` 检查文件状态；查看 portfolio 参数则用 `download_portfolio_from_colo`。文件接口拒绝访问时停止，不换工具绕过。
+用户要求排查具体产品，或 [preopen-watch](../preopen-watch/SKILL.md#停滞后的只读排查) 检出持续待开启产品时，从 `check_daily_preopen` 的 `pending` 按 `NAME` 分组，记录对应 `Colo`。用 `check_process_status` → `get_run_status` 检查该产品策略进程；ps 结果是整机口径，不能把同机其他产品的进程当成该产品已启动。再用 `get_strategy_start_errors(product)` 取得启动报错和每台的 `total_matched` 基线。需要文件上下文时，先用 `list_colo_file_resources` 确认资源，再用 `search_colo_file` 定位行号、`read_colo_file_range` 读取附近行，或用 `stat_colo_file` 检查文件状态；查看 portfolio 参数则用 `download_portfolio_from_colo`。文件接口拒绝访问时停止，不换工具绕过。
 
 修复建议写根因、带 colo/文件/行号的证据、可选方案及各自影响范围。证据不足时说明还缺什么。用户选定方案后才走对应写通道；改参优先用 `preview_change_cfg_paras` → `deploy_change_cfg_paras`，白名单覆盖不到的产品动作走 `preview_product_action` → `execute_product_action`，文件下发遵守下文的 `run_scp` 规则。不得用整机级快捷命令 `start`/`stop` 补救单产品。修复后重新检查进程与预开启状态，并将日志新增的 `total_matched` 与基线比较；旧日志中的 failed 行不会自动消失。
 

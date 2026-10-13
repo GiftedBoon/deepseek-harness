@@ -178,6 +178,7 @@ function mount(
       ok: true, value: { id: expected.id, updated: false, record: expected },
     })),
     onOpenSession: vi.fn(),
+    loadExecutions: vi.fn().mockResolvedValue({ ok: true, value: [] }),
     loadHistory: vi.fn<TaskManagerPageProps['loadHistory']>(async ({ id }) => {
       const receipt = snapshot.records.find(record => record.id === id)?.lastDelivery
       return { ok: true, value: {
@@ -217,8 +218,8 @@ function detailViewLabels(dictionary: typeof en | typeof zh) {
       empty: 'No delivery record available',
     }
     : {
-      tablist: '任务详情视图', rules: '规则', records: '任务运行记录',
-      empty: '暂无任务运行记录',
+      tablist: '任务详情视图', rules: '规则', records: '提醒投递记录',
+      empty: '暂无提醒投递记录',
     }
 }
 
@@ -700,7 +701,7 @@ describe('Task manager catalog', () => {
   it('describes row frequency and next time without exposing its Session', () => {
     const h = mount({ records: [every] })
     const row = screen.getByRole('button', {
-      name: 'Check metrics', description: /^Every 301 seconds.*Next scheduled time:/,
+      name: 'Check metrics', description: /^ReminderEvery 301 seconds.*Next scheduled time:/,
     })
     const descriptionId = row.getAttribute('aria-describedby')!
     const metadata = document.getElementById(descriptionId)!
@@ -720,7 +721,7 @@ describe('Task manager catalog', () => {
     expect(document.activeElement).toBe(row)
     h.view.rerender(<TaskManagerPage {...h.props} t={makeTranslate(zh)} />)
     expect(screen.getByRole('button', {
-      name: 'Check metrics', description: /^每 301 秒.*下次计划时间：/,
+      name: 'Check metrics', description: /^提醒每 301 秒.*下次计划时间：/,
     })).toBe(row)
     expect(time.textContent).toBe(absoluteNextRun(every.scheduledAt, zh))
     expect(relativeText(metadata)).toBe(relativeNextRun(every.scheduledAt, zh))
@@ -4242,4 +4243,41 @@ describe('timing pickers', () => {
     expect(screen.getByRole('button', { name: dictionary['timing.prevMonth'] })).toBeDefined()
     expect(screen.getByRole('button', { name: dictionary['timing.nextMonth'] })).toBeDefined()
   })
+})
+
+it('distinguishes Agent tasks and reads execution states using the original binding instead of delivery history', async () => {
+  const task: ScheduleCatalogEntry = {
+    ...every, purpose: 'task', expiresAt: '2026-10-02T00:30:00.000Z',
+    lastDelivery: { scheduledAt: every.scheduledAt, deliveredAt: every.scheduledAt, messageId: 'inbox-only' as NonNullable<ScheduleCatalogEntry['lastDelivery']>['messageId'] },
+  }
+  const h = mount({ records: [task] })
+  expect(screen.getByRole('button', { name: task.title }).getAttribute('aria-describedby')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: task.title }))
+  expect(screen.getAllByText(en['purpose.task'])).toHaveLength(2)
+  expect(screen.getByText(en['detail.cutoff'], { exact: false })).toBeTruthy()
+  fireEvent.click(screen.getByRole('tab', { name: en['detail.executions'] }))
+  await screen.findByText(en['execution.empty'])
+  expect(h.props.loadExecutions).toHaveBeenCalledExactlyOnceWith({ id: task.id, sessionId: task.sessionId, limit: 100 })
+  expect(h.props.loadHistory).not.toHaveBeenCalled()
+  h.update({ readSettled: 1 })
+  await act(async () => {})
+  expect(h.props.loadExecutions).toHaveBeenCalledTimes(2)
+  fireEvent.click(screen.getByRole('button', { name: en['detail.more'] }))
+  fireEvent.click(screen.getByRole('menuitem', { name: en['delete.action'] }))
+  expect(screen.getByText(en['delete.taskDescription'])).toBeTruthy()
+})
+
+it('submits Agent task edits with the stored rule while retaining the fixed cutoff in the view', () => {
+  const task: ScheduleCatalogEntry = { ...at, purpose: 'task', expiresAt: '2026-10-02T00:30:00.000Z' }
+  const h = mount({ records: [task] })
+  fireEvent.click(screen.getByRole('button', { name: task.title }))
+  fireEvent.change(nameField(), { target: { value: 'Execute release audit' } })
+  clickSave()
+  expect(h.updateTiming).toHaveBeenCalledExactlyOnceWith({
+    sessionId: task.sessionId, id: task.id, expected: timingSnapshot(task), title: 'Execute release audit',
+  })
+  const request = h.updateTiming.mock.calls[0]![0]
+  expect(request.expected).not.toHaveProperty('purpose')
+  expect(request.expected).not.toHaveProperty('expiresAt')
+  expect(screen.getByText(en['detail.cutoff'], { exact: false }).querySelector('time')?.dateTime).toBe(task.expiresAt)
 })

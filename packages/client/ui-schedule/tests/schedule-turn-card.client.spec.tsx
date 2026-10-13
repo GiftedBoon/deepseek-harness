@@ -215,17 +215,17 @@ function cardProps(
 }
 
 describe('schedule-created Turn data', () => {
-  it('folds the created task of one settled schedule_create call into its Turn', () => {
+  it.each(['schedule_create', 'schedule_task_create'])('folds a settled %s creation into its Turn', (toolName) => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),
-      call(2, CALL, 'schedule_create', ARGS),
+      call(2, CALL, toolName, ARGS),
       result(3, CALL, JSON.stringify(dailyTask)),
     ])
     const data = scheduleOf(value)
     expect(data?.created).toHaveLength(1)
     expect(data?.created[0]?.seq).toBe(3)
     expect(data?.created[0]?.callId).toBe(CALL)
-    expect(data?.created[0]?.call?.name).toBe('schedule_create')
+    expect(data?.created[0]?.call?.name).toBe(toolName)
     expect(data?.created[0]?.content).toEqual([{ type: 'text', text: JSON.stringify(dailyTask) }])
   })
 
@@ -641,4 +641,12 @@ describe('schedule-created Definition lifecycle', () => {
     // A different created array republishes.
     expect(build({ ...state, created: [] }, 'turn', built)).not.toBe(built)
   })
+})
+
+it.each([en, zh])('labels an executable task created in the closing Turn', (dictionary) => {
+  const block = settledBlock(dailyTask)
+  const executable: ToolResultNode = { ...block, call: { name: 'schedule_task_create', argsRaw: JSON.stringify(ARGS) } }
+  render(<ScheduleTurnCard {...cardProps([executable], vi.fn(), makeTranslate(dictionary))} />)
+  expect(screen.getByText(dictionary['purpose.task'])).toBeTruthy()
+  expect(document.querySelector('[data-tool="schedule_task_create"]')).toBeTruthy()
 })

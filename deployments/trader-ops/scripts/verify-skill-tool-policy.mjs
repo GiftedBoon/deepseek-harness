@@ -17,8 +17,8 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const ENVIRONMENTS = ['development', 'staging', 'production']
-/** `mcp__<serverName>__<tool>`; the trailing wildcard in prose does not match. */
-const TOOL_REFERENCE = /mcp__[A-Za-z0-9_-]+?__[A-Za-z0-9_]+/g
+/** Match exact deployment MCP and Schedule tool names, excluding prose wildcards. */
+const TOOL_REFERENCE = /\b(?:mcp__[A-Za-z0-9_-]+?__[A-Za-z0-9_]+|schedule_(?:task_(?:create|list|update|delete|executions)|state_(?:read|write)|create|list|delete)|scheduled_action_(?:create|list|delete))\b/g
 
 const [repoRoot, deploymentRoot] = process.argv.slice(2)
 if (repoRoot === undefined || deploymentRoot === undefined) {
@@ -71,6 +71,7 @@ function referenceFiles(root) {
     if (isFile(skillFile)) files.push(skillFile)
   }
   files.push(join(root, 'config/dsh/trader-ops-wecom.patch.yml'))
+  files.push(join(root, 'scripts/preopen-watch-plugin.mjs'))
   return files
 }
 

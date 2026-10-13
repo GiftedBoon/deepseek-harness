@@ -1,0 +1,11 @@
+# The selected committed Session supplies all replayed model chunks.
+- insert:
+    - id: scheduled-preopen-replay
+      name: '@deepseek-ai/dsh-llm-replay'
+      disabled: !!js "process.env.DSH_PREOPEN_AUTHOR === '1'"
+      config:
+        providers:
+          - id: deepseek-official
+            name: DeepSeek
+            models:
+              - id: deepseek-flash

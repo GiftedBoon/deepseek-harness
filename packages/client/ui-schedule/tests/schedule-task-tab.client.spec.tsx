@@ -104,6 +104,7 @@ function mount(
     onDelete: vi.fn(async () => 'deleted' as const),
     onRetry: vi.fn(async () => {}),
     onUpdateTiming: updateTiming,
+    loadExecutions: vi.fn().mockResolvedValue({ ok: true, value: [] }),
     loadHistory: vi.fn(async ({ id }: { id: ScheduleId }) => ({
       ok: true, value: {
         id, records: [], earlierRecordsUnavailable: false,

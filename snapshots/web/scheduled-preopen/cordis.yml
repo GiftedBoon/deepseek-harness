@@ -1,0 +1,32 @@
+# Real Web Host/Agent/Schedule assembly with external dependencies replaced.
+- id: llm-deepseek
+  disabled: true
+- id: session-title-llm
+  disabled: true
+- id: session-log-deepseek
+  disabled: true
+- id: agent-instructions
+  disabled: true
+- id: agent-default-model
+  config:
+    provider: deepseek-official
+    model: deepseek-flash
+- id: skill-filesystem
+  disabled: false
+  config:
+    includeDefaultRoots: false
+    bundledSkillDir: !!js "process.env.DSH_PREOPEN_SKILLS"
+    watch: false
+- id: session-persistence-jsonl
+  config:
+    root: !!js process.env.DSH_PREOPEN_SESSIONS
+    compression: none
+- id: web-runtime
+  config:
+    openBrowser: false
+    printUrl: true
+    surfaceContext: false
+    trustedHosts: []
+- insert:
+    - id: scheduled-preopen-boundaries
+      name: './boundaries.ts'

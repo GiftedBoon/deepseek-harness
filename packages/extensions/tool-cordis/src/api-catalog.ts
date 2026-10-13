@@ -1870,6 +1870,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'The durably stored schedule. Cancellation does not roll back an in-flight write.',
       },
       {
+        signature: 'async createTask(sessionId: SessionId, request: ScheduleTaskCreateRequest, signal?: AbortSignal): Promise<ScheduleTaskRecord>',
+        description: 'Create executable user-requested work with its adapter fixed before arming the timer.',
+        parameters: [{ name: 'sessionId', description: 'Owner.' }, { name: 'request', description: 'Instruction and timing.' }, { name: 'signal', description: 'Optional write cancellation.' }],
+        returns: 'Durable task record.',
+      },
+      {
         signature: '@Remote(\'list\') async list(request: ScheduleListRequest): Promise<ScheduleRecord[]>',
         description: 'Read the selected Session\'s active tasks without resuming its Agent.',
         parameters: [{ name: 'request', description: 'Session whose task list is requested.' }],
@@ -1899,6 +1905,36 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Update the name, instruction, and timing of an active task within the original Session binding without activating the Session or changing saved deliveries.\n\nEach supplied field replaces its stored value; an omitted field keeps it. A name or instruction change alone does not reset the committed target.',
         parameters: [{ name: 'request', description: 'Task binding, complete observed record, and any combination of timing, name, and instruction.' }, { name: 'signal', description: 'Cancellation checked after domain readiness and FIFO waits, before persistence begins.' }],
         returns: 'The committed record, unchanged record for a no-op, or a non-mutating input/lookup/conflict result. Storage and lifecycle failures reject; cancellation after a write starts does not roll it back.',
+      },
+      {
+        signature: 'registerTaskExecutor(provider: ScheduleTaskExecutor): () => void',
+        description: 'Register a named Session executor.',
+        parameters: [{ name: 'provider', description: 'Adapter retaining preset, permissions, and route.' }],
+        returns: 'Idempotent disposer.',
+      },
+      {
+        signature: 'async listTasks(request: ScheduleListRequest): Promise<ScheduleTaskRecord[]>',
+        description: 'Read executable schedules.',
+        parameters: [{ name: 'request', description: 'Session owner.' }],
+        returns: 'Active task records, excluding reminders.',
+      },
+      {
+        signature: '@Remote(\'executions\') async executions(request: ScheduleListRequest & { id?: import(\'./types.ts\').ScheduleId before?: import(\'./types.ts\').ScheduleExecutionId limit: number }): Promise<ScheduleExecution[]>',
+        description: 'Read retained execution facts.',
+        parameters: [{ name: 'request', description: 'Owner, optional task, page limit, and optional exclusive execution cursor.' }],
+        returns: 'Newest-first bounded executions; an unknown or pruned cursor rejects with invalid_rule.',
+      },
+      {
+        signature: 'async readState(sessionId: SessionId, workflow: string): Promise<ScheduleWorkflowState>',
+        description: 'Read one Session workflow revision.',
+        parameters: [{ name: 'sessionId', description: 'Owner.' }, { name: 'workflow', description: 'Key.' }],
+        returns: 'Value and revision.',
+      },
+      {
+        signature: 'async writeState(sessionId: SessionId, workflow: string, revision: number, value: ScheduleJson): Promise<ScheduleWorkflowState | { code: \'state_conflict\'; current: ScheduleWorkflowState }>',
+        description: 'Replace one workflow with compare-and-set.',
+        parameters: [{ name: 'sessionId', description: 'Owner.' }, { name: 'workflow', description: 'Key.' }, { name: 'revision', description: 'Observed revision.' }, { name: 'value', description: 'Bounded JSON replacement.' }],
+        returns: 'Revision or current conflicting state.',
       },
     ],
   },
@@ -3511,6 +3547,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'weComNotifications',
+    summary: 'Host-generated Markdown notifications using the channel\'s existing connection and durable outbox.',
+    description: 'Host-generated Markdown notifications using the channel\'s existing connection and durable outbox.',
+    methods: [
+      {
+        signature: 'enqueue(content: string): Promise<void>',
+        description: 'Persist a report for the configured exact allowlisted group.',
+        parameters: [{ name: 'content', description: 'Markdown bounded by the channel\'s reply byte limit.' }],
+        returns: 'Resolves after durable queue admission, not provider receipt; rejects on storage failure or disposal.',
+      },
+    ],
+  },
+  {
     key: 'workflowEngine',
     summary: 'Workflow Service Definition contract.',
     description: 'Workflow Service Definition contract. Invalid requests throw before publication; a live run is holder-owned, its result never rejects, and disposal waits for script and child cleanup. Lifecycle listener failures are contained, and `workflow/end` fires exactly once as the result settles.',
@@ -4146,6 +4195,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'Durable task set changed; clients refetch global task and Session-active catalogs.',
     description: 'Durable task set changed; clients refetch global task and Session-active catalogs.',
     parameters: [],
+  },
+  {
+    name: 'schedule/execution',
+    mode: 'emit',
+    signature: '\'schedule/execution\'(execution: ScheduleExecution): void',
+    summary: 'Execution admission or settlement committed.',
+    description: 'Execution admission or settlement committed. Listener failures do not affect execution. @mode emit',
+    parameters: [{ name: 'execution', description: 'Complete persisted execution.' }],
   },
   {
     name: 'session-telemetry/record',
@@ -6281,7 +6338,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ScheduleCatalogEntry',
-    declaration: 'export type ScheduleCatalogEntry = ScheduleRecord & {\n    readonly sessionId: SessionId;\n    readonly status: \'active\' | \'inactive\';\n    readonly lastDelivery?: ScheduleDeliveryReceipt;\n};',
+    declaration: 'export type ScheduleCatalogEntry = ScheduleRecord & {\n    readonly purpose?: \'task\';\n    readonly expiresAt?: string | undefined;\n    readonly sessionId: SessionId;\n    readonly status: \'active\' | \'inactive\';\n    readonly lastDelivery?: ScheduleDeliveryReceipt;\n};',
   },
   {
     name: 'ScheduleCreateRequest',
@@ -6320,8 +6377,24 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ScheduledToolPreparation = {\n    kind: \'dispatch\';\n    exec: ToolRunContext;\n} | {\n    kind: \'post-result\';\n    exec: ToolRunContext;\n    result: ToolExecutionResult;\n} | {\n    kind: \'final-result\';\n    exec: ToolRunContext;\n    result: ToolExecutionResult;\n};',
   },
   {
+    name: 'ScheduleExecution',
+    declaration: 'export interface ScheduleExecution {\n    readonly providerId: string;\n    readonly id: ScheduleExecutionId;\n    readonly scheduleId: ScheduleId;\n    readonly sessionId: SessionId;\n    readonly title: string;\n    readonly prompt: string;\n    readonly scheduledAt: string;\n    readonly expiresAt?: string | undefined;\n    readonly createdAt: string;\n    readonly status: \'queued\' | \'running\' | \'completed\' | \'failed\' | \'interrupted\';\n    readonly interruptionReason?: \'cancelled\' | \'expired\' | \'unloaded\' | \'crash\' | undefined;\n    readonly inputMessageId: MessageId;\n    readonly messageIds?: MessageId[] | undefined;\n    readonly output?: string | undefined;\n    readonly error?: string | undefined;\n}',
+  },
+  {
+    name: 'ScheduleExecutionId',
+    declaration: 'export type ScheduleExecutionId = Branded<\'ScheduleExecutionId\'>;',
+  },
+  {
+    name: 'ScheduleExecutionOutcome',
+    declaration: 'export interface ScheduleExecutionOutcome {\n    readonly status: \'completed\' | \'failed\' | \'interrupted\';\n    readonly interruptionReason?: \'cancelled\' | \'expired\' | \'unloaded\' | \'crash\' | undefined;\n    readonly inputMessageId?: MessageId | undefined;\n    readonly messageIds?: MessageId[] | undefined;\n    readonly output?: string | undefined;\n    readonly error?: string | undefined;\n}',
+  },
+  {
     name: 'ScheduleId',
     declaration: 'export type ScheduleId = Branded<\'ScheduleId\'>;',
+  },
+  {
+    name: 'ScheduleJson',
+    declaration: 'export type ScheduleJson = null | boolean | number | string | ScheduleJson[] | {\n    [key: string]: ScheduleJson;\n};',
   },
   {
     name: 'ScheduleListRequest',
@@ -6330,6 +6403,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ScheduleRecord',
     declaration: 'export type ScheduleRecord = OneShotScheduleRecord | RecurringScheduleRecord;',
+  },
+  {
+    name: 'ScheduleTaskCreateRequest',
+    declaration: 'export interface ScheduleTaskCreateRequest extends ScheduleCreateRequest {\n    readonly expires_at?: string;\n}',
+  },
+  {
+    name: 'ScheduleTaskExecutor',
+    declaration: 'export interface ScheduleTaskExecutor {\n    readonly id: string;\n    accepts(sessionId: SessionId): boolean;\n    execute(execution: ScheduleExecution, signal: AbortSignal): Promise<ScheduleExecutionOutcome>;\n}',
+  },
+  {
+    name: 'ScheduleTaskRecord',
+    declaration: 'export type ScheduleTaskRecord = ScheduleRecord & {\n    readonly expiresAt?: string;\n};',
   },
   {
     name: 'ScheduleTimingChange',
@@ -6354,6 +6439,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ScheduleUpdateResult',
     declaration: 'export type ScheduleUpdateResult = {\n    readonly id: ScheduleId;\n    readonly updated: boolean;\n    readonly record: ScheduleRecord;\n} | ScheduleUpdateMiss | ScheduleToolError;',
+  },
+  {
+    name: 'ScheduleWorkflowState',
+    declaration: 'export interface ScheduleWorkflowState {\n    readonly workflow: string;\n    readonly revision: number;\n    readonly value: ScheduleJson;\n}',
   },
   {
     name: 'Scoped',

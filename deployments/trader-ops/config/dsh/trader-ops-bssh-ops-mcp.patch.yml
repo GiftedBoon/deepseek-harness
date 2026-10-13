@@ -18,3 +18,24 @@
           maxAttempts: 5
           initialDelayMs: 1000
           maxDelayMs: 30000
+
+    # Legacy watcher remains available until Agent-task acceptance and cutover.
+    # Disable TRADER_OPS_PREOPEN_WATCH_ENABLED before creating Agent tasks.
+    - id: trader-ops-preopen-watch
+      name: '../../../../deployments/trader-ops/scripts/preopen-watch-plugin.mjs'
+      disabled: !!js process.env.TRADER_OPS_PREOPEN_WATCH_ENABLED !== '1'
+      config:
+        stateDir: !!js (process.env.DSH_HOME ?? '/var/lib/deepseek-harness') + '/trader-ops/preopen-watch'
+        start: '23:40'
+        logWindowStart: '23:30'
+        end: '00:30'
+        intervalMs: 60000
+        freshSeconds: 180
+        stallRepeats: 3
+        productsPerCheck: 2
+        retries: 3
+        processWaitMs: 180000
+        toolTimeoutMs: 75000
+        maxDetailRows: 200
+        retentionDays: 30
+        expectedExcluded: [GSLS4, JPMLS2, MSLS2, SHORTMSBOXLS1, SHORTMSBOXLS2, UBSLS2]

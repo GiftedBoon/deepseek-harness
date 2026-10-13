@@ -183,6 +183,7 @@ export function TaskManagerPage(props: TaskManagerPageProps) {
                           <span className={css.rowSummary} id={`${detailId}-metadata-${record.id}`}>
                             {record.status === 'inactive'
                               && <span className={css.metadata}>{t('status.inactive')}</span>}
+                            <span className={css.metadata}>{t(record.purpose === 'task' ? 'purpose.task' : 'purpose.reminder')}</span>
                             <span className={css.metadata}>{frequency(record)}</span>
                             {record.status === 'active' && <span className={css.metadata}>
                               {t('list.nextPrefix')}<time dateTime={record.scheduledAt}>

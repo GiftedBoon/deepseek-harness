@@ -826,6 +826,13 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Provider adapters dispatch authenticated deliveries; trusted plugins register independent process-local rules, and the runtime turns non-null results into ordinary Workspace-backed Sessions without delivery or completion state.',
   },
   {
+    key: 'weComNotifications',
+    pkg: 'channel-wecom',
+    title: 'Intelligent-bot notification queue',
+    mode: 'service',
+    note: 'The Trader Ops deployment watcher admits Markdown to the configured exact group through the existing channel connection and durable outbox; admission acknowledges persistence, not provider delivery.',
+  },
+  {
     key: 'lsp',
     pkg: 'lsp',
     title: 'Language-server navigation seam',

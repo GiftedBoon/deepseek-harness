@@ -328,6 +328,10 @@ interface ScheduleDeliveryReceipt {
 ```ts type-equiv
 /** Browser-safe retained reminder with its original Session binding. */
 type ScheduleCatalogEntry = ScheduleRecord & {
+  /** Executable tasks use the stored Session executor; absence denotes a reminder. */
+  readonly purpose?: 'task'
+  /** Executable task expiry; no new execution begins at or after this UTC instant. */
+  readonly expiresAt?: string | undefined
   /** Session receiving this reminder when it becomes due. */
   readonly sessionId: SessionId
   /** Inactive reminders remain visible but never schedule another delivery. */
@@ -437,6 +441,96 @@ type ScheduleDeliveryHistoryResult =
 
 Session 获取、消息入队或持久化确认失败时，任务继续保存在存储中，并报告宿主警告。后续管理变更或宿主重启会重试。Session 持久化与任务 put 不具有跨存储原子性。收件箱已持久化、任务尚未 put 时发生崩溃，可能重复投递；回执并未消除这一间隔。Schedule 不提供模型结果回执、执行取消或外部通知渠道。
 
+## Agent 管理的执行
+
+执行所有权保存在 `schedule_execution` 中，与已发布的提醒记录分离。具名执行器保留原 Session 的 preset、权限和结果路由。接纳、运行状态和最终结果均持久化；崩溃后中断未确定的运行工作，不回放副作用。一个 Session 同时接纳一个运行执行，每个任务最多保留一个排队发生时点，将新触发合并到同一个未开始的输入 id。失败和中断的输入 id 在整个 Session 生命周期内持久禁止执行，不受执行历史裁剪或任务删除影响。截止时间阻止新工作；独立工作流状态通过 compare-and-set revision 替换有界 JSON。[包 README](../../packages/schedule/schedule/README.zh.md) 定义执行和状态限制。
+
+```ts type-equiv
+/** Stable identity of one admitted scheduled execution. */
+type ScheduleExecutionId = Branded<'ScheduleExecutionId'>
+```
+
+```ts type-equiv
+/** Bounded JSON value retained for an Agent workflow. */
+type ScheduleJson = null | boolean | number | string | ScheduleJson[] | { [key: string]: ScheduleJson }
+```
+
+```ts type-equiv
+/** One revision of state scoped to a Session and workflow name. */
+interface ScheduleWorkflowState {
+  readonly workflow: string
+  readonly revision: number
+  readonly value: ScheduleJson
+}
+```
+
+```ts type-equiv
+/** Durable execution facts; output belongs to the executor's documented interval. */
+interface ScheduleExecution {
+  readonly providerId: string
+  readonly id: ScheduleExecutionId
+  readonly scheduleId: ScheduleId
+  readonly sessionId: SessionId
+  readonly title: string
+  readonly prompt: string
+  readonly scheduledAt: string
+  /** No new work begins at or after this UTC instant; already started work may settle. */
+  readonly expiresAt?: string | undefined
+  readonly createdAt: string
+  readonly status: 'queued' | 'running' | 'completed' | 'failed' | 'interrupted'
+  /** Distinguishes suppressed unstarted work from uncertain started work. */
+  readonly interruptionReason?: 'cancelled' | 'expired' | 'unloaded' | 'crash' | undefined
+  readonly inputMessageId: MessageId
+  readonly messageIds?: MessageId[] | undefined
+  readonly output?: string | undefined
+  readonly error?: string | undefined
+}
+```
+
+```ts type-equiv
+/** Executable creation with an optional absolute cutoff independent of its recurrence. */
+interface ScheduleTaskCreateRequest extends ScheduleCreateRequest {
+  /** Offset-bearing RFC 3339 cutoff, strictly later than creation and the first target. */
+  readonly expires_at?: string
+}
+```
+
+```ts type-equiv
+/** Executable timing and optional fixed cutoff returned to its owner. */
+type ScheduleTaskRecord = ScheduleRecord & { readonly expiresAt?: string }
+```
+
+```ts type-equiv
+/** Settlement supplied by the Session's execution provider. */
+interface ScheduleExecutionOutcome {
+  readonly status: 'completed' | 'failed' | 'interrupted'
+  readonly interruptionReason?: 'cancelled' | 'expired' | 'unloaded' | 'crash' | undefined
+  readonly inputMessageId?: MessageId | undefined
+  readonly messageIds?: MessageId[] | undefined
+  readonly output?: string | undefined
+  readonly error?: string | undefined
+}
+```
+
+```ts type-equiv
+/** Channel or application adapter retaining its Session's preset, authority, and result routing. */
+interface ScheduleTaskExecutor {
+  /** Stable adapter identity; persisted tasks never fall back to another adapter. */
+  readonly id: string
+  /**
+   * @param sessionId - Original owner.
+   * @returns Whether this adapter owns execution for the Session.
+   */
+  accepts(sessionId: SessionId): boolean
+  /**
+   * @param execution - Persisted admission.
+   * @param signal - Cancellation on unloading.
+   * @returns Settlement after owned work is quiescent.
+   */
+  execute(execution: ScheduleExecution, signal: AbortSignal): Promise<ScheduleExecutionOutcome>
+}
+```
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -468,6 +562,15 @@ Shared management service; reads, deletion, and timing edits never activate a Se
  * @returns The durably stored schedule. Cancellation does not roll back an in-flight write.
  */
 async create(sessionId: SessionId, request: ScheduleCreateRequest, signal?: AbortSignal): Promise<ScheduleRecord>
+
+/**
+ * Create executable user-requested work with its adapter fixed before arming the timer.
+ * @param sessionId - Owner.
+ * @param request - Instruction and timing.
+ * @param signal - Optional write cancellation.
+ * @returns Durable task record.
+ */
+async createTask(sessionId: SessionId, request: ScheduleTaskCreateRequest, signal?: AbortSignal): Promise<ScheduleTaskRecord>
 
 /**
  * Read the selected Session's active tasks without resuming its Agent.
@@ -516,6 +619,45 @@ async create(sessionId: SessionId, request: ScheduleCreateRequest, signal?: Abor
  * Storage and lifecycle failures reject; cancellation after a write starts does not roll it back.
  */
 @Remote('update') async update(request: ScheduleUpdateRequest, signal?: AbortSignal): Promise<ScheduleUpdateResult>
+
+/**
+ * Register a named Session executor.
+ * @param provider - Adapter retaining preset, permissions, and route.
+ * @returns Idempotent disposer.
+ */
+registerTaskExecutor(provider: ScheduleTaskExecutor): () => void
+
+/**
+ * Read executable schedules.
+ * @param request - Session owner.
+ * @returns Active task records, excluding reminders.
+ */
+async listTasks(request: ScheduleListRequest): Promise<ScheduleTaskRecord[]>
+
+/**
+ * Read retained execution facts.
+ * @param request - Owner, optional task, page limit, and optional exclusive execution cursor.
+ * @returns Newest-first bounded executions; an unknown or pruned cursor rejects with invalid_rule.
+ */
+@Remote('executions') async executions(request: ScheduleListRequest & { id?: import('./types.ts').ScheduleId before?: import('./types.ts').ScheduleExecutionId limit: number }): Promise<ScheduleExecution[]>
+
+/**
+ * Read one Session workflow revision.
+ * @param sessionId - Owner.
+ * @param workflow - Key.
+ * @returns Value and revision.
+ */
+async readState(sessionId: SessionId, workflow: string): Promise<ScheduleWorkflowState>
+
+/**
+ * Replace one workflow with compare-and-set.
+ * @param sessionId - Owner.
+ * @param workflow - Key.
+ * @param revision - Observed revision.
+ * @param value - Bounded JSON replacement.
+ * @returns Revision or current conflicting state.
+ */
+async writeState(sessionId: SessionId, workflow: string, revision: number, value: ScheduleJson): Promise<ScheduleWorkflowState | { code: 'state_conflict'; current: ScheduleWorkflowState }>
 ```
 
 Types: [SessionId](core.zh.md)
@@ -537,6 +679,22 @@ Durable task set changed; clients refetch global task and Session-active catalog
  * @mode emit
  */
 'schedule/changed'(): void
+```
+
+Source: [`packages/schedule/schedule/src/types.ts`](../../packages/schedule/schedule/src/types.ts)
+
+<a id="scheduleexecution--emit"></a>
+
+#### `schedule/execution` — emit
+
+Execution admission or settlement committed. Listener failures do not affect execution. @mode emit
+
+```ts cordis-catalog
+/**
+ * Execution admission or settlement committed. Listener failures do not affect execution. @mode emit
+ * @param execution - Complete persisted execution.
+ */
+'schedule/execution'(execution: ScheduleExecution): void
 ```
 
 Source: [`packages/schedule/schedule/src/types.ts`](../../packages/schedule/schedule/src/types.ts)

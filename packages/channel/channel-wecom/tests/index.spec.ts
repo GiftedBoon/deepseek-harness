@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { Context } from '@deepseek-ai/cordis'
 import type { ResolvedConfig } from '../src/config.ts'
 
 const mocks = vi.hoisted(() => {
@@ -8,6 +9,7 @@ const mocks = vi.hoisted(() => {
   class Runtime {
     static startError: Error | undefined
     readonly close = vi.fn(() => Promise.resolve())
+    readonly enqueueNotification = vi.fn((_content: string) => Promise.resolve())
     constructor(_ctx: unknown, readonly options: unknown) { state.runtimes.push(this) }
     start(): Promise<void> { return Runtime.startError === undefined ? Promise.resolve() : Promise.reject(Runtime.startError) }
   }
@@ -85,11 +87,42 @@ function context(options: {
       const cleanup = factory()
       return cleanup
     },
+    provide: vi.fn(),
   }
   return { ctx, calls }
 }
 
 describe('channel-wecom plugin', () => {
+  it('removes the notification service when its owning channel fiber unloads', async () => {
+    const ctx = new Context()
+    const test = context()
+    for (const [service, value] of Object.entries(test.ctx)) {
+      if (service !== 'effect' && service !== 'provide') ctx.provide(service, value)
+    }
+    try {
+      const fiber = await ctx.plugin({ apply: (owner: Context) => apply(owner, config({ allowedChats: ['chat'], notificationChatId: 'chat' })) })
+      expect(ctx.get('weComNotifications')).toBeDefined()
+      await fiber.dispose()
+      expect(ctx.get('weComNotifications')).toBeUndefined()
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+  it('publishes the existing connection queue only for a configured exact group', async () => {
+    const test = context()
+    await apply(test.ctx as never, config({ allowedChats: ['chat'], notificationChatId: 'chat' }))
+    expect(test.ctx.provide.mock.calls[0]![0]).toBe('weComNotifications')
+    const service = test.ctx.provide.mock.calls[0]![1] as { enqueue: (content: string) => Promise<void> }
+    expect(typeof service.enqueue).toBe('function')
+    await service.enqueue('report')
+    expect(mocks.state.runtimes[0]!.enqueueNotification).toHaveBeenCalledWith('report')
+  })
+
+  it('rejects a notification group outside the allowlist before opening storage', async () => {
+    const test = context()
+    await expect(apply(test.ctx as never, config({ notificationChatId: 'other' }))).rejects.toThrow('exact allowedChats')
+    expect(mocks.state.runtimes).toEqual([])
+  })
   it('declares its identity and resolves all startup inputs', async () => {
     expect(name).toBe('channel-wecom')
     expect(inject).toContain('storageDomain')

@@ -148,7 +148,7 @@ export const scheduleTurnDefinition: ConversationNodeDefinition<ScheduleTurnStat
     }
     if (match.event.type !== 'tool/result') return context.state
     const call = context.state.calls.get(String(match.event.data.message.source.callId))
-    if (call?.name !== SCHEDULE_CREATE_TOOL) return context.state
+    if (call?.name !== SCHEDULE_CREATE_TOOL && call?.name !== 'schedule_task_create') return context.state
     const block = createdTask(match, call)
     return block === undefined
       ? context.state

@@ -50,7 +50,7 @@ export function ScheduleCreateCard({ block, toolName, openTaskDetail, t, current
   const title = currentTask === undefined || currentTask === null ? model.title : taskName(currentTask)
   const openable = task !== undefined && !deleted
   return (
-    <div className={css.card} data-tool="schedule_create">
+    <div className={css.card} data-tool={toolName}>
       {openable
         ? (
           <button
@@ -65,6 +65,8 @@ export function ScheduleCreateCard({ block, toolName, openTaskDetail, t, current
         <span className={css.leading}><IconClockOutlineRegular size={18} /></span>
         <span className={css.body}>
           <span className={css.title}>{title}</span>
+          {toolName === 'schedule_task_create' && !deleted
+            && <span className={css.frequency}>{t('purpose.task')}</span>}
           {task !== undefined
             ? <span className={css.frequency}>{deleted ? t('card.deleted') : formatScheduleFrequency(task, t)}</span>
             : null}

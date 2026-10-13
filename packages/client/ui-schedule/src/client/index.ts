@@ -143,6 +143,7 @@ export function apply(ctx: ClientContext): void {
     onRetry: manager.onRetry,
     onUpdateTiming: updateTask,
     loadHistory,
+    loadExecutions: request => ctx.remote.schedule.executions(request),
     onOpenSession: openSession,
   }
   // The Sidebar persists a tab's layout record and not its navigation

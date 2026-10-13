@@ -19,6 +19,7 @@ import { CatalogFeedback } from './CatalogFeedback.tsx'
 import { IconCalendarOutlineRegular } from './CalendarIcon.tsx'
 import { ClockPicker } from './ClockPicker.tsx'
 import { DatePicker } from './DatePicker.tsx'
+import { ExecutionHistory, type ExecutionHistoryInjected } from './ExecutionHistory.tsx'
 import { DeliveryHistory, type DeliveryHistoryInjected } from './DeliveryHistory.tsx'
 import type { CatalogDeleteOutcome, CatalogSnapshot } from './catalog-source.ts'
 import { draftZone, secondPrecision, slashDate, timingDraft, timingError, timingSnapshot, zonedWallClock } from './task-timing.ts'
@@ -156,7 +157,7 @@ const sessionLinkMessages = {
  * Deletion, name/instruction/timing updates, saved-history, and original-Session
  * actions one task's detail calls.
  */
-export interface TaskDetailInjected extends DeliveryHistoryInjected, TaskTimingInjected {
+export interface TaskDetailInjected extends DeliveryHistoryInjected, ExecutionHistoryInjected, TaskTimingInjected {
   /**
    * Delete one retained task through its original Session binding.
    * @param id - Task shown in this detail.
@@ -189,6 +190,8 @@ export type TaskDetailProps = TaskDetailInjected
     readonly authoritative: boolean
     /** Element id shared by the detail panels and any control that points at them. */
     readonly id: string
+    /** Settled catalog read ordinal; refreshes execution records after Host changes. */
+    readonly historyRevision: number
     /** Catalog query state; loading keeps every action visible and disabled. */
     readonly status: 'loading' | 'ready' | 'error'
     /** Tasks with a deletion in flight. */
@@ -268,6 +271,7 @@ export function useTaskDetail(
     props: {
       ...injected,
       status: catalog.status,
+      historyRevision: catalog.readSettled,
       deleting: catalog.deleting,
       id,
       onEditState: setDraft,
@@ -289,7 +293,7 @@ export function useTaskDetail(
  * @returns the detail region, its deletion confirmation dialog, and the linked Session entry.
  */
 export function TaskDetail({
-  task, authoritative, id, status, deleting, onDelete, onRetry, onUpdateTiming, loadHistory, onOpenSession,
+  task, authoritative, id, status, deleting, onDelete, onRetry, onUpdateTiming, loadHistory, loadExecutions, historyRevision, onOpenSession,
   onEditState, tab, onTabChange, confirmId, onConfirm, onDeleted, onClose, withinSession, useSessions, useWorkspaces, t,
 }: TaskDetailProps): ReactNode {
   const sessions = useSessions(snapshot => snapshot)
@@ -680,7 +684,7 @@ export function TaskDetail({
                 onTabChange(next)
                 detailTabsRef.current?.querySelector<HTMLButtonElement>(`[data-detail-tab="${next}"]`)?.focus()
               }}
-            >{t(`detail.${value}`)}</button>
+            >{t(value === 'records' && task.purpose === 'task' ? 'detail.executions' : `detail.${value}`)}</button>
           ))}
         </div>
         <div className={css.detailActions}>
@@ -771,6 +775,10 @@ export function TaskDetail({
             />}
         </header>}
         {tab === 'rule' && !deleted && <div className={css.nextRun}>
+          <p>{t(task.purpose === 'task' ? 'purpose.task' : 'purpose.reminder')}</p>
+          {task.purpose === 'task' && task.expiresAt !== undefined && <p>
+            {t('detail.cutoff')}{' '}<time dateTime={task.expiresAt}>{nextRunParts(task.expiresAt, t('time.locale'), now, t).absolute}</time>
+          </p>}
           {task.status === 'active'
             ? <p>
               {t('detail.nextRun')}{' '}
@@ -812,10 +820,16 @@ export function TaskDetail({
         </div>
         <div role="tabpanel" id={`${id}-records-panel`} aria-labelledby={`${id}-records-tab`}
           className={css.recordsPanel} hidden={tab !== 'records'} tabIndex={0}>
-          {/* Deletion removed the saved records with the task, so a deleted
-              task mounts no history in the frame before `onDeleted` closes
-              this detail: no read is attempted against the removed row. */}
-          {tab === 'records' && !deleted && <DeliveryHistory
+          {/* A deleted task leaves this detail once the authoritative read settles. */}
+          {tab === 'records' && !deleted && (task.purpose === 'task' ? <ExecutionHistory
+            key={JSON.stringify([task.sessionId, task.id])}
+            id={task.id}
+            sessionId={task.sessionId}
+            revision={historyRevision}
+            timeZone={recordTimeZone(task)}
+            loadExecutions={loadExecutions}
+            t={t}
+          /> : <DeliveryHistory
             key={JSON.stringify([task.sessionId, task.id])}
             id={task.id}
             sessionId={task.sessionId}
@@ -823,7 +837,7 @@ export function TaskDetail({
             timeZone={recordTimeZone(task)}
             loadHistory={loadHistory}
             t={t}
-          />}
+          />)}
         </div>
       </div>
       {/* A notice about the original Session states its own line under the strip:
@@ -852,7 +866,7 @@ export function TaskDetail({
       contentClassName={css.confirmContent as string}
       open={confirming}
       title={t('delete.title')}
-      description={t('delete.description')}
+      description={t(task.purpose === 'task' ? 'delete.taskDescription' : 'delete.description')}
       closeLabel={t('delete.close')}
       onClose={closeConfirmation}
       footer={confirming && <div ref={footerRef} className={css.confirmActions}>

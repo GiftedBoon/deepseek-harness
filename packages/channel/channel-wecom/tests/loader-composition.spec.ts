@@ -48,6 +48,7 @@ class Adapter extends LlmAdapter {
 class Client implements WeComChannelClient {
   listener: ((frame: unknown) => void) | undefined
   final = Promise.withResolvers<string>()
+  readonly notifications: { target: string; content: string }[] = []
   connect(): Promise<void> { return Promise.resolve() }
   disconnect(): Promise<void> { return Promise.resolve() }
   onText(listener: (frame: unknown) => void): () => void {
@@ -60,7 +61,11 @@ class Client implements WeComChannelClient {
     if (finish) this.final.resolve(content)
     return Promise.resolve()
   }
-  sendMarkdown(_target: string, content: string): Promise<void> { this.final.resolve(content); return Promise.resolve() }
+  sendMarkdown(target: string, content: string): Promise<void> {
+    this.notifications.push({ target, content })
+    this.final.resolve(content)
+    return Promise.resolve()
+  }
 }
 
 let root: string | undefined
@@ -112,7 +117,7 @@ it('reports archive admission failure and resumes the same conversation after re
   runtime = new WeComChannelRuntime(ctx, {
     config: Config({
       botId: 'bot', secretEnv: 'SECRET', sessionKeyEnv: 'KEY', workspacePath: root,
-      agentPreset: 'empty', permissionPreset: 'unattended', allowedUsers: ['user'], allowedChats: [],
+      agentPreset: 'empty', permissionPreset: 'unattended', allowedUsers: ['user'], allowedChats: ['chat'], notificationChatId: 'chat',
       messages: { processing: '处理中', timeout: '超时', failure: '任务失败，请检查会话状态',
         emptyReply: '任务已完成，但没有文本回复。', unauthorized: '未授权', duplicate: '重复',
         scheduledActionSuccess: '成功', scheduledActionFailure: '失败', scheduledActionUncertain: '未知',
@@ -144,6 +149,8 @@ it('reports archive admission failure and resumes the same conversation after re
     expect([...domain.table('deliveries').entries()].map(([, record]) => record.state)).toEqual(['failed', 'completed'])
   })
   expect(adapter.requests).toBe(1)
+  await runtime.enqueueNotification('**预开启完成**')
+  await vi.waitFor(() => { expect(client.notifications).toEqual([{ target: 'chat', content: '**预开启完成**' }]) })
   await runtime.close()
   await using stored = await ctx.sessionPersistence.open(sessionId, 'read')
   const history = await stored.read()
@@ -154,5 +161,6 @@ it('reports archive admission failure and resumes the same conversation after re
     turns: history.events.filter(event => event.type === 'turn/end').map(event => event.data.reason.kind),
     modelRequests: adapter.requests,
     archived: ctx.workspaceRegistry.archivedSessionIds.includes(sessionId),
+    notifications: client.notifications,
   }, null, 2) + '\n').toMatchFileSnapshot('./expected/archive-recovery.json')
 })

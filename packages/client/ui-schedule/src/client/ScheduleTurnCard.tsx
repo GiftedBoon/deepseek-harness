@@ -41,7 +41,7 @@ function cardProps(
 ): ScheduleCreateCardInput {
   const supplied: ScheduleCreateCardInput = {
     callId: block.callId,
-    toolName: SCHEDULE_CREATE_TOOL,
+    toolName: block.call?.name ?? SCHEDULE_CREATE_TOOL,
     block,
     openTaskDetail,
     t,

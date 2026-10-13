@@ -1,0 +1,42 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pre-open scheduled reports > reports the first check, completes, and omits successful zero-missing comparisons 1`] = `
+[
+  "**结论：未完成**
+目标交易日：2026-10-13
+检查时间：2026-10-12 23:40:00（北京时间）
+批次：2026-10-12 23:39:58（延迟 2 秒）
+范围：2 行 / 1 产品｜待开启：2 行 / 1 产品
+将每分钟复查，确认完成后播报。",
+  "**结论：已完成 ✅**
+目标交易日：2026-10-13
+检查时间：2026-10-12 23:41:00（北京时间）
+批次：2026-10-12 23:39:58（延迟 2 秒）
+范围：2 行 / 1 产品｜待开启：0 行 / 0 产品
+**字段是否全部为 0（本批次检查范围）**
+> PnLratio：是
+> MV_shortSell：是
+> MV_net：是
+> traderUnRealizedTradePnL：是
+> traderRealizedTradePnL：是
+> traderTradePnL：是
+> traderPositionPnL：是
+> traderTotalPnL：是
+> traderTradingCost：是
+> netMVRatio：是
+> Posratio：是
+> TradePnLratio：是
+> TradeFeeratio：是
+共检查 2 次；本次检查范围内的预开启判据已通过，当夜守护结束。",
+]
+`;
+
+exports[`resumable pre-open triage > records per-colo evidence and never counts another product process as this product 1`] = `
+"**预开启自动排查**
+目标交易日：2026-10-13
+检查时间：2026-10-12 23:43:00（北京时间）
+批次：2026-10-12 23:39:58（延迟 2 秒）
+范围：2 行 / 1 产品｜待开启：2 行 / 1 产品
+本次排查 1 个产品；仍待排查 0 个。自动排查只读取证，未执行修复。
+> HJ1：csc-sh-12：进程输出未确认该产品，不能据此判定未启动；当夜报错 0 条、历史报错 1 条、时间未确认 1 条（仅统计返回明细）；failed 匹配总数 2；已记录首次取证基线，原因未确认；csc-sz-12：进程输出未确认该产品，不能据此判定未启动；当夜报错 0 条、历史报错 1 条、时间未确认 1 条（仅统计返回明细）；failed 匹配总数 2；已记录首次取证基线，原因未确认"
+`;
