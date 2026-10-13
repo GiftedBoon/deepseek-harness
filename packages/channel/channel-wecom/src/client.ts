@@ -103,4 +103,32 @@ export class OfficialWeComClient implements WeComChannelClient {
       throw replyFailure(error)
     }
   }
+
+  /** Upload a PNG through the long connection as a three-day temporary image. */
+  async uploadImage(png: Buffer, filename: string): Promise<string> {
+    try {
+      const result = await this.client.uploadMedia(png, { type: 'image', filename })
+      return result.media_id
+    } catch (error: unknown) {
+      throw replyFailure(error)
+    }
+  }
+
+  /** Passively reply with an uploaded image on the inbound frame's request id. */
+  async replyImage(frame: unknown, mediaId: string): Promise<void> {
+    try {
+      await this.client.replyMedia(frame as WsFrameHeaders, 'image', mediaId)
+    } catch (error: unknown) {
+      throw replyFailure(error)
+    }
+  }
+
+  /** Actively send an uploaded image when the passive reply is refused. */
+  async sendImage(target: string, mediaId: string): Promise<void> {
+    try {
+      await this.client.sendMediaMessage(target, 'image', mediaId)
+    } catch (error: unknown) {
+      throw replyFailure(error)
+    }
+  }
 }

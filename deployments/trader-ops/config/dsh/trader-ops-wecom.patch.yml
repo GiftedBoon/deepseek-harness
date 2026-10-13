@@ -60,6 +60,19 @@
             toolName: mcp__bssh-ops-remote__execute_quick_command_plan
             targetArgument: plan_id
             targetPattern: '^.+$'
+        # 趋势图：只接受 get_alpha_comparison 本轮成功结果里的 chart_id，从 bssh-ops MCP
+        # 同一服务的 /charts/<id>.png 取图（同一个 X-API-Key），在文字回复之后作为图片发送。
+        # TRADER_OPS_WECOM_CHARTS_ENABLED=0 关闭（需重启）。
+        chartAttachments: !!js >-
+          process.env.TRADER_OPS_BSSH_MCP_ENABLED === '1'
+          && process.env.TRADER_OPS_WECOM_CHARTS_ENABLED !== '0'
+          && process.env.TRADER_OPS_BSSH_MCP_URL
+          ? {
+            baseUrl: new URL('/', process.env.TRADER_OPS_BSSH_MCP_URL).href,
+            apiKeyEnv: 'TRADER_OPS_BSSH_MCP_API_KEY',
+            toolNames: ['mcp__bssh-ops-remote__get_alpha_comparison'],
+          }
+          : undefined
         messages:
           processing: '正在处理…'
           timeout: '处理超时，请稍后重试。'

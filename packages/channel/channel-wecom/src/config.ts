@@ -59,6 +59,29 @@ export interface ScheduledActionConfig {
   input?: ScheduledActionInputConfig | undefined
 }
 
+/**
+ * Chart images delivered after a successful text reply.
+ *
+ * Only `chart_id` values returned by the listed tools in the current turn are
+ * fetched, from `<baseUrl>/charts/<id>.png`; the model never supplies an address.
+ */
+export interface ChartAttachmentsConfig {
+  /** Absolute http(s) base of the chart-producing service. */
+  baseUrl: string
+  /** Credential reference sent as `X-API-Key` to that service. */
+  apiKeyEnv: string
+  /** Exact registered tool names whose successful results may carry `chart_id`. */
+  toolNames: string[]
+  /** Maximum images sent after one reply; the most recent ids win. */
+  maxPerReply?: number
+  /** Maximum accepted PNG size in bytes (the provider limit is 10 MB). */
+  maxBytes?: number
+  /** Timeout of one image fetch. */
+  fetchTimeoutMs?: number
+  /** Text sent once when no collected image could be delivered. */
+  failureNotice?: string
+}
+
 /** Enterprise WeCom channel configuration. */
 export interface Config {
   /** Enterprise WeCom intelligent-bot id. */
@@ -113,6 +136,8 @@ export interface Config {
   scheduledActionTimeoutMs?: number
   /** Fixed numeric offset used to resolve time-only scheduled-action requests. */
   scheduledActionUtcOffset?: string
+  /** Optional chart images sent after the text reply. */
+  chartAttachments?: ChartAttachmentsConfig | undefined
   /** Operator-localized text sent by channel-owned states. */
   messages: ChannelMessages
 }
@@ -162,6 +187,18 @@ export const Config: z<Config> = z.object({
   maxScheduledActionDelayMs: z.number().min(1).default(31_536_000_000),
   scheduledActionTimeoutMs: z.number().min(1).default(300_000),
   scheduledActionUtcOffset: z.string().pattern(/^(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/).default('Z'),
+  chartAttachments: z.union([
+    z.object({
+      baseUrl: z.string().required(),
+      apiKeyEnv: z.string().required(),
+      toolNames: z.array(z.string()).required(),
+      maxPerReply: z.number().min(1).max(5).default(2),
+      maxBytes: z.number().min(1).max(10_000_000).default(4_000_000),
+      fetchTimeoutMs: z.number().min(1).default(10_000),
+      failureNotice: z.string().default('趋势图发送失败，请稍后重试。'),
+    }),
+    z.const(undefined),
+  ]).default(undefined),
   messages: z.object({
     processing: z.string().required(),
     timeout: z.string().required(),

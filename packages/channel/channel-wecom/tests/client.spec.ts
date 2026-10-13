@@ -45,6 +45,23 @@ const sdk = vi.hoisted(() => {
       // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- The provider can reject with non-Error protocol values.
       return this.sendError === undefined ? Promise.resolve() : Promise.reject(this.sendError)
     }
+    readonly media: unknown[][] = []
+    mediaError: unknown
+    uploadMedia(...args: unknown[]): Promise<{ media_id: string }> {
+      this.media.push(['upload', ...args])
+      // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- The provider can reject with non-Error protocol values.
+      return this.mediaError === undefined ? Promise.resolve({ media_id: 'media-1' }) : Promise.reject(this.mediaError)
+    }
+    replyMedia(...args: unknown[]): Promise<void> {
+      this.media.push(['reply', ...args])
+      // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- The provider can reject with non-Error protocol values.
+      return this.mediaError === undefined ? Promise.resolve() : Promise.reject(this.mediaError)
+    }
+    sendMediaMessage(...args: unknown[]): Promise<void> {
+      this.media.push(['send', ...args])
+      // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- The provider can reject with non-Error protocol values.
+      return this.mediaError === undefined ? Promise.resolve() : Promise.reject(this.mediaError)
+    }
   }
   const state: { instances: Client[] } = { instances: [] }
   return { Client, state }
@@ -182,5 +199,22 @@ describe('OfficialWeComClient', () => {
 
     client.replyError = new Error('already an Error')
     await expect(adapter.replyStream({}, 'stream', 'content', true)).rejects.toThrow('already an Error')
+  })
+
+  it('uploads, replies, and actively sends images through the SDK media methods', async () => {
+    const { adapter, client } = harness()
+    const png = Buffer.from('png')
+    await expect(adapter.uploadImage(png, 'chart.png')).resolves.toBe('media-1')
+    await adapter.replyImage({ headers: { req_id: 'r' } }, 'media-1')
+    await adapter.sendImage('chat', 'media-1')
+    expect(client.media).toEqual([
+      ['upload', png, { type: 'image', filename: 'chart.png' }],
+      ['reply', { headers: { req_id: 'r' } }, 'image', 'media-1'],
+      ['send', 'chat', 'image', 'media-1'],
+    ])
+    client.mediaError = { errcode: 40_009, errmsg: 'invalid image size' }
+    await expect(adapter.uploadImage(png, 'chart.png')).rejects.toThrow('errcode=40009 errmsg=invalid image size')
+    await expect(adapter.replyImage({}, 'm')).rejects.toThrow('errcode=40009')
+    await expect(adapter.sendImage('chat', 'm')).rejects.toThrow('errcode=40009')
   })
 })

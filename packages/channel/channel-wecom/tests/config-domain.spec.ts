@@ -30,6 +30,7 @@ describe('WeCom configuration and domain', () => {
       scheduledActionUtcOffset: 'Z',
     })
     expect(parsed.scheduledActions).toEqual([])
+    expect(parsed.chartAttachments).toBeUndefined()
     expect(channelWeComDomainSpec).toMatchObject({
       name: 'channel_wecom', version: 1,
       tables: { conversations: {}, deliveries: {}, outbox: {} },
@@ -84,5 +85,16 @@ describe('WeCom configuration and domain', () => {
       }],
     } as never)
     expect(parsed.scheduledActions?.[0]?.input).toBeUndefined()
+  })
+
+  it('applies chart attachment defaults and bounds', () => {
+    const chartAttachments = { baseUrl: 'http://charts.test', apiKeyEnv: 'MCP_KEY', toolNames: ['tool'] }
+    expect(Config({ ...requiredConfig(), chartAttachments } as never).chartAttachments).toEqual({
+      ...chartAttachments, maxPerReply: 2, maxBytes: 4_000_000, fetchTimeoutMs: 10_000,
+      failureNotice: '趋势图发送失败，请稍后重试。',
+    })
+    expect(() => Config({ ...requiredConfig(), chartAttachments: { ...chartAttachments, maxPerReply: 6 } } as never)).toThrow()
+    expect(() => Config({ ...requiredConfig(), chartAttachments: { ...chartAttachments, maxBytes: 10_000_001 } } as never)).toThrow()
+    expect(() => Config({ ...requiredConfig(), chartAttachments: { baseUrl: 'http://charts.test' } } as never)).toThrow()
   })
 })

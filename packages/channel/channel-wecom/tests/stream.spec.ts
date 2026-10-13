@@ -14,6 +14,9 @@ class FakeClient implements WeComChannelClient {
     return Promise.resolve()
   }
   sendMarkdown(): Promise<void> { return Promise.resolve() }
+  uploadImage(): Promise<string> { return Promise.resolve('media') }
+  replyImage(): Promise<void> { return Promise.resolve() }
+  sendImage(): Promise<void> { return Promise.resolve() }
 }
 
 afterEach(() => { vi.useRealTimers() })

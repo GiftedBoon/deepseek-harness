@@ -66,6 +66,9 @@ class Client implements WeComChannelClient {
     this.final.resolve(content)
     return Promise.resolve()
   }
+  uploadImage(): Promise<string> { return Promise.resolve('media') }
+  replyImage(): Promise<void> { return Promise.resolve() }
+  sendImage(): Promise<void> { return Promise.resolve() }
 }
 
 let root: string | undefined

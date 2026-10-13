@@ -16,6 +16,7 @@ import type { ChannelWeComDomain } from './domain.ts'
 import type { WeComScheduledActionInputDomain } from './scheduled-action-input-domain.ts'
 import type { WeComScheduledActionDomain } from './scheduled-action-domain.ts'
 import { WeComScheduledActions } from './scheduled-actions.ts'
+import { extractChartIds, mergeChartIds, type ChartFetcher } from './chart-attachments.ts'
 import { conversationIdentity, deliveryIdentity } from './identity.ts'
 import { WeComReplyStream, boundUtf8 } from './stream.ts'
 import type { WeComChannelClient, WeComTextDelivery } from './types.ts'
@@ -35,7 +36,22 @@ interface PromptInterval {
   output: string
   committedOutput: string
   readonly messageIds: MessageId[]
+  /** Call ids of chart-producing tools issued in this turn. */
+  readonly chartCalls: Set<string>
+  /** Chart ids from their successful results, oldest first. */
+  charts: string[]
 }
+
+/** Resolved chart-image delivery; absent when `chartAttachments` is not configured. */
+export interface ChartDelivery {
+  readonly fetcher: ChartFetcher
+  readonly toolNames: ReadonlySet<string>
+  readonly maxPerReply: number
+  readonly failureNotice: string
+}
+
+/** Upper bound on fetching and sending every chart after one reply. */
+const CHART_PHASE_TIMEOUT_MS = 45_000
 
 interface RuntimeOptions {
   readonly config: ResolvedConfig
@@ -46,6 +62,7 @@ interface RuntimeOptions {
   readonly identitySecret: string
   readonly workspace: Workspace
   readonly modelSelection: ModelSelection
+  readonly charts?: ChartDelivery
 }
 
 interface OutboxDrainOptions {
@@ -340,6 +357,7 @@ export class WeComChannelRuntime {
       const result = await this.runAgent(conversationKey, sessionId, delivery.text, delivery.chatType, stream)
       finalReply = result.output.trim() === '' ? this.options.config.messages.emptyReply : result.output
       await this.deliverFinal(stream, delivery.target, finalReply)
+      await this.deliverCharts(delivery, result.charts)
       await deliveries.put(deliveryKey, { conversationKey, state: 'completed', reply: finalReply, updatedAt: Date.now() })
     } catch (error: unknown) {
       const timedOut = error instanceof Error && error.message.includes('timed out')
@@ -364,7 +382,14 @@ export class WeComChannelRuntime {
     signal: AbortSignal = this.controller.signal,
     inputMessageId?: MessageId,
     expiresAt?: string,
-  ): Promise<{ output: string; committedOutput: string; inputMessageId: MessageId; messageIds: MessageId[]; reason: TurnEndReason }> {
+  ): Promise<{
+    output: string
+    committedOutput: string
+    inputMessageId: MessageId
+    messageIds: MessageId[]
+    reason: TurnEndReason
+    charts: readonly string[]
+  }> {
     if (this.ctx.agents.get(sessionId) !== undefined) throw new Error(`channel-wecom: Session is already active: ${sessionId}`)
     const existing = await this.ctx.sessionPersistence.stat(sessionId, { signal: this.controller.signal }) !== undefined
     const setup = async (agentCtx: Context, agent: Agent): Promise<void> => {
@@ -404,6 +429,8 @@ export class WeComChannelRuntime {
         output: '',
         committedOutput: '',
         messageIds: [],
+        chartCalls: new Set(),
+        charts: [],
       }
       this.active.set(sessionId, interval)
       signal.throwIfAborted()
@@ -424,7 +451,7 @@ export class WeComChannelRuntime {
         throw new Error('WeCom Agent turn was blocked; check Session archive state and admission policy')
       }
       return { output: interval.output, committedOutput: interval.committedOutput,
-        inputMessageId: message.id, messageIds: interval.messageIds, reason,
+        inputMessageId: message.id, messageIds: interval.messageIds, reason, charts: interval.charts,
       }
     } finally {
       this.active.delete(sessionId)
@@ -452,6 +479,17 @@ export class WeComChannelRuntime {
     }
     if (event.type === 'turn/end' && event.data.turn === interval.turn) {
       interval.settleTurn(event.data.reason)
+      return
+    }
+    const charts = this.options.charts
+    if (charts === undefined) return
+    if (event.type === 'tool/call' && event.data.turn === interval.turn && charts.toolNames.has(event.data.name)) {
+      interval.chartCalls.add(event.data.callId)
+    } else if (event.type === 'tool/result' && event.data.turn === interval.turn) {
+      const { message } = event.data
+      if (!interval.chartCalls.has(message.toolCallId) || message.isError === true) return
+      const ids = message.content.flatMap(block => block.type === 'text' ? extractChartIds(block.text) : [])
+      interval.charts = mergeChartIds(interval.charts, ids, charts.maxPerReply)
     }
   }
 
@@ -485,6 +523,38 @@ export class WeComChannelRuntime {
         )
       }
     }
+  }
+
+  /**
+   * Send the turn's chart images after the final text frame. Never throws: a chart
+   * is supplementary, so any failure degrades to one short text notice.
+   */
+  private async deliverCharts(delivery: WeComTextDelivery, chartIds: readonly string[]): Promise<void> {
+    const charts = this.options.charts
+    if (charts === undefined || chartIds.length === 0) return
+    const signal = AbortSignal.any([this.controller.signal, AbortSignal.timeout(CHART_PHASE_TIMEOUT_MS)])
+    let delivered = 0
+    for (const chartId of chartIds) {
+      const label = chartId.slice(0, 8)
+      try {
+        const png = await charts.fetcher.fetchPng(chartId, signal)
+        signal.throwIfAborted()
+        const mediaId = await this.options.client.uploadImage(png, `chart-${label}.png`)
+        try {
+          await this.options.client.replyImage(delivery.frame, mediaId)
+        } catch (replyError: unknown) {
+          this.ctx.logger.warn(`channel-wecom: chart ${label} passive reply failed, sending actively: ${errorChain(replyError)}`)
+          await this.options.client.sendImage(delivery.target, mediaId)
+        }
+        delivered += 1
+      } catch (error: unknown) {
+        this.ctx.logger.warn(`channel-wecom: chart ${label} delivery failed: ${errorChain(error)}`)
+      }
+    }
+    if (delivered === chartIds.length) return
+    await this.options.client.sendMarkdown(delivery.target, charts.failureNotice).catch((error: unknown) => {
+      this.ctx.logger.warn(`channel-wecom: chart failure notice failed: ${errorChain(error)}`)
+    })
   }
 
   private async enqueueOutbox(target: string, content: string): Promise<void> {

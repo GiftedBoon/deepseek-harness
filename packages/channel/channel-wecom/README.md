@@ -98,6 +98,8 @@ When `scheduledActions` is non-empty, mapped Agents receive `scheduled_action_cr
 
 Executable [Schedule tasks](../../schedule/schedule/README.md) bind to the mapped Session's `wecom` executor. They queue behind human messages, create or resume the same Agent preset and confined permission preset, and persist their exact input and committed assistant output before settlement. Reports use the original conversation route and bot connection, independently of `notificationChatId`; execution and each report retry require that user or group to remain explicitly allowlisted. Successful empty output and cancelled or expired unstarted tasks remain silent. The independent `channel_wecom_task_reports` domain records outbox admission and delivery so restart retries unsent results without rerunning the Agent. Reports and receipts expire under `outboxRetentionMs`; startup pages through all retained executions per conversation in requests of at most 100 records. A provider acceptance followed by process loss before its receipt commits can duplicate a report because the provider has no idempotent-send acknowledgment.
 
+`chartAttachments` is absent by default. When configured, the channel records the call ids of the exact `toolNames` in the active turn and reads every `"chart_id": "<32 hex>"` from their successful text results; failed results, other tools, and other turns are ignored, and only the most recent `maxPerReply` distinct ids (default 2) are kept. After the final text frame succeeds, each image is fetched from `<baseUrl>/charts/<id>.png` with the `apiKeyEnv` credential as `X-API-Key`, redirects refused, a `200` `image/png` response, `maxBytes`, and the PNG signature required, then uploaded with the SDK and sent as a passive image reply on the inbound frame, falling back to an active image send. The model never supplies an address. Any failure sends one `failureNotice` and leaves the delivery completed; scheduled-action notifications send no images.
+
 <a id="security"></a>
 ## Security
 
@@ -124,7 +126,7 @@ Resuming the same mapped Session preserves its reusable conversation prefix. Cha
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Text input only** — images, mixed messages, voice, files, video, cards, and welcome events are not admitted.
+- **Text input only** — images, mixed messages, voice, files, video, cards, and welcome events are not admitted. Outbound images are limited to `chartAttachments`.
 - **One active replica per BotID** — the package has no leader election or distributed conversation lock.
 - **Credential reload requires reconnection** — bot secret and Session identity key are resolved at plugin activation; rotate them by reloading the plugin.
 - **Bounded reply projection** — replies longer than `maxReplyBytes` are truncated with an ellipsis; tools and reasoning are not rendered into WeCom.

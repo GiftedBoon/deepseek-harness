@@ -98,6 +98,8 @@ kind: "package-reference"
 
 可执行的 [Schedule 任务](../../schedule/schedule/README.zh.md)绑定到映射 Session 的 `wecom` 执行器。任务与人工消息串行排队，使用相同的 Agent 预设和受约束的权限预设创建或恢复 Agent，在结算前持久化准确的输入和已提交的助手输出。报告通过原始会话路由及机器人连接发送，不受 `notificationChatId` 影响；任务执行及每次报告重试都要求用户或群仍在明确的白名单内。成功但没有输出的任务，以及尚未执行便取消或过期的任务保持静默。独立的 `channel_wecom_task_reports` 域记录发件箱入队和送达状态，使重启能够重试未发送结果而不重新运行 Agent。报告及回执按 `outboxRetentionMs` 过期；启动时以每次最多 100 条记录分页恢复每个会话的所有保留执行。如果提供方已接收消息，但进程在提交回执前丢失，由于提供方没有幂等发送确认，报告可能重复。
 
+`chartAttachments` 默认不配置。配置后，渠道记录当前轮次中 `toolNames` 所列确切工具的调用 id，并从它们**成功**的文本结果中读取每个 `"chart_id": "<32 位十六进制>"`；失败结果、其他工具和其他轮次一律忽略，只保留最近的 `maxPerReply` 个不同 id（默认 2）。最终文本帧发送成功后，逐张从 `<baseUrl>/charts/<id>.png` 取图：以 `apiKeyEnv` 凭据作为 `X-API-Key`，拒绝重定向，要求 `200`、`image/png`、不超过 `maxBytes` 且带 PNG 签名；随后经 SDK 上传，并在入站帧上被动回复图片，失败时改为主动发送。地址从不由模型提供。任一失败只发送一次 `failureNotice`，交付仍记为完成；定时动作通知不发送图片。
+
 <a id="security"></a>
 ## 安全
 
@@ -124,7 +126,7 @@ kind: "package-reference"
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **仅文本输入** — 不准入图片、图文混排、语音、文件、视频、卡片与欢迎事件。
+- **仅文本输入** — 不准入图片、图文混排、语音、文件、视频、卡片与欢迎事件。出站图片仅限 `chartAttachments`。
 - **每个 BotID 仅一个活动副本** — 本包没有 leader election 或分布式会话锁。
 - **凭据重载需要重新连接** — 机器人 secret 与 Session 身份密钥在插件激活时解析；轮换后请重新加载插件。
 - **回复投影有长度限制** — 超过 `maxReplyBytes` 的回复会用省略号截断；工具与 reasoning 不会渲染到企业微信。

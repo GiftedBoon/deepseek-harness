@@ -6,12 +6,13 @@ import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-permission-presets'
 import { isAbsolute } from 'node:path'
+import { ChartFetcher } from './chart-attachments.ts'
 import { OfficialWeComClient } from './client.ts'
-import { Config, type ResolvedConfig } from './config.ts'
+import { Config, type ChartAttachmentsConfig, type ResolvedConfig } from './config.ts'
 import { channelWeComDomainSpec } from './domain.ts'
 import { weComScheduledActionInputDomainSpec } from './scheduled-action-input-domain.ts'
 import { weComScheduledActionDomainSpec } from './scheduled-action-domain.ts'
-import { WeComChannelRuntime } from './runtime.ts'
+import { WeComChannelRuntime, type ChartDelivery } from './runtime.ts'
 import { resolveScheduledActions } from './scheduled-actions.ts'
 import type { WeComNotifications } from './types.ts'
 
@@ -55,6 +56,7 @@ export function apply(ctx: Context, config: Config): Promise<void> {
     if (secret === undefined) throw new Error(`channel-wecom: credential ${resolved.secretEnv} is not configured`)
     const identity = await ctx.credentials.resolve(credentialRef(resolved.sessionKeyEnv))
     if (identity === undefined) throw new Error(`channel-wecom: credential ${resolved.sessionKeyEnv} is not configured`)
+    const charts = await resolveChartDelivery(ctx, resolved.chartAttachments)
     const workspace = await ctx.workspaceRegistry.create(resolved.workspacePath)
     const domain = await ctx.storageDomain.open(channelWeComDomainSpec)
     let scheduledActionDomain
@@ -85,6 +87,7 @@ export function apply(ctx: Context, config: Config): Promise<void> {
       identitySecret: identity.value,
       workspace,
       modelSelection: ctx.agentDefaultModel.currentSelection(),
+      ...charts === undefined ? {} : { charts },
     })
     const dispose = ctx.effect(() => () => runtime.close(), 'channel-wecom.lifecycle()')
     try {
@@ -97,4 +100,27 @@ export function apply(ctx: Context, config: Config): Promise<void> {
       throw error
     }
   })()
+}
+
+/** Validate chart delivery and resolve its credential before connecting. */
+async function resolveChartDelivery(
+  ctx: Context,
+  config: ChartAttachmentsConfig | undefined,
+): Promise<ChartDelivery | undefined> {
+  if (config === undefined) return undefined
+  const toolNames = new Set(config.toolNames.filter(name => name !== ''))
+  if (toolNames.size === 0) throw new Error('channel-wecom: chartAttachments.toolNames must name at least one tool')
+  const apiKey = await ctx.credentials.resolve(credentialRef(config.apiKeyEnv))
+  if (apiKey === undefined) throw new Error(`channel-wecom: credential ${config.apiKeyEnv} is not configured`)
+  return {
+    fetcher: new ChartFetcher({
+      baseUrl: config.baseUrl,
+      apiKey: apiKey.value,
+      timeoutMs: config.fetchTimeoutMs ?? 10_000,
+      maxBytes: config.maxBytes ?? 4_000_000,
+    }),
+    toolNames,
+    maxPerReply: config.maxPerReply ?? 2,
+    failureNotice: config.failureNotice ?? '趋势图发送失败，请稍后重试。',
+  }
 }

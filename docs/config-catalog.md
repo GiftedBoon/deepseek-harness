@@ -435,7 +435,7 @@ export type Config = LocalConfig
 ## `@deepseek-ai/dsh-channel-wecom`
 
 - `inject`: `agents` · `agentDefaultModel` · `agentPresets` · `credentials` · `permissionPresets` · `sessionPersistence` · `sessions` · `sessionTitle` · `storageDomain` · `workspaceRegistry` · `tools`
-- `source`: [`packages/channel/channel-wecom/src/config.ts:63`](../packages/channel/channel-wecom/src/config.ts)
+- `source`: [`packages/channel/channel-wecom/src/config.ts:86`](../packages/channel/channel-wecom/src/config.ts)
 
 ```ts config-catalog
 /** Enterprise WeCom channel configuration. */
@@ -492,6 +492,8 @@ export interface Config {
   scheduledActionTimeoutMs?: number
   /** Fixed numeric offset used to resolve time-only scheduled-action requests. */
   scheduledActionUtcOffset?: string
+  /** Optional chart images sent after the text reply. */
+  chartAttachments?: ChartAttachmentsConfig | undefined
   /** Operator-localized text sent by channel-owned states. */
   messages: ChannelMessages
 }
@@ -517,6 +519,29 @@ export interface ScheduledActionConfig {
   arguments?: unknown
   /** Optional model-supplied string argument persisted for due-time dispatch. */
   input?: ScheduledActionInputConfig | undefined
+}
+
+/**
+ * Chart images delivered after a successful text reply.
+ *
+ * Only `chart_id` values returned by the listed tools in the current turn are
+ * fetched, from `<baseUrl>/charts/<id>.png`; the model never supplies an address.
+ */
+export interface ChartAttachmentsConfig {
+  /** Absolute http(s) base of the chart-producing service. */
+  baseUrl: string
+  /** Credential reference sent as `X-API-Key` to that service. */
+  apiKeyEnv: string
+  /** Exact registered tool names whose successful results may carry `chart_id`. */
+  toolNames: string[]
+  /** Maximum images sent after one reply; the most recent ids win. */
+  maxPerReply?: number
+  /** Maximum accepted PNG size in bytes (the provider limit is 10 MB). */
+  maxBytes?: number
+  /** Timeout of one image fetch. */
+  fetchTimeoutMs?: number
+  /** Text sent once when no collected image could be delivered. */
+  failureNotice?: string
 }
 
 /** Operator-owned user-visible channel messages. */

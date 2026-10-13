@@ -36,4 +36,10 @@ export interface WeComChannelClient {
   createStreamId(): string
   replyStream(frame: unknown, streamId: string, content: string, finish: boolean): Promise<void>
   sendMarkdown(target: string, content: string): Promise<void>
+  /** Upload a PNG as a temporary image and return its provider media id. */
+  uploadImage(png: Buffer, filename: string): Promise<string>
+  /** Passively reply to an inbound frame with an uploaded image. */
+  replyImage(frame: unknown, mediaId: string): Promise<void>
+  /** Actively send an uploaded image to a conversation target. */
+  sendImage(target: string, mediaId: string): Promise<void>
 }

@@ -3,7 +3,8 @@ import type { ScheduleTaskExecutor } from '@deepseek-ai/dsh-schedule'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ResolvedConfig } from '../src/config.ts'
 import { conversationIdentity, deliveryIdentity } from '../src/identity.ts'
-import { WeComChannelRuntime } from '../src/runtime.ts'
+import { WeComChannelRuntime, type ChartDelivery } from '../src/runtime.ts'
+import type { ChartFetcher } from '../src/chart-attachments.ts'
 import { resolveScheduledActions } from '../src/scheduled-actions.ts'
 import type { WeComChannelClient } from '../src/types.ts'
 
@@ -102,6 +103,22 @@ class Client implements WeComChannelClient {
     this.sends.push({ target, content })
     return this.failSend ? Promise.reject(new Error('active failed')) : Promise.resolve()
   }
+  readonly media: string[] = []
+  failUpload = false
+  failReplyImage = false
+  failSendImage = false
+  uploadImage(png: Buffer, filename: string): Promise<string> {
+    this.media.push(`upload:${filename}:${png.toString()}`)
+    return this.failUpload ? Promise.reject(new Error('upload failed')) : Promise.resolve(`media-${this.media.length}`)
+  }
+  replyImage(_frame: unknown, mediaId: string): Promise<void> {
+    this.media.push(`reply:${mediaId}`)
+    return this.failReplyImage ? Promise.reject(new Error('reply image failed')) : Promise.resolve()
+  }
+  sendImage(target: string, mediaId: string): Promise<void> {
+    this.media.push(`send:${target}:${mediaId}`)
+    return this.failSendImage ? Promise.reject(new Error('send image failed')) : Promise.resolve()
+  }
   emitText(frame: unknown): void { for (const listener of this.textListeners) listener(frame) }
   emitAuthenticated(): void { for (const listener of this.authListeners) listener() }
 }
@@ -113,6 +130,8 @@ interface AgentBehavior {
   requestHeader?: object
   activeConflict?: boolean
   emitAgentError?: boolean
+  /** Tool call/result pairs emitted in the turn before it ends. */
+  toolEvents?: Array<{ callId: string; name: string; text: string; isError?: boolean; turn?: number }>
 }
 
 interface RuntimeHarness {
@@ -172,6 +191,7 @@ function baseConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     scheduledActions: [], maxScheduledActionsPerConversation: 32,
     maxScheduledActionDelayMs: 1_000_000, scheduledActionTimeoutMs: 1_000,
     scheduledActionUtcOffset: '+08:00',
+    chartAttachments: undefined,
     messages: {
       processing: 'processing', timeout: 'timeout', failure: 'failure', emptyReply: 'empty',
       unauthorized: 'unauthorized', duplicate: 'duplicate',
@@ -200,6 +220,7 @@ function harness(options: {
   client?: Client
   domain?: Domain
   tasks?: boolean
+  charts?: ChartDelivery
 } = {}): RuntimeHarness {
   const behavior = options.behavior ?? {}
   const config = baseConfig(options.config)
@@ -265,6 +286,13 @@ function harness(options: {
           }
           emit('agent/assistant-stream', { agent, frame: { type: 'end', attemptId: 'attempt', revision: 6, index: 2, outcome: { kind: 'abandoned' } } })
           emit('session/event', session, { type: 'assistant/message', data: { turn: 1, message: { id: 'committed', content: [{ type: 'text', text: behavior.output ?? '' }] } } })
+          for (const tool of behavior.toolEvents ?? []) {
+            const turn = tool.turn ?? 1
+            emit('session/event', session, { type: 'tool/call', data: { turn, step: 1, callId: tool.callId, name: tool.name, arguments: {} } })
+            emit('session/event', session, { type: 'tool/result', data: { turn, step: 1, message: {
+              toolCallId: tool.callId, isError: tool.isError ?? false, content: [{ type: 'text', text: tool.text }],
+            } } })
+          }
           emit('session/event', session, { type: 'turn/end', data: { turn: 1, reason: behavior.reason ?? { kind: 'completed' } } })
         })
       },
@@ -333,6 +361,7 @@ function harness(options: {
     identitySecret: 'identity',
     workspace: workspace as never,
     modelSelection: { provider: 'provider', model: 'model', reasoningEffort: ReasoningEffortId('high') },
+    ...options.charts === undefined ? {} : { charts: options.charts },
   })
   runtimes.push(runtime)
   return {
@@ -633,5 +662,98 @@ describe('WeComChannelRuntime', () => {
     client.connectError = new Error('connect failed')
     const failed = harness({ client })
     await expect(failed.runtime.start()).rejects.toThrow('connect failed')
+  })
+
+  describe('chart attachments', () => {
+    const CHART_TOOL = 'mcp__bssh-ops-remote__get_alpha_comparison'
+    const A = 'a'.repeat(32)
+    const B = 'b'.repeat(32)
+    const C = 'c'.repeat(32)
+    const result = (...ids: string[]): string =>
+      JSON.stringify({ chart_id: ids[0], extra: ids.slice(1).map(id => ({ chart_id: id })) }, null, 2)
+
+    function charts(fetchPng: (id: string) => Promise<Buffer> = id => Promise.resolve(Buffer.from(`png-${id.slice(0, 1)}`))) {
+      const fetcher = { fetchPng: vi.fn(fetchPng) }
+      const delivery: ChartDelivery = {
+        fetcher: fetcher as unknown as ChartFetcher,
+        toolNames: new Set([CHART_TOOL]),
+        maxPerReply: 2,
+        failureNotice: 'chart failed',
+      }
+      return { delivery, fetcher }
+    }
+
+    async function run(behavior: AgentBehavior, client = new Client(), chartDelivery = charts()) {
+      const test = harness({ behavior: { output: 'table', ...behavior }, client, charts: chartDelivery.delivery })
+      await test.runtime.start()
+      test.client.emitText(frame())
+      await waitForDelivery(test.domain, behavior.reason?.kind === 'error' ? 'failed' : 'completed')
+      return { test, fetcher: chartDelivery.fetcher }
+    }
+
+    it('sends the chart after the final text frame on the same inbound frame', async () => {
+      const client = new Client()
+      const order: string[] = []
+      const replyStream = client.replyStream.bind(client)
+      client.replyStream = async (...args) => { order.push(`stream:${args[3]}`); await replyStream(...args) }
+      const uploadImage = client.uploadImage.bind(client)
+      client.uploadImage = async (...args) => { order.push('upload'); return await uploadImage(...args) }
+      const { test, fetcher } = await run({ toolEvents: [{ callId: 'c1', name: CHART_TOOL, text: result(A) }] }, client)
+      expect(fetcher.fetchPng).toHaveBeenCalledWith(A, expect.any(AbortSignal))
+      expect(test.client.media).toEqual(['upload:chart-aaaaaaaa.png:png-a', 'reply:media-1'])
+      expect(order).toEqual(['stream:false', 'stream:true', 'upload'])
+      expect(test.client.sends).toEqual([])
+    })
+
+    it('ignores failed calls, other tools, other turns, and an unconfigured channel', async () => {
+      const { test, fetcher } = await run({ toolEvents: [
+        { callId: 'c1', name: CHART_TOOL, text: result(A), isError: true },
+        { callId: 'c2', name: 'mcp__bssh-ops-remote__db_run_query', text: result(B) },
+        { callId: 'c3', name: CHART_TOOL, text: result(C), turn: 2 },
+      ] })
+      expect(fetcher.fetchPng).not.toHaveBeenCalled()
+      expect(test.client.media).toEqual([])
+
+      const plain = harness({ behavior: { output: 'table', toolEvents: [{ callId: 'c1', name: CHART_TOOL, text: result(A) }] } })
+      await plain.runtime.start()
+      plain.client.emitText(frame())
+      await waitForDelivery(plain.domain, 'completed')
+      expect(plain.client.media).toEqual([])
+    })
+
+    it('dedupes repeated ids and keeps only the most recent charts', async () => {
+      const { fetcher } = await run({ toolEvents: [
+        { callId: 'c1', name: CHART_TOOL, text: result(A, B) },
+        { callId: 'c2', name: CHART_TOOL, text: result(C, A) },
+      ] })
+      expect(fetcher.fetchPng.mock.calls.map(call => call[0])).toEqual([C, A])
+    })
+
+    it('falls back to an active image send when the passive reply is refused', async () => {
+      const client = new Client()
+      client.failReplyImage = true
+      const { test } = await run({ toolEvents: [{ callId: 'c1', name: CHART_TOOL, text: result(A) }] }, client)
+      expect(test.client.media).toEqual(['upload:chart-aaaaaaaa.png:png-a', 'reply:media-1', 'send:allowed:media-1'])
+      expect(test.client.sends).toEqual([])
+    })
+
+    it('sends one failure notice and still completes the delivery when a chart cannot be delivered', async () => {
+      const client = new Client()
+      client.failUpload = true
+      const failing = charts(id => id === B ? Promise.reject(new Error('HTTP 404')) : Promise.resolve(Buffer.from('png')))
+      const { test } = await run({ toolEvents: [{ callId: 'c1', name: CHART_TOOL, text: result(A, B) }] }, client, failing)
+      expect(test.client.sends).toEqual([{ target: 'allowed', content: 'chart failed' }])
+      expect([...test.domain.deliveries.records.values()][0]?.reply).toBe('table')
+      expect(test.warnings.mock.calls.map(call => String(call[0])).filter(text => text.includes('chart'))).toHaveLength(2)
+    })
+
+    it('sends no chart when the turn fails', async () => {
+      const { test, fetcher } = await run({
+        reason: { kind: 'error', error: { message: 'model failed' } },
+        toolEvents: [{ callId: 'c1', name: CHART_TOOL, text: result(A) }],
+      })
+      expect(fetcher.fetchPng).not.toHaveBeenCalled()
+      expect(test.client.media).toEqual([])
+    })
   })
 })

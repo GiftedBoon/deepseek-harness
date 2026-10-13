@@ -39,6 +39,7 @@ function config(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     scheduledActions: [], maxScheduledActionsPerConversation: 32,
     maxScheduledActionDelayMs: 1_000_000, scheduledActionTimeoutMs: 1_000,
     scheduledActionUtcOffset: '+08:00',
+    chartAttachments: undefined,
     messages: {
       processing: 'p', timeout: 't', failure: 'f', emptyReply: 'e', unauthorized: 'u', duplicate: 'd',
       scheduledActionSuccess: 'ss', scheduledActionFailure: 'sf', scheduledActionUncertain: 'su',
@@ -69,6 +70,7 @@ function context(options: {
     credentials: {
       resolve: async (value: string) => {
         if (options.missing !== undefined && value.includes(options.missing)) return undefined
+        if (value.includes('MCP_KEY')) return { value: 'mcp-secret' }
         return { value: value.includes('SECRET') ? 'bot-secret' : 'identity-secret' }
       },
     },
@@ -162,5 +164,30 @@ describe('channel-wecom plugin', () => {
     const test = context({ storageFailureAt: 3 })
     await expect(apply(test.ctx as never, config())).rejects.toThrow('storage open failed')
     expect(test.calls).toEqual(expect.arrayContaining(['close-domain-2', 'close-domain-1']))
+  })
+
+  it('resolves chart delivery with its credential and passes it to the runtime', async () => {
+    const chartAttachments = {
+      baseUrl: 'http://charts.test:8095/', apiKeyEnv: 'MCP_KEY', toolNames: ['mcp__x__get_alpha_comparison'],
+      maxPerReply: 3, maxBytes: 1_000, fetchTimeoutMs: 500, failureNotice: 'no chart',
+    }
+    await apply(context().ctx as never, config({ chartAttachments }))
+    const options = mocks.state.runtimes[0]?.options as { charts?: { toolNames: Set<string>; maxPerReply: number; failureNotice: string } }
+    expect(options.charts?.toolNames).toEqual(new Set(['mcp__x__get_alpha_comparison']))
+    expect(options.charts?.maxPerReply).toBe(3)
+    expect(options.charts?.failureNotice).toBe('no chart')
+
+    await apply(context().ctx as never, config())
+    expect((mocks.state.runtimes[1]?.options as { charts?: unknown }).charts).toBeUndefined()
+  })
+
+  it('rejects chart delivery without tools, credential, or an http base', async () => {
+    const base = { baseUrl: 'http://charts.test', apiKeyEnv: 'MCP_KEY', toolNames: ['tool'] }
+    await expect(apply(context().ctx as never, config({ chartAttachments: { ...base, toolNames: [''] } })))
+      .rejects.toThrow(/toolNames/)
+    await expect(apply(context({ missing: 'MCP_KEY' }).ctx as never, config({ chartAttachments: base })))
+      .rejects.toThrow(/MCP_KEY/)
+    await expect(apply(context().ctx as never, config({ chartAttachments: { ...base, baseUrl: 'ftp://charts.test' } })))
+      .rejects.toThrow(/http\(s\)/)
   })
 })
