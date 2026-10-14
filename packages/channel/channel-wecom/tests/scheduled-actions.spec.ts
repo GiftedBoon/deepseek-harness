@@ -47,6 +47,7 @@ function config(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     maxOutboxAttempts: 3, outboxRetentionMs: 604_800_000, maxScheduledActionsPerConversation: 2,
     maxScheduledActionDelayMs: 86_400_000, scheduledActionTimeoutMs: 10_000,
     scheduledActionUtcOffset: '+08:00',
+    chartAttachments: undefined,
     scheduledActions: [{
       id: 'ps_check', description: 'Run the read-only process check.', toolName: 'quick',
       targetArgument: 'colos', targetArgumentFormat: 'singleton-array',

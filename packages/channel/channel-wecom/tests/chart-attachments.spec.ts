@@ -53,11 +53,16 @@ describe('ChartFetcher', () => {
     ['signature', png({}, new Uint8Array(10)), 'not a PNG'],
   ])('rejects a bad %s without leaking the key', async (_name, response, message) => {
     const { instance } = fetcher(response)
-    const error = await instance.fetchPng(ID, new AbortController().signal).catch((failure: unknown) => failure as Error)
+    let error: Error | undefined
+    try {
+      await instance.fetchPng(ID, new AbortController().signal)
+    } catch (failure: unknown) {
+      error = failure as Error
+    }
     expect(error).toBeInstanceOf(Error)
-    expect(error.message).toContain(message)
-    expect(error.message).toContain('chart 01234567')
-    expect(error.message).not.toContain('secret-key')
+    expect(error?.message).toContain(message)
+    expect(error?.message).toContain('chart 01234567')
+    expect(error?.message).not.toContain('secret-key')
   })
 
   it('rejects malformed ids before any request and non-http bases at construction', async () => {

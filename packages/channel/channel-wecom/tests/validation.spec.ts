@@ -11,6 +11,7 @@ const config: ResolvedConfig = {
   outboxRetryIntervalMs: 1, maxOutboxAttempts: 1, outboxRetentionMs: 604_800_000,
   scheduledActions: [], maxScheduledActionsPerConversation: 1, maxScheduledActionDelayMs: 1,
   scheduledActionTimeoutMs: 1, scheduledActionUtcOffset: 'Z',
+  chartAttachments: undefined,
   messages: {
     processing: 'p', timeout: 't', failure: 'f', emptyReply: 'e', unauthorized: 'u', duplicate: 'd',
     scheduledActionSuccess: 'ss', scheduledActionFailure: 'sf', scheduledActionUncertain: 'su',

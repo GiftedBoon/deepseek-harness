@@ -73,6 +73,9 @@ export class TaskClient implements WeComChannelClient {
     this.notifications.push({ target, content })
     return Promise.resolve()
   }
+  uploadImage(): Promise<string> { return Promise.resolve('media') }
+  replyImage(): Promise<void> { return Promise.resolve() }
+  sendImage(): Promise<void> { return Promise.resolve() }
   receive(id: string, text: string, group?: string): void {
     this.listener?.({ headers: { req_id: id }, body: {
       msgid: id, aibotid: 'bot', chattype: group === undefined ? 'single' : 'group', ...group === undefined ? {} : { chatid: group }, from: { userid: 'user' }, msgtype: 'text', text: { content: text },
