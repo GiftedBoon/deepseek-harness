@@ -5,6 +5,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { expect, test } from 'vitest'
+import { load } from 'js-yaml'
 
 const execFileAsync = promisify(execFile)
 const renderScript = resolve(dirname(fileURLToPath(import.meta.url)), '../deployments/trader-ops/scripts/render-wecom-preset.mjs')
@@ -23,6 +24,8 @@ test('renders the minimal WeCom preset when launched through a release symlink',
       'persona', 'tool-skill', 'compaction', 'compaction-basic', 'tool-result-pruner',
     ])
     expect(source).toContain('我是CFI 股票交易组的 AI Agent 智能助手')
+    const plugins = load(source) as Array<{ id: string; config?: { prefix?: string } }>
+    expect(plugins.find(plugin => plugin.id === 'persona')?.config?.prefix).toMatchSnapshot()
     await execFileAsync(process.execPath, [join(current, 'render-wecom-preset.mjs'), '--verify', join(preset, 'preset.cordis.yml')])
   } finally {
     await rm(root, { recursive: true, force: true })
