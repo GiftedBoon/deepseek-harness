@@ -40,7 +40,7 @@ description: Use the bssh_ops MCP server for audited quantitative-trading colo o
 
 用户要求排查具体产品，或 [preopen-watch](../preopen-watch/SKILL.md#停滞后的只读排查) 检出持续待开启产品时，从 `check_daily_preopen` 的 `pending` 按 `NAME` 分组，记录对应 `Colo`。用 `check_process_status` → `get_run_status` 检查该产品策略进程；ps 结果是整机口径，不能把同机其他产品的进程当成该产品已启动。再用 `get_strategy_start_errors(product)` 取得启动报错和每台的 `total_matched` 基线。需要文件上下文时，先用 `list_colo_file_resources` 确认资源，再用 `search_colo_file` 定位行号、`read_colo_file_range` 读取附近行，或用 `stat_colo_file` 检查文件状态；查看 portfolio 参数则用 `download_portfolio_from_colo`。文件接口拒绝访问时停止，不换工具绕过。
 
-修复建议写根因、带 colo/文件/行号的证据、可选方案及各自影响范围。证据不足时说明还缺什么。用户选定方案后才走对应写通道；改参优先用 `preview_change_cfg_paras` → `deploy_change_cfg_paras`，白名单覆盖不到的产品动作走 `preview_product_action` → `execute_product_action`，文件下发遵守下文的 `run_scp` 规则。不得用整机级快捷命令 `start`/`stop` 补救单产品。修复后重新检查进程与预开启状态，并将日志新增的 `total_matched` 与基线比较；旧日志中的 failed 行不会自动消失。
+修复建议写根因、带 colo/文件/行号的证据、可选方案及各自影响范围。证据不足时说明还缺什么。用户选定方案后才走对应写通道；改参用 `preview_change_cfg_paras` → `deploy_change_cfg_paras`，单产品启停和其他产品动作走 `preview_product_action` → `execute_product_action`，文件下发遵守下文的 `run_scp` 规则。不得用整机级快捷命令 `start`/`stop` 补救单产品。修复后重新检查进程与预开启状态，并将日志新增的 `total_matched` 与基线比较；旧日志中的 failed 行不会自动消失。
 
 ## 产品级操作
 
@@ -51,7 +51,7 @@ description: Use the bssh_ops MCP server for audited quantitative-trading colo o
 1. 确认产品名；缺失时提问，不能猜测。
 2. 调用 `preview_product_action`；`syntax_ok` 为 false 时停止。
 3. 向用户展示完整 `colos`、`shell_command`、动作说明、风险以及 1 台或 2 台 colo 的含义。
-4. 取得明确确认后，把 preview 返回的 `confirmed_colos` 和 `confirmed_shell` 原样传给 `execute_product_action`。
+4. 取得明确确认后，把 preview 返回的 `confirmed_colos` 和 `confirmed_shell` 原样传给 `execute_product_action`。只有 [产品重启与重置](../product-restart-reset/SKILL.md) 这类明确要求按机器依次执行的流程，才把 `confirmed_colos` 缩小为预览 colo 中的一台。
 5. 返回 `run_id`、每台 colo 的结果和失败信息，不声称未返回的操作成功。
 
 `stop_signal`、`start_signal`、`stop_trader` 和 `start_trader` 影响整台机器，可能连带同机其他产品，不能当作产品级动作。`product_ops_actions.json` 中的动作每次调用都会重新读取；动作必须确实只影响单个产品，且 `label` 与 `shell_template` 的实际效果一致。`{product}` 只负责模板替换，不证明命令已按产品隔离。
@@ -62,9 +62,11 @@ description: Use the bssh_ops MCP server for audited quantitative-trading colo o
 
 取得用户对完整范围的明确确认后，固定进程检查使用 `check_process_status`；其他快捷命令把完整 `colos` 传给 `prepare_quick_command`，再用返回的 `plan_id` 执行。
 
-## 盘中改参与策略启停
+## 盘中改参
 
-对指定产品执行 `kill`、`start`、`open_t0`、`close_t0` 或其他 `preview_change_cfg_paras` 白名单命令时，优先使用 change-cfg-paras 通道，不使用 `execute_product_action` 或临时 shell。工具参数说明是 rule 结构和 `cmd` 白名单的权威来源；`product_ops_actions.json` 只用于白名单覆盖不到的产品级动作。
+对指定产品执行 `open_t0`、`close_t0` 或其他 `preview_change_cfg_paras` 白名单命令时，使用 change-cfg-paras 通道，不使用 `execute_product_action` 或临时 shell。工具参数说明是 rule 结构和 `cmd` 白名单的权威来源。
+
+单产品的杀策略和启动策略不走该通道，也不使用白名单里的 `kill`、`start`：单产品使用产品动作 `stop product alpha`、`start product alpha`，整台机器使用快捷命令 `stop`、`start`。
 
 `preview_change_cfg_paras` 只解析规则，`deploy_change_cfg_paras` 才会生成当天 cfg、上传跳板机并触发 colo 生效。cfg 是覆盖写入；当天需要一起生效的全部规则必须合并到同一次 `rules` 数组和一次 deploy 中。`curdate` 缺省为今天，不能填写过去的交易日。
 
