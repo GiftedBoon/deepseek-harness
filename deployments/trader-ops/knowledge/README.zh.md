@@ -15,7 +15,7 @@
 
 ## 不应该放在这里
 
-- 要求 Agent 严格逐步执行的任务流程；应写成 `../skills/<name>/SKILL.md`。
+- 要求 Agent 严格逐步执行的任务流程；应写成 `../skills/<name>/SKILL.md`（[Skill 还是 Knowledge 的判断表](../skills/README.zh.md)）。
 - 权限、审批和工具阻断规则；应放在 `../policies/`。
 - 当前策略、当天状态、实时日志等动态数据；应通过 MCP/API 查询。
 - 未审核的临时经验或包含秘密的原始数据。

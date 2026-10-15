@@ -19,6 +19,21 @@ This directory contains skill bundles discovered by Harness. Each direct child d
 - Permission, approval, or risk classification rules; place them in `../policies/` and enforce them on the execution path.
 - Critical steps that require the model to guess from a summary; put every required step in the complete `SKILL.md`.
 
+## Skill or knowledge
+
+Decide by how the content must reach the agent. A skill is loaded completely when a task matches and is followed step by step. Knowledge is retrieved as fragments only when it is relevant and is used as reference.
+
+| Question | Home |
+|---|---|
+| Does it define steps, tool calls, stopping conditions, or a fixed output format that the agent must follow? | Skill |
+| Would the agent skip a step or answer incorrectly if only a retrieved fragment were present? | Skill |
+| Is it a term, field meaning, classification, rule, or system description? | Knowledge |
+| Do several skills depend on the same fact? | Knowledge; each skill states only what it needs and links to the fact |
+| Is it a diagnostic order or recovery guidance for a person? | Knowledge in `../knowledge/runbooks/`; add a skill only when the agent must run it |
+| Does it grant, deny, or approve a tool call? | `../policies/`, never a skill or knowledge entry |
+
+Keep each fact in one home. A value that a tool returns or a table that a tool defines stays in the tool; neither a skill nor a knowledge entry copies it.
+
 ## Skill bundle example
 
 ```text

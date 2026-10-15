@@ -15,7 +15,7 @@ Knowledge entries under `business/`, `systems/`, and `runbooks/` are deployment 
 
 ## What does not belong here
 
-- Task procedures that the agent must follow step by step; write these as `../skills/<name>/SKILL.md`.
+- Task procedures that the agent must follow step by step; write these as `../skills/<name>/SKILL.md` ([Skill or knowledge decision table](../skills/README.md)).
 - Permission, approval, or tool-blocking rules; place these in `../policies/`.
 - Current strategies, today's status, or live logs; query them through MCP or an API.
 - Unreviewed temporary experience or raw data that contains secrets.

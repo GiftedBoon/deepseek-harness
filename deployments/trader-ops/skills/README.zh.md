@@ -19,6 +19,21 @@
 - 仅用于权限、审批或风险分级的规则；放在 `../policies/` 并由执行路径强制实施。
 - 依赖模型从摘要猜测的关键步骤；所有必要步骤必须写入完整 `SKILL.md`。
 
+## Skill 还是 Knowledge
+
+按内容必须以什么方式到达 Agent 来判断。Skill 在任务匹配时完整加载并逐步执行；Knowledge 只在相关时以片段形式被检索，用作参考。
+
+| 问题 | 归属 |
+|---|---|
+| 是否定义了 Agent 必须遵守的步骤、工具调用、停止条件或固定输出格式？ | Skill |
+| 只检索到片段时，Agent 是否会漏步骤或答错？ | Skill |
+| 是术语、字段含义、分类、规则或系统说明吗？ | Knowledge |
+| 多个 Skill 依赖同一事实吗？ | Knowledge；各 Skill 只写自己需要的部分并链接该事实 |
+| 是给人看的诊断顺序或恢复指引吗？ | `../knowledge/runbooks/` 下的 Knowledge；仅当 Agent 必须执行时再增加 Skill |
+| 是否授予、拒绝或审批工具调用？ | `../policies/`，不写入 Skill 或 Knowledge |
+
+每个事实只有一个归属。工具返回的值或由工具定义的表保留在工具中，Skill 和 Knowledge 都不复制。
+
 ## Skill bundle 示例
 
 ```text
