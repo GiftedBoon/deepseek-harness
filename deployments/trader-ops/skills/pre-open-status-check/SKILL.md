@@ -7,7 +7,7 @@ user-invocable: true
 
 # 预开启状态检查
 
-每次手动或定时检查都先在本轮用 `skill` 加载本 Skill，不沿用此前轮次的模板或摘要，再调用 `mcp__bssh-ops-remote__check_daily_preopen`，传 `max_detail_rows=30`。它只读最新一批 `trade.ProductionMonitorData`，不连接 colo；`ready` 只表示检查范围内每行的预开启重置字段都为 0：`PnLratio`、`MV_shortSell`、`MV_net`、`traderUnRealizedTradePnL`、`traderRealizedTradePnL`、`traderTradePnL`、`traderPositionPnL`、`traderTotalPnL`、`traderTradingCost`、`netMVRatio`、`Posratio`、`TradePnLratio` 和 `TradeFeeratio`。任一字段非 0、NULL 或非有限值的行进入 `pending`，其 `nonzero_fields` 列出未归零的字段；只有 `PnLratio` 为 0 不能说明该行已重置。行数与产品数不同，计数以工具汇总字段为准，明细可能截断。不要用 `TimeIsRight` 或 `All` 列替代工具判据，也不要仅凭 `ready` 判断当夜完成。
+每次手动或定时检查都先在本轮用 `skill` 加载本 Skill，不沿用此前轮次的模板或摘要，再调用 `mcp__bssh-ops-remote__check_daily_preopen`，传 `max_detail_rows=30`。它只读最新一批 `trade.ProductionMonitorData`，不连接 colo；`ready` 只表示检查范围内每行的 13 个预开启重置字段（清单见下文“固定输出”的归零检查模板）都为 0。任一字段非 0、NULL 或非有限值的行进入 `pending`，其 `nonzero_fields` 列出未归零的字段；只有 `PnLratio` 为 0 不能说明该行已重置。行数与产品数不同，计数以工具汇总字段为准，明细可能截断。不要用 `TimeIsRight` 或 `All` 列替代工具判据，也不要仅凭 `ready` 判断当夜完成。
 
 ## 判断时间
 
